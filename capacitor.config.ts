@@ -1,4 +1,4 @@
-import type { CapacitorConfig } from '@capacitor/cli'
+/*import type { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
   appId: 'com.safewalk.app',
@@ -31,4 +31,8 @@ const config: CapacitorConfig = {
   }
 }
 
-export default config
+export default config*/
+
+// Este archivo es solo para compilar el APK con Capacitor
+// No se usa en el deploy web de Vercel
+export {}
