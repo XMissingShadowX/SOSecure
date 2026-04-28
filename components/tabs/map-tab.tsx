@@ -132,6 +132,8 @@ export function MapTab() {
       latitude: coordinates.latitude,
       longitude: coordinates.longitude,
     })
+    .select()
+    .single()
     
     if (!error) {
       setNewIncident({
