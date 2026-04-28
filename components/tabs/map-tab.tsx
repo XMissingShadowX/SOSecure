@@ -123,7 +123,7 @@ export function MapTab() {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     
-    const { error } = await supabase.from('incidents').insert({
+    const { data, error } = await supabase.from('incidents').insert({
       user_id: user?.id || null,
       title: newIncident.title,
       description: newIncident.description || null,
