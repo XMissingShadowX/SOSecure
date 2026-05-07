@@ -1,50 +1,50 @@
-# SafeWalk — Personal Safety App
+# SafeWalk — Aplicación de Seguridad Personal
 
-> Emergency SOS • Community Incident Map • Safe Routes • AI Paramedic
+> SOS de Emergencia • Mapa Comunitario de Incidentes • Rutas Seguras • Paramédico con IA
 
 ---
 
-## Features
+## Funcionalidades
 
-| Feature | Description |
+| Funcionalidad | Descripción |
 |---|---|
-| 🆘 SOS Hold-to-Activate | Hold 2 seconds → calls 3 contacts, sends GPS SMS, records 10s video |
-| 🗺️ Community Incident Map | Real-time Leaflet map with color-coded zones (red=assault, amber=suspicious) |
-| 🛣️ Safe Route Suggestions | 1-3 alternative routes avoiding danger zones with safety scores |
-| 🤖 AI Paramedic Chat | Claude-powered first aid assistant with offline fallback instructions |
-| 👤 Auth & Contact Management | Supabase auth, up to 3 emergency contacts |
+| 🆘 SOS con Pulsación Prolongada | Mantén 2 segundos → llama a 3 contactos, envía SMS con GPS, graba 10s de video |
+| 🗺️ Mapa Comunitario de Incidentes | Mapa en tiempo real con Leaflet y zonas por colores (rojo=asalto, ámbar=sospechoso) |
+| 🛣️ Sugerencias de Rutas Seguras | 1-3 rutas alternativas evitando zonas de peligro con puntuaciones de seguridad |
+| 🤖 Chat Paramédico con IA | Asistente de primeros auxilios impulsado por Claude con instrucciones offline de respaldo |
+| 👤 Autenticación y Gestión de Contactos | Autenticación con Supabase, hasta 3 contactos de emergencia |
 
 ---
 
-## Stack
+## Stack Tecnológico
 
-- **Frontend**: Next.js 15 (App Router, static export) + Tailwind CSS v4 + shadcn/ui
-- **State**: Zustand (persisted)
-- **Map**: Leaflet + react-leaflet (OpenStreetMap / CartoDB Dark)
-- **Backend**: Supabase (auth + postgres + realtime)
-- **AI**: Anthropic Claude (claude-haiku-4-5)
-- **Mobile**: Capacitor v6
+- **Frontend**: Next.js 15 (App Router, exportación estática) + Tailwind CSS v4 + shadcn/ui
+- **Estado**: Zustand (persistido)
+- **Mapa**: Leaflet + react-leaflet (OpenStreetMap / CartoDB Dark)
+- **Backend**: Supabase (autenticación + postgres + tiempo real)
+- **IA**: Anthropic Claude (claude-haiku-4-5)
+- **Móvil**: Capacitor v6
 
 ---
 
-## Environment Variables
+## Variables de Entorno
 
-Create `.env.local`:
+Crea un archivo `.env.local`:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-NEXT_PUBLIC_ANTHROPIC_API_KEY=your-anthropic-key
+NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=tu-clave-anonima
+NEXT_PUBLIC_ANTHROPIC_API_KEY=tu-clave-anthropic
 ```
 
 ---
 
-## Supabase Schema
+## Esquema de Supabase
 
-Run this SQL in your Supabase project:
+Ejecuta este SQL en tu proyecto de Supabase:
 
 ```sql
--- Emergency contacts
+-- Contactos de emergencia
 create table emergency_contacts (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade,
@@ -55,10 +55,10 @@ create table emergency_contacts (
   created_at timestamptz default now()
 );
 alter table emergency_contacts enable row level security;
-create policy "Users manage own contacts" on emergency_contacts
+create policy "Los usuarios gestionan sus propios contactos" on emergency_contacts
   for all using (auth.uid() = user_id);
 
--- SOS alerts
+-- Alertas SOS
 create table sos_alerts (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade,
@@ -70,10 +70,10 @@ create table sos_alerts (
   resolved_at timestamptz
 );
 alter table sos_alerts enable row level security;
-create policy "Users manage own alerts" on sos_alerts
+create policy "Los usuarios gestionan sus propias alertas" on sos_alerts
   for all using (auth.uid() = user_id);
 
--- Community incidents
+-- Incidentes comunitarios
 create table incidents (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete set null,
@@ -88,111 +88,111 @@ create table incidents (
   resolved_at timestamptz
 );
 alter table incidents enable row level security;
-create policy "Anyone can read active incidents" on incidents
+create policy "Cualquiera puede leer incidentes activos" on incidents
   for select using (is_active = true);
-create policy "Auth users can insert" on incidents
+create policy "Usuarios autenticados pueden insertar" on incidents
   for insert with check (auth.uid() is not null);
-create policy "Users can update own" on incidents
+create policy "Los usuarios pueden actualizar los suyos" on incidents
   for update using (auth.uid() = user_id);
 ```
 
 ---
 
-## Build & Deploy (Web)
+## Compilación y Despliegue (Web)
 
 ```bash
 npm install
 npm run build
-# Static files output to /out directory
+# Los archivos estáticos se generan en el directorio /out
 ```
 
 ---
 
-## Build APK (Android)
+## Compilación del APK (Android)
 
-### Prerequisites
+### Requisitos Previos
 - Node.js 18+
 - Java JDK 17+
-- Android Studio (with SDK 34+)
+- Android Studio (con SDK 34+)
 - Gradle
 
-### Steps
+### Pasos
 
 ```bash
-# 1. Install dependencies
+# 1. Instalar dependencias
 npm install
 
-# 2. Install Capacitor
+# 2. Instalar Capacitor
 npm install @capacitor/core @capacitor/cli @capacitor/android
 npm install @capacitor/geolocation @capacitor/haptics @capacitor/splash-screen
 
-# 3. Build the Next.js static export
+# 3. Compilar la exportación estática de Next.js
 npm run build
-# This creates the /out directory
+# Esto crea el directorio /out
 
-# 4. Add Android platform
+# 4. Agregar la plataforma Android
 npx cap add android
 
-# 5. Sync web assets to Android
+# 5. Sincronizar los archivos web con Android
 npx cap sync android
 
-# 6. Open in Android Studio
+# 6. Abrir en Android Studio
 npx cap open android
 
-# 7. In Android Studio: Build > Build Bundle(s)/APK(s) > Build APK(s)
-#    APK will be at: android/app/build/outputs/apk/debug/app-debug.apk
+# 7. En Android Studio: Build > Build Bundle(s)/APK(s) > Build APK(s)
+#    El APK estará en: android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-### One-liner (after Android Studio setup)
+### Comando único (después de configurar Android Studio)
 ```bash
 npm run build && npx cap sync android && cd android && ./gradlew assembleDebug
-# Output: android/app/build/outputs/apk/debug/app-debug.apk
+# Salida: android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
 ---
 
-## Android Permissions (auto-added by Capacitor)
+## Permisos de Android (agregados automáticamente por Capacitor)
 
-The following are added to `AndroidManifest.xml` automatically:
-- `ACCESS_FINE_LOCATION` — GPS tracking
-- `ACCESS_COARSE_LOCATION` — Network location
-- `CAMERA` — 10-second video recording on SOS
-- `VIBRATE` — Haptic feedback on SOS
-- `RECEIVE_BOOT_COMPLETED` — Background services
+Los siguientes permisos se añaden al `AndroidManifest.xml` de forma automática:
+- `ACCESS_FINE_LOCATION` — Rastreo GPS
+- `ACCESS_COARSE_LOCATION` — Ubicación por red
+- `CAMERA` — Grabación de video de 10 segundos al activar SOS
+- `VIBRATE` — Vibración háptica al activar SOS
+- `RECEIVE_BOOT_COMPLETED` — Servicios en segundo plano
 
 ---
 
-## Project Structure
+## Estructura del Proyecto
 
 ```
 safewalk/
 ├── app/
-│   ├── page.tsx              # Home (client-side auth check)
-│   ├── globals.css           # Dark theme CSS variables
-│   ├── layout.tsx            # Root layout + PWA meta
+│   ├── page.tsx              # Inicio (verificación de autenticación en cliente)
+│   ├── globals.css           # Variables CSS del tema oscuro
+│   ├── layout.tsx            # Layout raíz + metadatos PWA
 │   └── auth/
 │       ├── login/page.tsx
 │       ├── sign-up/page.tsx
 │       └── callback/page.tsx
 ├── components/
-│   ├── app-shell.tsx         # Main shell with header + navigation
-│   ├── sos-button.tsx        # Hold-to-activate SOS button
+│   ├── app-shell.tsx         # Shell principal con encabezado y navegación
+│   ├── sos-button.tsx        # Botón SOS con activación por pulsación prolongada
 │   ├── bottom-navigation.tsx
-│   ├── incident-map.tsx      # Leaflet map component
+│   ├── incident-map.tsx      # Componente del mapa con Leaflet
 │   └── tabs/
-│       ├── home-tab.tsx      # Status + contacts management
-│       ├── map-tab.tsx       # Community incident map
-│       ├── routes-tab.tsx    # Safe route planner
-│       └── medic-tab.tsx     # AI Paramedic chat
+│       ├── home-tab.tsx      # Estado + gestión de contactos
+│       ├── map-tab.tsx       # Mapa comunitario de incidentes
+│       ├── routes-tab.tsx    # Planificador de rutas seguras
+│       └── medic-tab.tsx     # Chat paramédico con IA
 ├── lib/
-│   ├── store.ts              # Zustand global state
-│   ├── types.ts              # TypeScript types
-│   ├── utils.ts              # cn() helper
+│   ├── store.ts              # Estado global con Zustand
+│   ├── types.ts              # Tipos de TypeScript
+│   ├── utils.ts              # Helper cn()
 │   └── supabase/
-│       ├── client.ts         # Browser Supabase client
-│       └── server.ts         # Server Supabase client
+│       ├── client.ts         # Cliente Supabase para el navegador
+│       └── server.ts         # Cliente Supabase para el servidor
 ├── hooks/
-│   └── use-geolocation.ts    # GPS hook with watch mode
-├── capacitor.config.ts       # Capacitor APK config
-└── next.config.ts            # Static export config
+│   └── use-geolocation.ts    # Hook de GPS con modo watch
+├── capacitor.config.ts       # Configuración de Capacitor para APK
+└── next.config.ts            # Configuración de exportación estática
 ```
