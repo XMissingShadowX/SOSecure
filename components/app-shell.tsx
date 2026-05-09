@@ -39,12 +39,22 @@ export function AppShell() {
 }, [])
 
   const applyTheme = (theme: string) => {
-    const isDarkTheme = theme === 'dark'
-    document.documentElement.className = theme
-    document.body.style.backgroundColor = isDarkTheme ? 'oklch(0.13 0.01 260)' : 'oklch(0.98 0.005 260)'
-    document.body.style.color = isDarkTheme ? 'oklch(0.95 0.01 260)' : 'oklch(0.15 0.01 260)'
-    localStorage.setItem('safewalk-theme', theme)
-  }
+  const isDarkTheme = theme === 'dark'
+  const bg = isDarkTheme ? 'oklch(0.13 0.01 260)' : 'oklch(0.98 0.005 260)'
+  const fg = isDarkTheme ? 'oklch(0.95 0.01 260)' : 'oklch(0.15 0.01 260)'
+  
+  document.documentElement.className = theme
+  document.body.style.backgroundColor = bg
+  document.body.style.color = fg
+
+  // Forzar fondo en todos los elementos con bg fijo
+  document.querySelectorAll<HTMLElement>('.bg-background, .min-h-screen, header').forEach(el => {
+    el.style.backgroundColor = bg
+    el.style.color = fg
+  })
+
+  localStorage.setItem('safewalk-theme', theme)
+}
 
   const toggleTheme = () => {
     const next = isDark ? 'light' : 'dark'
