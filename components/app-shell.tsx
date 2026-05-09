@@ -31,7 +31,7 @@ export function AppShell() {
   const { coordinates } = useGeolocation({ watch: true })
   const [user, setUser] = useState<User | null>(null)
   const [isOnline, setIsOnline] = useState(true)
-  const { theme, setTheme } = useTheme()
+  const { resolvedTheme, setTheme } = useTheme()
 
   useEffect(() => {
     if (coordinates) {
@@ -117,10 +117,10 @@ export function AppShell() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
                 aria-label="Cambiar tema"
               >
-                {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                {resolvedTheme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </Button>
 
               <DropdownMenu>
