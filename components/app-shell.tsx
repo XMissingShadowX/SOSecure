@@ -33,14 +33,22 @@ export function AppShell() {
   const [isDark, setIsDark] = useState(true)
 
   useEffect(() => {
-    const saved = localStorage.getItem('safewalk-theme') || 'dark'
-    setIsDark(saved === 'dark')
-  }, [])
+  const saved = localStorage.getItem('safewalk-theme') || 'dark'
+  applyTheme(saved)
+  setIsDark(saved === 'dark')
+}, [])
+
+  const applyTheme = (theme: string) => {
+    const isDarkTheme = theme === 'dark'
+    document.documentElement.className = theme
+    document.body.style.backgroundColor = isDarkTheme ? 'oklch(0.13 0.01 260)' : 'oklch(0.98 0.005 260)'
+    document.body.style.color = isDarkTheme ? 'oklch(0.95 0.01 260)' : 'oklch(0.15 0.01 260)'
+    localStorage.setItem('safewalk-theme', theme)
+  }
 
   const toggleTheme = () => {
     const next = isDark ? 'light' : 'dark'
-    document.documentElement.className = next
-    localStorage.setItem('safewalk-theme', next)
+    applyTheme(next)
     setIsDark(!isDark)
   }
 
