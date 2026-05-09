@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useTheme } from 'next-themes'
 import { useAppStore } from '@/lib/store'
 import { useGeolocation } from '@/hooks/use-geolocation'
 import { createClient } from '@/lib/supabase/client'
@@ -14,7 +15,7 @@ import { MedicTab } from './tabs/medic-tab'
 import { BeforeTab } from './tabs/before-tab'
 import { DuringTab } from './tabs/during-tab'
 import { AfterTab } from './tabs/after-tab'
-import { Shield, Settings, LogOut, BellRing, WifiOff } from 'lucide-react'
+import { Shield, Settings, LogOut, BellRing, WifiOff, Sun, Moon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -30,6 +31,7 @@ export function AppShell() {
   const { coordinates } = useGeolocation({ watch: true })
   const [user, setUser] = useState<User | null>(null)
   const [isOnline, setIsOnline] = useState(true)
+  const { theme, setTheme } = useTheme()
 
   useEffect(() => {
     if (coordinates) {
@@ -110,27 +112,39 @@ export function AppShell() {
               )}
             </div>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <Settings className="w-5 h-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {user && (
-                  <>
-                    <DropdownMenuItem className="text-xs text-muted-foreground">
-                      {user.email}
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                  </>
-                )}
-                <DropdownMenuItem onClick={handleSignOut}>
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Cerrar sesión
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-1">
+              {/* Theme toggle */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                aria-label="Cambiar tema"
+              >
+                {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              </Button>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <Settings className="w-5 h-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {user && (
+                    <>
+                      <DropdownMenuItem className="text-xs text-muted-foreground">
+                        {user.email}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+                  <DropdownMenuItem onClick={handleSignOut}>
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Cerrar sesión
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </header>
 
