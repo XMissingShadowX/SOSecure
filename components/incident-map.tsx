@@ -1,13 +1,12 @@
 'use client'
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { useAppStore } from '@/lib/store'
 import type { Incident, Coordinates } from '@/lib/types'
 import 'leaflet/dist/leaflet.css'
 
-// Fix Leaflet default marker icons
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: () => string })._getIconUrl
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
@@ -15,7 +14,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 })
 
-// Custom marker icons
 const createIcon = (color: string) => new L.DivIcon({
   className: 'custom-marker',
   html: `
@@ -57,12 +55,12 @@ const severityColors: Record<string, string> = {
 }
 
 const incidentTypeLabels: Record<string, string> = {
-  theft: 'Theft',
-  assault: 'Assault',
-  harassment: 'Harassment',
-  suspicious: 'Suspicious Activity',
-  accident: 'Accident',
-  other: 'Other',
+  theft: 'Robo',
+  assault: 'Asalto',
+  harassment: 'Acoso',
+  suspicious: 'Actividad sospechosa',
+  accident: 'Accidente',
+  other: 'Otro',
 }
 
 interface MapUpdaterProps {
@@ -72,11 +70,9 @@ interface MapUpdaterProps {
 
 function MapUpdater({ center, zoom }: MapUpdaterProps) {
   const map = useMap()
-  
   useEffect(() => {
     map.setView([center.latitude, center.longitude], zoom)
   }, [map, center, zoom])
-  
   return null
 }
 
@@ -87,29 +83,41 @@ interface IncidentMapProps {
   showHeatZones?: boolean
 }
 
-export function IncidentMap({ 
-  incidents, 
-  userLocation, 
-  onMapClick,
-  showHeatZones = true 
-}: IncidentMapProps) {
-  const { mapCenter, mapZoom, setMapCenter, setMapZoom } = useAppStore()
+export function IncidentMap({ incidents, userLocation, onMapClick, showHeatZones = true }: IncidentMapProps) {
+  const { mapCenter, mapZoom } = useAppStore()
+
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window === 'undefined') return true
+    return document.documentElement.className === 'dark'
+  })
+  const [tileKey, setTileKey] = useState(Date.now())
+
+  useEffect(() => {
+    const updateTheme = () => {
+      const dark = document.documentElement.className === 'dark'
+      setIsDark(dark)
+      setTileKey(Date.now())
+    }
+    updateTheme()
+    const observer = new MutationObserver(updateTheme)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [])
+
+  const tileUrl = isDark
+    ? 'https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png'
 
   const center = useMemo(() => {
-    if (userLocation) {
-      return userLocation
-    }
+    if (userLocation) return userLocation
     return mapCenter
   }, [userLocation, mapCenter])
 
-  // Group incidents by proximity for heat zones
   const heatZones = useMemo(() => {
     if (!showHeatZones) return []
-    
-    const highSeverity = incidents.filter(i => i.severity === 'high')
-    return highSeverity.map(incident => ({
+    return incidents.filter(i => i.severity === 'high').map(incident => ({
       center: [incident.latitude, incident.longitude] as [number, number],
-      radius: 200, // 200 meters
+      radius: 200,
       color: '#ef4444',
     }))
   }, [incidents, showHeatZones])
@@ -122,43 +130,41 @@ export function IncidentMap({
       zoomControl={false}
       attributionControl={false}
     >
-      <TileLayer
-        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-      />
-      
+      {isDark ? (
+        <TileLayer
+          key="dark-tiles"
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          attribution='&copy; OpenStreetMap'
+        />
+      ) : (
+        <TileLayer
+          key="light-tiles"
+          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+          attribution='&copy; OpenStreetMap'
+        />
+      )}
+
       <MapUpdater center={center} zoom={mapZoom} />
-      
-      {/* Heat zones for high severity areas */}
+
       {heatZones.map((zone, index) => (
         <Circle
           key={`zone-${index}`}
           center={zone.center}
           radius={zone.radius}
-          pathOptions={{
-            color: zone.color,
-            fillColor: zone.color,
-            fillOpacity: 0.2,
-            weight: 1,
-          }}
+          pathOptions={{ color: zone.color, fillColor: zone.color, fillOpacity: 0.2, weight: 1 }}
         />
       ))}
-      
-      {/* User location marker */}
+
       {userLocation && (
-        <Marker
-          position={[userLocation.latitude, userLocation.longitude]}
-          icon={userIcon}
-        >
+        <Marker position={[userLocation.latitude, userLocation.longitude]} icon={userIcon}>
           <Popup>
             <div className="text-center p-1">
-              <strong>You are here</strong>
+              <strong>Estás aquí</strong>
             </div>
           </Popup>
         </Marker>
       )}
-      
-      {/* Incident markers */}
+
       {incidents.map((incident) => (
         <Marker
           key={incident.id}
@@ -168,21 +174,12 @@ export function IncidentMap({
           <Popup>
             <div className="p-2 min-w-[200px]">
               <div className="flex items-center gap-2 mb-2">
-                <span 
-                  className="w-3 h-3 rounded-full"
-                  style={{ background: severityColors[incident.severity] }}
-                />
+                <span className="w-3 h-3 rounded-full" style={{ background: severityColors[incident.severity] }} />
                 <strong className="text-sm">{incident.title}</strong>
               </div>
-              <p className="text-xs text-gray-600 mb-1">
-                {incidentTypeLabels[incident.incident_type]}
-              </p>
-              {incident.description && (
-                <p className="text-xs text-gray-500 mb-2">{incident.description}</p>
-              )}
-              <p className="text-xs text-gray-400">
-                {new Date(incident.reported_at).toLocaleString()}
-              </p>
+              <p className="text-xs text-gray-600 mb-1">{incidentTypeLabels[incident.incident_type]}</p>
+              {incident.description && <p className="text-xs text-gray-500 mb-2">{incident.description}</p>}
+              <p className="text-xs text-gray-400">{new Date(incident.reported_at).toLocaleString()}</p>
             </div>
           </Popup>
         </Marker>

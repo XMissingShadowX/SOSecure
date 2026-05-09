@@ -189,3 +189,21 @@ html.light {
 .recording-indicator {
   animation: recording-blink 1s ease-in-out infinite;
 }
+
+/* Forzar uso de variables CSS en elementos clave */
+.bg-background { background-color: var(--background) !important; }
+.bg-card { background-color: var(--card) !important; }
+.bg-muted { background-color: var(--muted) !important; }
+.bg-popover { background-color: var(--popover) !important; }
+.bg-secondary { background-color: var(--secondary) !important; }
+.bg-accent { background-color: var(--accent) !important; }
+.text-foreground { color: var(--foreground) !important; }
+.text-card-foreground { color: var(--card-foreground) !important; }
+.text-muted-foreground { color: var(--muted-foreground) !important; }
+.border-border { border-color: var(--border) !important; }
+
+/* Mapa modo claro — tiles naturales */
+html.light .leaflet-container img,
+html.light .leaflet-tile {
+  filter: none !important;
+}

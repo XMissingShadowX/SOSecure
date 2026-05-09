@@ -32,32 +32,45 @@ export function AppShell() {
   const [isOnline, setIsOnline] = useState(true)
   const [isDark, setIsDark] = useState(true)
 
-  useEffect(() => {
-  const saved = localStorage.getItem('safewalk-theme') || 'dark'
-  applyTheme(saved)
-  setIsDark(saved === 'dark')
-}, [])
-
   const applyTheme = (theme: string) => {
-  const isDarkTheme = theme === 'dark'
-  const bg = isDarkTheme ? 'oklch(0.13 0.01 260)' : 'oklch(0.98 0.005 260)'
-  const fg = isDarkTheme ? 'oklch(0.95 0.01 260)' : 'oklch(0.15 0.01 260)'
-  
-  document.documentElement.className = theme
-  document.body.style.backgroundColor = bg
-  document.body.style.color = fg
+    const isDarkTheme = theme === 'dark'
+    const bg = isDarkTheme ? 'oklch(0.13 0.01 260)' : 'oklch(0.98 0.005 260)'
+    const fg = isDarkTheme ? 'oklch(0.95 0.01 260)' : 'oklch(0.15 0.01 260)'
+    const card = isDarkTheme ? 'oklch(0.17 0.01 260)' : 'oklch(1 0 0)'
+    const border = isDarkTheme ? 'oklch(0.28 0.02 260)' : 'oklch(0.90 0.01 260)'
+    const muted = isDarkTheme ? 'oklch(0.22 0.02 260)' : 'oklch(0.95 0.01 260)'
 
-  // Forzar fondo en todos los elementos con bg fijo
-  document.querySelectorAll<HTMLElement>('.bg-background, .min-h-screen, header').forEach(el => {
-    el.style.backgroundColor = bg
-    el.style.color = fg
-  })
+    document.body.style.backgroundColor = bg
+    document.body.style.color = fg
 
-  localStorage.setItem('safewalk-theme', theme)
-}
+    document.querySelectorAll<HTMLElement>('.bg-background, .min-h-screen, header').forEach(el => {
+      el.style.backgroundColor = bg
+      el.style.color = fg
+    })
+
+    document.querySelectorAll<HTMLElement>('.bg-card, [class*="card"]').forEach(el => {
+      // No tocar el contenedor del mapa
+      if (el.classList.contains('leaflet-container') || el.closest('.leaflet-container')) return
+      el.style.backgroundColor = card
+      el.style.color = fg
+      el.style.borderColor = border
+    })
+
+    document.querySelectorAll<HTMLElement>('.bg-muted, [class*="muted"]').forEach(el => {
+      el.style.backgroundColor = muted
+    })
+  }
+
+  useEffect(() => {
+    const saved = localStorage.getItem('safewalk-theme') || 'dark'
+    setIsDark(saved === 'dark')
+    applyTheme(saved)
+  }, [])
 
   const toggleTheme = () => {
     const next = isDark ? 'light' : 'dark'
+    document.documentElement.className = next
+    localStorage.setItem('safewalk-theme', next)
     applyTheme(next)
     setIsDark(!isDark)
   }
@@ -121,7 +134,6 @@ export function AppShell() {
   return (
     <PermissionGate>
       <div className="min-h-screen bg-background flex flex-col">
-        {/* Header */}
         <header className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border safe-area-top">
           <div className="flex items-center justify-between h-14 px-4 max-w-lg mx-auto">
             <div className="flex items-center gap-2">
@@ -176,7 +188,6 @@ export function AppShell() {
           </div>
         </header>
 
-        {/* Main Content */}
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-lg mx-auto px-4 py-4">
             {activeTab === 'home' && <HomeTab />}

@@ -62,6 +62,18 @@ const severityLevels: { value: IncidentSeverity; label: string; color: string }[
 
 export function MapTab() {
   const { coordinates } = useGeolocation({ watch: true })
+  const [mapTheme, setMapTheme] = useState(() => {
+    if (typeof window === 'undefined') return 'dark'
+    return document.documentElement.className === 'dark' ? 'dark' : 'light'
+  })
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setMapTheme(document.documentElement.className === 'dark' ? 'dark' : 'light')
+    })
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [])
   const { nearbyIncidents, setNearbyIncidents, currentLocation, addToOfflineQueue, offlineQueue } = useAppStore()
   const [showReportDialog, setShowReportDialog] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -207,12 +219,12 @@ export function MapTab() {
             </div>
           </div>
         ) : (
-          <IncidentMap incidents={filteredIncidents} userLocation={currentLocation || coordinates || null} showHeatZones={true} />
+          <IncidentMap key={mapTheme} incidents={filteredIncidents} userLocation={currentLocation || coordinates || null} showHeatZones={true} />
         )}
 
         {/* Map controls overlay */}
         <div className="absolute top-3 right-3 z-[1000] flex flex-col gap-2">
-          <Button size="icon" variant="secondary" className="shadow-lg" onClick={handleRefresh} disabled={refreshing}>
+          <Button size="icon" variant="secondary" className="shadow-lg bg-card text-foreground border border-border hover:bg-muted" onClick={handleRefresh} disabled={refreshing}>
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>
         </div>
