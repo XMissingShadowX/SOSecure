@@ -138,7 +138,7 @@ export function AppShell() {
           <div className="flex items-center justify-between h-14 px-4 max-w-lg mx-auto">
             <div className="flex items-center gap-2">
               <Shield className="w-6 h-6 text-primary" />
-              <span className="font-bold text-lg">SafeWalk</span>
+              <span className="font-bold text-lg">SOSecure</span>
               {!isOnline && (
                 <div className="flex items-center gap-1 px-2 py-0.5 bg-warning/20 rounded-full">
                   <WifiOff className="w-3 h-3 text-warning" />

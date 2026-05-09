@@ -6,14 +6,14 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'SafeWalk - Personal Safety App',
+  title: 'SOSecure - Personal Safety App',
   description: 'Your personal safety companion with SOS alerts, community crime mapping, safe route planning, and AI-powered emergency assistance.',
   generator: 'v0.app',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'SafeWalk',
+    title: 'SOSecure',
   },
   icons: {
     icon: [

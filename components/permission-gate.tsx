@@ -42,7 +42,7 @@ export function PermissionGate({ children }: PermissionGateProps) {
           <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center">
             <Shield className="w-10 h-10 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold">SafeWalk necesita permisos</h1>
+          <h1 className="text-2xl font-bold">SOSecure necesita permisos</h1>
           <p className="text-sm text-muted-foreground text-center">
             Para protegerte correctamente, necesitamos acceso a los siguientes permisos:
           </p>
