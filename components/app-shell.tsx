@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useTheme } from 'next-themes'
 import { useAppStore } from '@/lib/store'
 import { useGeolocation } from '@/hooks/use-geolocation'
 import { createClient } from '@/lib/supabase/client'
@@ -31,7 +30,19 @@ export function AppShell() {
   const { coordinates } = useGeolocation({ watch: true })
   const [user, setUser] = useState<User | null>(null)
   const [isOnline, setIsOnline] = useState(true)
-  const { resolvedTheme, setTheme } = useTheme()
+  const [isDark, setIsDark] = useState(true)
+
+  useEffect(() => {
+    const saved = localStorage.getItem('safewalk-theme') || 'dark'
+    setIsDark(saved === 'dark')
+  }, [])
+
+  const toggleTheme = () => {
+    const next = isDark ? 'light' : 'dark'
+    document.documentElement.className = next
+    localStorage.setItem('safewalk-theme', next)
+    setIsDark(!isDark)
+  }
 
   useEffect(() => {
     if (coordinates) {
@@ -113,14 +124,13 @@ export function AppShell() {
             </div>
 
             <div className="flex items-center gap-1">
-              {/* Theme toggle */}
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+                onClick={toggleTheme}
                 aria-label="Cambiar tema"
               >
-                {resolvedTheme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </Button>
 
               <DropdownMenu>
@@ -161,10 +171,7 @@ export function AppShell() {
           </div>
         </main>
 
-        {/* SOS Button */}
         <SOSButton />
-
-        {/* Bottom Navigation */}
         <BottomNavigation />
       </div>
     </PermissionGate>
