@@ -1,13 +1,19 @@
 'use client'
-
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Mic, MicOff, Video, VideoOff, AlertTriangle, WifiOff, Wifi, Radio } from 'lucide-react'
+import { Mic, MicOff, Video, VideoOff, AlertTriangle, WifiOff, Wifi, Radio, Save, Send, Upload, CheckCircle } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { useGeolocation } from '@/hooks/use-geolocation'
 import { sendAlarmNotification, playAlarmSound } from '@/lib/notifications'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import {
+  saveRecordingLocally,
+  sendRecordingToContacts,
+  uploadRecordingToDB,
+  generateRecordingId,
+  type RecordingMeta,
+} from '@/lib/recordings'
 
 export function DuringTab() {
   const { sosActive, setSosActive, contacts, locationHistory } = useAppStore()
