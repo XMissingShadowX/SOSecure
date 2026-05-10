@@ -1,4 +1,4 @@
-# SafeWalk — Aplicación de Seguridad Personal
+# SOSecure — Aplicación de Seguridad Personal
 
 > SOS de Emergencia • Mapa Comunitario de Incidentes • Rutas Seguras • Paramédico con IA
 

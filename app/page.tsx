@@ -30,7 +30,7 @@ export default function HomePage() {
           <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center">
             <Shield className="w-10 h-10 text-primary animate-pulse" />
           </div>
-          <p className="text-muted-foreground text-sm">Loading SafeWalk...</p>
+          <p className="text-muted-foreground text-sm">Loading SOSecure...</p>
         </div>
       </div>
     )
@@ -44,7 +44,7 @@ export default function HomePage() {
             <div className="w-20 h-20 rounded-3xl bg-primary/20 flex items-center justify-center">
               <Shield className="w-12 h-12 text-primary" />
             </div>
-            <h1 className="text-3xl font-bold">SafeWalk</h1>
+            <h1 className="text-3xl font-bold">SOSecure</h1>
             <p className="text-muted-foreground">Your personal safety companion</p>
           </div>
           <div className="flex flex-col gap-3">

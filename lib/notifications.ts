@@ -32,7 +32,7 @@ export function sendAlarmNotification(title: string, body: string, urgent = fals
 export function sendSOSNotification(contactName: string, location: { latitude: number; longitude: number }) {
   const mapsUrl = `https://maps.google.com/?q=${location.latitude},${location.longitude}`
   sendAlarmNotification(
-    '🚨 SafeWalk - SOS Activado',
+    '🚨 SOSecure - SOS Activado',
     `Alerta enviada a ${contactName}. Tu ubicación ha sido compartida.`,
     true
   )

@@ -211,3 +211,26 @@ html.light .leaflet-tile {
 .text-primary {
   color: var(--primary) !important;
 }
+
+/* Fix select dropdowns text */
+[role="listbox"],
+[role="option"],
+[role="combobox"] {
+  color: oklch(0.15 0.01 260) !important;
+  background-color: oklch(1 0 0) !important;
+}
+
+html.dark [role="listbox"],
+html.dark [role="option"],
+html.dark [role="combobox"] {
+  color: oklch(0.95 0.01 260) !important;
+  background-color: oklch(0.17 0.01 260) !important;
+}
+
+[role="option"][data-highlighted] {
+  background-color: oklch(0.90 0.01 260) !important;
+}
+
+html.dark [role="option"][data-highlighted] {
+  background-color: oklch(0.25 0.02 260) !important;
+}

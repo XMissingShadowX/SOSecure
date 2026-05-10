@@ -56,7 +56,7 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('push', (event) => {
   const data = event.data ? event.data.json() : {}
   event.waitUntil(
-    self.registration.showNotification(data.title || 'SafeWalk Alert', {
+    self.registration.showNotification(data.title || 'SOSecure Alert', {
       body: data.body || 'Nueva alerta de seguridad',
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-72.png',

@@ -1,6 +1,6 @@
 {
-  "name": "SafeWalk - Personal Safety",
-  "short_name": "SafeWalk",
+  "name": "SOSecure - Personal Safety",
+  "short_name": "SOSecure",
   "description": "Personal safety app with SOS, community map, safe routes, and AI medic",
   "start_url": "/",
   "display": "standalone",

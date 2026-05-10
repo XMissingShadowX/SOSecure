@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { Plus, RefreshCw, AlertTriangle, Filter, ShieldCheck } from 'lucide-react'
+import { Plus, RefreshCw, AlertTriangle, Filter, ShieldCheck, Pencil, Trash2 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { useGeolocation } from '@/hooks/use-geolocation'
 import { createClient } from '@/lib/supabase/client'
@@ -45,7 +45,17 @@ const IncidentMap = dynamic(
   }
 )
 
-const incidentTypes: { value: IncidentType; label: string }[] = [
+const incidentTypes: { value: IncidentType | 'all'; label: string }[] = [
+  { value: 'all', label: 'Todos los tipos' },
+  { value: 'theft', label: 'Robo' },
+  { value: 'assault', label: 'Asalto' },
+  { value: 'harassment', label: 'Acoso' },
+  { value: 'suspicious', label: 'Actividad Sospechosa' },
+  { value: 'accident', label: 'Accidente' },
+  { value: 'other', label: 'Otro' },
+]
+
+const incidentTypesForm: { value: IncidentType; label: string }[] = [
   { value: 'theft', label: 'Robo' },
   { value: 'assault', label: 'Asalto' },
   { value: 'harassment', label: 'Acoso' },
@@ -74,12 +84,17 @@ export function MapTab() {
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
     return () => observer.disconnect()
   }, [])
+
   const { nearbyIncidents, setNearbyIncidents, currentLocation, addToOfflineQueue, offlineQueue } = useAppStore()
   const [showReportDialog, setShowReportDialog] = useState(false)
+  const [showEditDialog, setShowEditDialog] = useState(false)
+  const [editingIncident, setEditingIncident] = useState<Incident | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [filterSeverity, setFilterSeverity] = useState<IncidentSeverity | 'all'>('all')
+  const [filterType, setFilterType] = useState<IncidentType | 'all'>('all')
   const [isOnline, setIsOnline] = useState(true)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
   const [newIncident, setNewIncident] = useState({
     title: '',
@@ -89,6 +104,13 @@ export function MapTab() {
   })
 
   useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setCurrentUserId(user?.id || null)
+    })
+  }, [])
+
+  useEffect(() => {
     const update = () => setIsOnline(navigator.onLine)
     window.addEventListener('online', update)
     window.addEventListener('offline', update)
@@ -96,7 +118,6 @@ export function MapTab() {
     return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update) }
   }, [])
 
-  // Sync offline queue when back online
   useEffect(() => {
     if (isOnline && offlineQueue.length > 0) {
       syncOfflineQueue()
@@ -149,7 +170,6 @@ export function MapTab() {
     if (!newIncident.title || !coordinates) return
 
     if (!isOnline) {
-      // Save locally
       addToOfflineQueue({
         user_id: null,
         title: newIncident.title,
@@ -175,7 +195,7 @@ export function MapTab() {
       severity: newIncident.severity,
       latitude: coordinates.latitude,
       longitude: coordinates.longitude,
-      verified: false,
+      is_verified: false,
     }).select().single()
 
     if (!error) {
@@ -191,7 +211,38 @@ export function MapTab() {
     }
   }
 
-  const filteredIncidents = filterSeverity === 'all' ? nearbyIncidents : nearbyIncidents.filter(i => i.severity === filterSeverity)
+  const handleEdit = (incident: Incident) => {
+    setEditingIncident(incident)
+    setShowEditDialog(true)
+  }
+
+  const saveEdit = async () => {
+    if (!editingIncident) return
+    const supabase = createClient()
+    await supabase.from('incidents').update({
+      title: editingIncident.title,
+      description: editingIncident.description,
+      incident_type: editingIncident.incident_type,
+      severity: editingIncident.severity,
+    }).eq('id', editingIncident.id)
+    setShowEditDialog(false)
+    setEditingIncident(null)
+    loadIncidents()
+  }
+
+  const handleDelete = async (incidentId: string) => {
+    if (!confirm('¿Seguro que quieres eliminar este incidente?')) return
+    const supabase = createClient()
+    await supabase.from('incidents').delete().eq('id', incidentId)
+    loadIncidents()
+  }
+
+  const filteredIncidents = nearbyIncidents.filter(i => {
+    if (filterSeverity !== 'all' && i.severity !== filterSeverity) return false
+    if (filterType !== 'all' && i.incident_type !== filterType) return false
+    return true
+  })
+
   const incidentCounts = {
     high: nearbyIncidents.filter(i => i.severity === 'high').length,
     medium: nearbyIncidents.filter(i => i.severity === 'medium').length,
@@ -200,7 +251,6 @@ export function MapTab() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] pb-24">
-      {/* Offline banner */}
       {!isOnline && (
         <div className="mb-2 px-3 py-2 bg-warning/20 text-warning rounded-lg text-sm flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
@@ -209,7 +259,6 @@ export function MapTab() {
         </div>
       )}
 
-      {/* Map — always rendered, dialog renders ON TOP */}
       <div className="flex-1 relative rounded-lg overflow-hidden mb-4">
         {loading ? (
           <div className="h-full w-full flex items-center justify-center bg-muted rounded-lg">
@@ -219,17 +268,23 @@ export function MapTab() {
             </div>
           </div>
         ) : (
-          <IncidentMap key={mapTheme} incidents={filteredIncidents} userLocation={currentLocation || coordinates || null} showHeatZones={true} />
+          <IncidentMap
+            key={mapTheme}
+            incidents={filteredIncidents}
+            userLocation={currentLocation || coordinates || null}
+            showHeatZones={true}
+            currentUserId={currentUserId}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
         )}
 
-        {/* Map controls overlay */}
         <div className="absolute top-3 right-3 z-[1000] flex flex-col gap-2">
           <Button size="icon" variant="secondary" className="shadow-lg bg-card text-foreground border border-border hover:bg-muted" onClick={handleRefresh} disabled={refreshing}>
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>
         </div>
 
-        {/* Legend */}
         <div className="absolute bottom-3 left-3 z-[1000] bg-card/95 backdrop-blur-sm rounded-lg p-3 shadow-lg">
           <p className="text-xs font-medium mb-2">Severidad</p>
           <div className="flex flex-col gap-1.5">
@@ -241,18 +296,29 @@ export function MapTab() {
         </div>
       </div>
 
-      {/* Filter & Actions — Dialog opens centered ON TOP of map */}
-      <div className="flex items-center gap-2 mb-4">
+      {/* Filtros */}
+      <div className="flex items-center gap-2 mb-3">
         <Select value={filterSeverity} onValueChange={(v) => setFilterSeverity(v as IncidentSeverity | 'all')}>
-          <SelectTrigger className="w-[140px]">
-            <Filter className="w-4 h-4 mr-2" />
-            <SelectValue placeholder="Filtrar" />
+          <SelectTrigger className="w-[130px]">
+            <Filter className="w-4 h-4 mr-1" />
+            <SelectValue placeholder="Severidad" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="all">Severidad</SelectItem>
             <SelectItem value="high">Solo Alto</SelectItem>
             <SelectItem value="medium">Solo Medio</SelectItem>
             <SelectItem value="low">Solo Bajo</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={filterType} onValueChange={(v) => setFilterType(v as IncidentType | 'all')}>
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="Tipo" />
+          </SelectTrigger>
+          <SelectContent>
+            {incidentTypes.map(t => (
+              <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
 
@@ -260,10 +326,9 @@ export function MapTab() {
           <DialogTrigger asChild>
             <Button className="flex-1">
               <Plus className="w-4 h-4 mr-2" />
-              Reportar Incidente
+              Reportar
             </Button>
           </DialogTrigger>
-          {/* DialogContent uses fixed positioning by default — renders above map */}
           <DialogContent className="z-[2000]">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
@@ -286,7 +351,7 @@ export function MapTab() {
                 <Select value={newIncident.incident_type} onValueChange={(v) => setNewIncident({ ...newIncident, incident_type: v as IncidentType })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {incidentTypes.map((type) => <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>)}
+                    {incidentTypesForm.map((type) => <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </Field>
@@ -325,7 +390,57 @@ export function MapTab() {
         </Dialog>
       </div>
 
-      {/* Recent Incidents */}
+      {/* Dialog de edición */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="z-[2000]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5" />
+              Editar Incidente
+            </DialogTitle>
+          </DialogHeader>
+          {editingIncident && (
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Título</FieldLabel>
+                <Input value={editingIncident.title} onChange={(e) => setEditingIncident({ ...editingIncident, title: e.target.value })} />
+              </Field>
+              <Field>
+                <FieldLabel>Tipo de Incidente</FieldLabel>
+                <Select value={editingIncident.incident_type} onValueChange={(v) => setEditingIncident({ ...editingIncident, incident_type: v as IncidentType })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {incidentTypesForm.map((type) => <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field>
+                <FieldLabel>Severidad</FieldLabel>
+                <div className="flex gap-2">
+                  {severityLevels.map((level) => (
+                    <button key={level.value} type="button"
+                      onClick={() => setEditingIncident({ ...editingIncident, severity: level.value })}
+                      className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
+                        editingIncident.severity === level.value ? level.color : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                      }`}
+                    >{level.label}</button>
+                  ))}
+                </div>
+              </Field>
+              <Field>
+                <FieldLabel>Detalles</FieldLabel>
+                <Textarea rows={3} value={editingIncident.description || ''} onChange={(e) => setEditingIncident({ ...editingIncident, description: e.target.value })} />
+              </Field>
+            </FieldGroup>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)}>Cancelar</Button>
+            <Button onClick={saveEdit}>Guardar Cambios</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Incidentes recientes */}
       <Card className="flex-shrink-0">
         <CardHeader className="py-3">
           <CardTitle className="text-sm flex items-center justify-between">
@@ -345,7 +460,19 @@ export function MapTab() {
                   <p className="text-sm font-medium truncate">{incident.title}</p>
                   <p className="text-xs text-muted-foreground">{new Date(incident.reported_at).toLocaleString()}</p>
                 </div>
-                {incident.verified && <Badge variant="outline" className="text-xs text-safe border-safe">✓ Verificado</Badge>}
+                <div className="flex items-center gap-1">
+                  {incident.verified && <Badge variant="outline" className="text-xs text-safe border-safe">✓</Badge>}
+                  {incident.user_id === currentUserId && (
+                    <>
+                      <button onClick={() => handleEdit(incident)} className="p-1 hover:text-primary transition-colors">
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                      <button onClick={() => handleDelete(incident.id)} className="p-1 hover:text-destructive transition-colors">
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             ))
           )}

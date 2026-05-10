@@ -12,7 +12,7 @@ export default function AuthErrorPage() {
           <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center">
             <Shield className="w-10 h-10 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold">SafeWalk</h1>
+          <h1 className="text-2xl font-bold">SOSecure</h1>
         </div>
 
         <Card>

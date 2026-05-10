@@ -71,7 +71,7 @@ export function DuringTab() {
         setAudioRecorder(recorder)
         setIsRecordingAudio(true)
       } catch {
-        sendAlarmNotification('⚠️ SafeWalk', 'No se pudo acceder al micrófono')
+        sendAlarmNotification('⚠️ SOSecure', 'No se pudo acceder al micrófono')
       }
     }
   }, [isRecordingAudio, audioRecorder, audioStream, audioChunks])
@@ -88,7 +88,7 @@ export function DuringTab() {
         if (videoRef.current) videoRef.current.srcObject = stream
         setIsRecordingVideo(true)
       } catch {
-        sendAlarmNotification('⚠️ SafeWalk', 'No se pudo acceder a la cámara')
+        sendAlarmNotification('⚠️ SOSecure', 'No se pudo acceder a la cámara')
       }
     }
   }, [isRecordingVideo, videoStream])

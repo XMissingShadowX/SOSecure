@@ -57,14 +57,14 @@ export default function SignUpPage() {
           <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center">
             <Shield className="w-10 h-10 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold">SafeWalk</h1>
+          <h1 className="text-2xl font-bold">SOSecure</h1>
           <p className="text-sm text-muted-foreground">Tu acompañante de seguridad personal</p>
         </div>
 
         <Card>
           <CardHeader className="space-y-1">
             <CardTitle className="text-xl">Crear cuenta</CardTitle>
-            <CardDescription>Comienza a usar SafeWalk gratis</CardDescription>
+            <CardDescription>Comienza a usar SOSecure gratis</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSignUp}>

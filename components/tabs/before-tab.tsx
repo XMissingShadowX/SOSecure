@@ -65,7 +65,7 @@ export function BeforeTab() {
         setCountdown(remaining)
         // Warn at 5 min
         if (remaining < 5 * 60 * 1000 && remaining > 4.9 * 60 * 1000) {
-          sendAlarmNotification('⏰ SafeWalk', 'Quedan 5 minutos en tu temporizador de seguridad')
+          sendAlarmNotification('⏰ SOSecure', 'Quedan 5 minutos en tu temporizador de seguridad')
         }
       }
     }

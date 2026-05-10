@@ -53,7 +53,7 @@ export function SOSButton() {
     setIsRecording(true)
 
     playAlarmSound()
-    sendAlarmNotification('🚨 SafeWalk SOS Activado', 'Alerta de emergencia enviada a tus contactos', true)
+    sendAlarmNotification('🚨 SOSecure SOS Activado', 'Alerta de emergencia enviada a tus contactos', true)
 
     // Start recording (audio + video if permitted)
     try {

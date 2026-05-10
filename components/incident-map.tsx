@@ -81,9 +81,12 @@ interface IncidentMapProps {
   userLocation: Coordinates | null
   onMapClick?: (coords: Coordinates) => void
   showHeatZones?: boolean
+  currentUserId?: string | null
+  onEdit?: (incident: Incident) => void
+  onDelete?: (incidentId: string) => void
 }
 
-export function IncidentMap({ incidents, userLocation, onMapClick, showHeatZones = true }: IncidentMapProps) {
+export function IncidentMap({ incidents, userLocation, onMapClick, showHeatZones = true, currentUserId, onEdit, onDelete }: IncidentMapProps) {
   const { mapCenter, mapZoom } = useAppStore()
 
   const [isDark, setIsDark] = useState(() => {
@@ -103,10 +106,6 @@ export function IncidentMap({ incidents, userLocation, onMapClick, showHeatZones
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
     return () => observer.disconnect()
   }, [])
-
-  const tileUrl = isDark
-    ? 'https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png'
-    : 'https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png'
 
   const center = useMemo(() => {
     if (userLocation) return userLocation
@@ -174,12 +173,28 @@ export function IncidentMap({ incidents, userLocation, onMapClick, showHeatZones
           <Popup>
             <div className="p-2 min-w-[200px]">
               <div className="flex items-center gap-2 mb-2">
-                <span className="w-3 h-3 rounded-full" style={{ background: severityColors[incident.severity] }} />
+                <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: severityColors[incident.severity] }} />
                 <strong className="text-sm">{incident.title}</strong>
               </div>
               <p className="text-xs text-gray-600 mb-1">{incidentTypeLabels[incident.incident_type]}</p>
               {incident.description && <p className="text-xs text-gray-500 mb-2">{incident.description}</p>}
-              <p className="text-xs text-gray-400">{new Date(incident.reported_at).toLocaleString()}</p>
+              <p className="text-xs text-gray-400 mb-2">{new Date(incident.reported_at).toLocaleString()}</p>
+              {currentUserId && incident.user_id === currentUserId && (
+                <div className="flex gap-2 pt-1 border-t border-gray-200">
+                  <button
+                    onClick={() => onEdit?.(incident)}
+                    className="flex-1 text-xs py-1 px-2 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                  >
+                    ✏️ Editar
+                  </button>
+                  <button
+                    onClick={() => onDelete?.(incident.id)}
+                    className="flex-1 text-xs py-1 px-2 rounded bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                  >
+                    🗑️ Eliminar
+                  </button>
+                </div>
+              )}
             </div>
           </Popup>
         </Marker>
