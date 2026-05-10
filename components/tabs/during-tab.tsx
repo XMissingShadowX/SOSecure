@@ -61,18 +61,28 @@ export function DuringTab() {
       setAudioStream(null)
       setAudioRecorder(null)
       setIsRecordingAudio(false)
-      // Save recording locally
+
       if (audioChunks.length) {
         const blob = new Blob(audioChunks, { type: 'audio/webm' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url; a.download = `sosecure-audio-${Date.now()}.webm`; a.click()
+        const meta: RecordingMeta = {
+          id: generateRecordingId(),
+          blob,
+          type: 'audio',
+          mimeType: 'audio/webm',
+          durationMs: Date.now() - audioStartRef.current,
+          createdAt: new Date().toISOString(),
+          latitude: coordinates?.latitude,
+          longitude: coordinates?.longitude,
+        }
+        setLastRecording(meta)
+        setStatusMsg('Grabación lista. ¿Qué deseas hacer?')
       }
       setAudioChunks([])
     } else {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
         setAudioStream(stream)
+        audioStartRef.current = Date.now()
         const recorder = new MediaRecorder(stream)
         const chunks: Blob[] = []
         recorder.ondataavailable = (e) => chunks.push(e.data)
@@ -80,11 +90,50 @@ export function DuringTab() {
         recorder.start()
         setAudioRecorder(recorder)
         setIsRecordingAudio(true)
+        setLastRecording(null)
+        setStatusMsg('')
       } catch {
         sendAlarmNotification('⚠️ SOSecure', 'No se pudo acceder al micrófono')
       }
     }
-  }, [isRecordingAudio, audioRecorder, audioStream, audioChunks])
+  }, [isRecordingAudio, audioRecorder, audioStream, audioChunks, coordinates])
+
+  // Guardar localmente
+  const handleSaveLocally = useCallback(() => {
+    if (!lastRecording) return
+    setRecordingStatus('saving')
+    saveRecordingLocally(lastRecording)
+    setStatusMsg('✅ Descarga iniciada en tu dispositivo')
+    setRecordingStatus('done')
+  }, [lastRecording])
+
+  // Enviar a contactos
+  const handleSendToContacts = useCallback(async () => {
+    if (!lastRecording) return
+    setRecordingStatus('sending')
+    setStatusMsg('Enviando a contactos...')
+    const result = await sendRecordingToContacts(lastRecording, contacts)
+    if (result.success) {
+      setStatusMsg(`✅ Compartido vía ${result.method === 'share' ? 'sistema' : 'WhatsApp'}`)
+    } else {
+      setStatusMsg('⚠️ No se pudo enviar. Guarda localmente.')
+    }
+    setRecordingStatus('done')
+  }, [lastRecording, contacts])
+
+  // Subir a base de datos
+  const handleUploadToDB = useCallback(async () => {
+    if (!lastRecording) return
+    setRecordingStatus('uploading')
+    setStatusMsg('Subiendo a la nube...')
+    const result = await uploadRecordingToDB(lastRecording)
+    if (result.error) {
+      setStatusMsg(`⚠️ Error: ${result.error}`)
+    } else {
+      setStatusMsg('✅ Grabación guardada en la nube')
+    }
+    setRecordingStatus('done')
+  }, [lastRecording])
 
   const toggleVideo = useCallback(async () => {
     if (isRecordingVideo) {
@@ -203,16 +252,76 @@ export function DuringTab() {
             </Button>
           </div>
 
-          {isRecordingAudio && (
+             {isRecordingAudio && (
             <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-lg">
               <div className="w-3 h-3 rounded-full bg-destructive animate-pulse" />
-              <p className="text-sm text-destructive font-medium">Grabando audio... Al detener, se descargará automáticamente</p>
+              <p className="text-sm text-destructive font-medium">Grabando audio... Toca "Detener" cuando termines</p>
             </div>
           )}
 
-          <p className="text-xs text-muted-foreground text-center">
-            Las grabaciones se guardan localmente en tu dispositivo
-          </p>
+          {/* Panel de acciones post-grabación */}
+          {lastRecording && (
+            <div className="space-y-3 pt-2 border-t border-border">
+              <p className="text-sm font-medium text-center">{statusMsg || '¿Qué deseas hacer con la grabación?'}</p>
+
+              {recordingStatus !== 'done' && (
+                <div className="flex flex-col gap-2">
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleSaveLocally}
+                    disabled={recordingStatus !== 'idle'}
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    Guardar en dispositivo
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleSendToContacts}
+                    disabled={recordingStatus !== 'idle' || contacts.length === 0}
+                  >
+                    <Send className="w-4 h-4 mr-2" />
+                    Enviar a contactos de emergencia
+                    {contacts.length === 0 && <span className="ml-1 text-xs text-muted-foreground">(sin contactos)</span>}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleUploadToDB}
+                    disabled={recordingStatus !== 'idle'}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Guardar en la nube (Supabase)
+                  </Button>
+                </div>
+              )}
+
+              {recordingStatus === 'done' && (
+                <div className="flex items-center justify-center gap-2 p-3 bg-primary/10 rounded-lg">
+                  <CheckCircle className="w-4 h-4 text-primary" />
+                  <p className="text-sm text-primary font-medium">{statusMsg}</p>
+                </div>
+              )}
+
+              {recordingStatus === 'done' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-muted-foreground"
+                  onClick={() => { setLastRecording(null); setRecordingStatus('idle'); setStatusMsg('') }}
+                >
+                  Limpiar
+                </Button>
+              )}
+            </div>
+          )}
+
+          {!lastRecording && (
+            <p className="text-xs text-muted-foreground text-center">
+              Al detener la grabación podrás guardarla, enviarla o subirla a la nube
+            </p>
+          )}
         </CardContent>
       </Card>
 
