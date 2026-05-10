@@ -212,7 +212,11 @@ export function AppShell() {
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-lg mx-auto px-4 py-4">
             {activeTab === 'home' && <HomeTab />}
-            {activeTab === 'map' && <MapTab />}
+            {activeTab === 'map' && (
+              <div className="relative z-0">
+                <MapTab />
+              </div>
+            )}
             {activeTab === 'routes' && <RoutesTab />}
             {activeTab === 'medic' && <MedicTab />}
             {activeTab === 'before' && <BeforeTab />}

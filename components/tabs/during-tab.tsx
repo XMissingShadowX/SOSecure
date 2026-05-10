@@ -48,11 +48,9 @@ export function DuringTab() {
     tapTimerRef.current = setTimeout(() => { tapCountRef.current = 0 }, 3000)
     if (tapCountRef.current >= 5) {
       tapCountRef.current = 0
-      playAlarmSound()
-      sendAlarmNotification('🚨 SOS Activado', 'Alerta enviada por secuencia de botones', true)
-      setSosActive(true)
+      window.dispatchEvent(new CustomEvent('sosecure:activate'))
     }
-  }, [setSosActive])
+  }, [])
 
   const toggleAudio = useCallback(async () => {
     if (isRecordingAudio) {
