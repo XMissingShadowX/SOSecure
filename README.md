@@ -94,6 +94,40 @@ create policy "Usuarios autenticados pueden insertar" on incidents
   for insert with check (auth.uid() is not null);
 create policy "Los usuarios pueden actualizar los suyos" on incidents
   for update using (auth.uid() = user_id);
+create table if not exists public.recordings (
+  id                uuid         primary key default gen_random_uuid(),
+  user_id           uuid         not null references auth.users(id) on delete cascade,
+  storage_path      text         not null,
+  public_url        text,
+  recording_type    text         not null check (recording_type in ('audio', 'video')),
+  mime_type         text         not null,
+  duration_ms       integer      not null default 0,
+  file_size_bytes   bigint       not null default 0,
+  latitude          double precision,
+  longitude         double precision,
+  sos_alert_id      uuid         references public.sos_alerts(id) on delete set null,
+  created_at        timestamptz  not null default now()
+);
+
+-- Seguridad: solo el dueño ve/sube/borra sus grabaciones
+alter table public.recordings enable row level security;
+
+create policy "select_own" on public.recordings for select using (auth.uid() = user_id);
+create policy "insert_own" on public.recordings for insert with check (auth.uid() = user_id);
+create policy "delete_own" on public.recordings for delete using (auth.uid() = user_id);
+
+-- Bucket de Storage (también puedes crearlo desde el dashboard)
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('recordings', 'recordings', false, 52428800,
+  array['audio/webm','audio/ogg','audio/mp4','video/webm','video/mp4'])
+on conflict (id) do nothing;
+
+-- Políticas del bucket
+create policy "upload_own" on storage.objects for insert
+  with check (bucket_id = 'recordings' and auth.uid()::text = (string_to_array(name, '/'))[1]);
+
+create policy "read_own" on storage.objects for select
+  using (bucket_id = 'recordings' and auth.uid()::text = (string_to_array(name, '/'))[1]);
 ```
 
 ---
