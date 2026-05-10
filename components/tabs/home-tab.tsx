@@ -55,7 +55,8 @@ export function HomeTab() {
   const [showAddContact, setShowAddContact] = useState(false)
   const [showAddPlace, setShowAddPlace] = useState(false)
   const [newContact, setNewContact] = useState({ name: '', phone: '', relationship: '', importance: 'secondary' as EmergencyContact['importance'] })
-  const [newPlace, setNewPlace] = useState({ label: '', type: 'home', address: '' })
+  const [newPlace, setNewPlace] = useState<{ label: string; type: string; address: string; lat?: string; lon?: string }>({ label: '', type: 'home', address: '' })
+  const [placeSuggestions, setPlaceSuggestions] = useState<{ display_name: string; lat: string; lon: string }[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -68,14 +69,12 @@ export function HomeTab() {
     async function loadContacts() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      
       if (user) {
         const { data } = await supabase
           .from('emergency_contacts')
           .select('*')
           .eq('user_id', user.id)
           .order('priority')
-        
         if (data) setContacts(data)
       }
       setLoading(false)
@@ -86,10 +85,8 @@ export function HomeTab() {
   const addContact = async () => {
     if (!newContact.name || !newContact.phone) return
     if (contacts.length >= MAX_CONTACTS) return
-    
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    
     if (user) {
       const { data, error } = await supabase
         .from('emergency_contacts')
@@ -103,7 +100,6 @@ export function HomeTab() {
         })
         .select()
         .single()
-      
       if (data && !error) {
         setContacts([...contacts, data])
         setNewContact({ name: '', phone: '', relationship: '', importance: 'secondary' })
@@ -118,17 +114,28 @@ export function HomeTab() {
     setContacts(contacts.filter(c => c.id !== contact.id))
   }
 
-  const addPlace = () => {
+  const addPlace = async () => {
     if (!newPlace.label || !coordinates) return
+
+    let placeCoordinates = coordinates
+
+    if (newPlace.lat && newPlace.lon) {
+      placeCoordinates = {
+        latitude: parseFloat(newPlace.lat),
+        longitude: parseFloat(newPlace.lon),
+      }
+    }
+
     const place: FrequentPlace = {
       id: Date.now().toString(),
       label: newPlace.label,
       icon: newPlace.type,
       address: newPlace.address || `${coordinates.latitude.toFixed(5)}, ${coordinates.longitude.toFixed(5)}`,
-      coordinates: coordinates,
+      coordinates: placeCoordinates,
     }
     addFrequentPlace(place)
     setNewPlace({ label: '', type: 'home', address: '' })
+    setPlaceSuggestions([])
     setShowAddPlace(false)
   }
 
@@ -161,7 +168,7 @@ export function HomeTab() {
         </CardContent>
       </Card>
 
-      {/* Current Location */}
+      {/* Ubicación Actual */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -193,7 +200,7 @@ export function HomeTab() {
         </CardContent>
       </Card>
 
-      {/* Frequent Places */}
+      {/* Lugares Frecuentes */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -238,7 +245,7 @@ export function HomeTab() {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Agregar Lugar Frecuente</DialogTitle>
-                <DialogDescription>Guarda tu ubicación actual como un lugar frecuente.</DialogDescription>
+                <DialogDescription>Busca una dirección o usa tu ubicación actual.</DialogDescription>
               </DialogHeader>
               <FieldGroup>
                 <Field>
@@ -258,16 +265,62 @@ export function HomeTab() {
                 </Field>
                 <Field>
                   <FieldLabel>Dirección (opcional)</FieldLabel>
-                  <Input placeholder="Calle, Colonia..." value={newPlace.address} onChange={(e) => setNewPlace({ ...newPlace, address: e.target.value })} />
+                  <div className="relative">
+                    <Input
+                      placeholder="Busca una dirección..."
+                      value={newPlace.address}
+                      onChange={async (e) => {
+                        const value = e.target.value
+                        setNewPlace({ ...newPlace, address: value, lat: undefined, lon: undefined })
+                        if (value.length < 3) { setPlaceSuggestions([]); return }
+                        clearTimeout((window as any)._placeTimeout)
+                        ;(window as any)._placeTimeout = setTimeout(async () => {
+                          try {
+                            const res = await fetch(
+                              `https://photon.komoot.io/api/?q=${encodeURIComponent(value)}&limit=5`,
+                              { headers: { 'Accept': 'application/json' } }
+                            )
+                            const data = await res.json()
+                            setPlaceSuggestions(data.features.map((f: any) => ({
+                              display_name: [f.properties.name, f.properties.street, f.properties.city, f.properties.country].filter(Boolean).join(', '),
+                              lat: f.geometry.coordinates[1].toString(),
+                              lon: f.geometry.coordinates[0].toString(),
+                            })))
+                          } catch {}
+                        }, 500)
+                      }}
+                    />
+                    {placeSuggestions.length > 0 && (
+                      <div className="absolute top-10 left-0 right-0 bg-card border border-border rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
+                        {placeSuggestions.map((s, i) => (
+                          <button
+                            key={i}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-muted border-b border-border last:border-0"
+                            onClick={() => {
+                              setNewPlace({ ...newPlace, address: s.display_name, lat: s.lat, lon: s.lon })
+                              setPlaceSuggestions([])
+                            }}
+                          >
+                            {s.display_name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </Field>
-                {coordinates && (
+                {coordinates && !newPlace.lat && (
                   <div className="p-3 bg-muted rounded-lg text-xs text-muted-foreground">
-                    📍 Se usará tu ubicación actual: {coordinates.latitude.toFixed(5)}, {coordinates.longitude.toFixed(5)}
+                    📍 Sin dirección seleccionada se usará tu ubicación actual: {coordinates.latitude.toFixed(5)}, {coordinates.longitude.toFixed(5)}
+                  </div>
+                )}
+                {newPlace.lat && (
+                  <div className="p-3 bg-safe/10 rounded-lg text-xs text-safe">
+                    ✓ Dirección geocodificada correctamente
                   </div>
                 )}
               </FieldGroup>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setShowAddPlace(false)}>Cancelar</Button>
+                <Button variant="outline" onClick={() => { setShowAddPlace(false); setPlaceSuggestions([]) }}>Cancelar</Button>
                 <Button onClick={addPlace} disabled={!newPlace.label || !coordinates}>Guardar</Button>
               </DialogFooter>
             </DialogContent>
@@ -275,7 +328,7 @@ export function HomeTab() {
         </CardContent>
       </Card>
 
-      {/* Emergency Contacts */}
+      {/* Contactos de Emergencia */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -324,7 +377,6 @@ export function HomeTab() {
               ))}
             </div>
           )}
-          
           {contacts.length < MAX_CONTACTS && (
             <Dialog open={showAddContact} onOpenChange={setShowAddContact}>
               <DialogTrigger asChild>
@@ -389,7 +441,7 @@ export function HomeTab() {
         </CardContent>
       </Card>
 
-      {/* Quick Tips */}
+      {/* Consejos de Seguridad */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Consejos de Seguridad</CardTitle>

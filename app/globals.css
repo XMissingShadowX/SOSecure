@@ -178,6 +178,7 @@ html.light {
 
 .sos-pulse {
   animation: sos-pulse 1.5s ease-in-out infinite;
+  z-index: 50;
 }
 
 /* Recording indicator */
