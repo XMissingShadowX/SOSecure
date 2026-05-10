@@ -470,7 +470,7 @@ export function MapTab() {
         <CardHeader className="py-3">
           <CardTitle className="text-sm flex items-center justify-between">
             Incidentes Recientes
-            <Badge variant="secondary">{filteredIncidents.length}</Badge>
+            <Badge variant="secondary" className="!text-black dark:!text-white">{filteredIncidents.length}</Badge>
           </CardTitle>
         </CardHeader>
         <CardContent className="max-h-[150px] overflow-y-auto space-y-2 pb-3">
