@@ -31,8 +31,7 @@ export function PermissionGate({ children }: PermissionGateProps) {
   // Show gate only on first load if required permissions not granted
   if (allGranted || dismissed) return <>{children}</>
 
-  const requiredMissing = permissions.geolocation !== 'granted' || permissions.notifications !== 'granted'
-
+  const requiredMissing = permissions.geolocation === 'denied' || permissions.notifications === 'denied'
   if (!requiredMissing) return <>{children}</>
 
   return (

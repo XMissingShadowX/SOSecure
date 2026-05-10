@@ -12,13 +12,27 @@ export interface PermissionState {
 const isNative = () => typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.()
 
 export function usePermissions() {
-  const [permissions, setPermissions] = useState<PermissionState>({
-    geolocation: 'unknown',
-    notifications: 'unknown',
-    camera: 'unknown',
-    microphone: 'unknown',
+  const [permissions, setPermissions] = useState<PermissionState>(() => {
+    if (typeof window === 'undefined') return {
+      geolocation: 'unknown', notifications: 'unknown', camera: 'unknown', microphone: 'unknown',
+    }
+    const notifState = typeof Notification !== 'undefined'
+      ? Notification.permission as PermissionStatus['state']
+      : 'unknown'
+    return {
+      geolocation: 'unknown',
+      notifications: notifState,
+      camera: 'unknown',
+      microphone: 'unknown',
+    }
   })
-  const [allGranted, setAllGranted] = useState(false)
+  const [allGranted, setAllGranted] = useState(() => {
+    if (typeof window === 'undefined') return false
+    // Chequeo síncrono rápido — solo notificaciones son sincrónamente disponibles
+    const notifGranted = typeof Notification !== 'undefined' && Notification.permission === 'granted'
+    // Si notificaciones ya están granted, asumimos que el resto también y dejamos que el useEffect confirme
+    return notifGranted
+  })
 
   const requestGeolocation = useCallback(async () => {
     try {
@@ -106,12 +120,32 @@ export function usePermissions() {
           setPermissions(state)
           setAllGranted(state.geolocation === 'granted' && state.notifications === 'granted')
         } else {
-          // Web browser fallback
-          const notifState = typeof Notification !== 'undefined'
-            ? Notification.permission === 'granted' ? 'granted'
-              : Notification.permission === 'denied' ? 'denied' : 'prompt'
-            : 'unknown'
-          setPermissions(prev => ({ ...prev, notifications: notifState as PermissionStatus['state'] }))
+          // Web browser fallback — usar Permissions API para verificar sin pedir
+          const results = await Promise.all([
+            navigator.permissions.query({ name: 'geolocation' }),
+            navigator.permissions.query({ name: 'notifications' }),
+            navigator.permissions.query({ name: 'camera' as PermissionName }),
+            navigator.permissions.query({ name: 'microphone' as PermissionName }),
+          ]).catch(() => null)
+
+          if (results) {
+            const [geo, notif, cam, mic] = results
+            const state: PermissionState = {
+              geolocation: geo.state,
+              notifications: notif.state,
+              camera: cam.state,
+              microphone: mic.state,
+            }
+            setPermissions(state)
+            setAllGranted(geo.state === 'granted' && notif.state === 'granted')
+          } else {
+            // Fallback si Permissions API no está disponible
+            const notifState = typeof Notification !== 'undefined'
+              ? Notification.permission === 'granted' ? 'granted'
+                : Notification.permission === 'denied' ? 'denied' : 'prompt'
+              : 'unknown'
+            setPermissions(prev => ({ ...prev, notifications: notifState as PermissionStatus['state'] }))
+          }
         }
       } catch { /* silently fail */ }
     }
