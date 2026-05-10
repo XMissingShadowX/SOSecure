@@ -39,17 +39,22 @@ export function AppShell() {
     const card = isDarkTheme ? 'oklch(0.17 0.01 260)' : 'oklch(1 0 0)'
     const border = isDarkTheme ? 'oklch(0.28 0.02 260)' : 'oklch(0.90 0.01 260)'
     const muted = isDarkTheme ? 'oklch(0.22 0.02 260)' : 'oklch(0.95 0.01 260)'
+    const primary = isDarkTheme ? 'oklch(0.75 0.15 180)' : 'oklch(0.55 0.15 180)'
 
     document.body.style.backgroundColor = bg
     document.body.style.color = fg
 
-    document.querySelectorAll<HTMLElement>('.bg-background, .min-h-screen, header').forEach(el => {
+    document.querySelectorAll<HTMLElement>('.bg-background, .min-h-screen, header, nav').forEach(el => {
       el.style.backgroundColor = bg
       el.style.color = fg
     })
 
+    document.querySelectorAll<HTMLElement>('.text-muted-foreground').forEach(el => {
+      el.style.color = isDarkTheme ? 'oklch(0.65 0.02 260)' : 'oklch(0.45 0.02 260)'
+    })
+
     document.querySelectorAll<HTMLElement>('.bg-card, [class*="card"]').forEach(el => {
-      // No tocar el contenedor del mapa
+      if (el.tagName === 'BUTTON') return
       if (el.classList.contains('leaflet-container') || el.closest('.leaflet-container')) return
       el.style.backgroundColor = card
       el.style.color = fg
@@ -57,7 +62,18 @@ export function AppShell() {
     })
 
     document.querySelectorAll<HTMLElement>('.bg-muted, [class*="muted"]').forEach(el => {
+      if (el.tagName === 'BUTTON' || el.closest('nav')) return
       el.style.backgroundColor = muted
+    })
+
+    document.querySelectorAll<HTMLElement>('nav button').forEach(el => {
+      el.style.backgroundColor = 'transparent'
+    })
+
+    // Limpiar estilos inline de botones del nav y dejar que React maneje sus colores
+    document.querySelectorAll<HTMLElement>('nav button').forEach(el => {
+      el.style.backgroundColor = 'transparent'
+      el.style.color = ''  // quita el color inline para que React tome control
     })
   }
 
@@ -80,6 +96,11 @@ export function AppShell() {
       setCurrentLocation(coordinates)
     }
   }, [coordinates, setCurrentLocation])
+
+  useEffect(() => {
+    const saved = localStorage.getItem('safewalk-theme') || 'dark'
+    setTimeout(() => applyTheme(saved), 50)
+  }, [activeTab])
 
   useEffect(() => {
     const update = () => setIsOnline(navigator.onLine)

@@ -207,3 +207,7 @@ html.light .leaflet-container img,
 html.light .leaflet-tile {
   filter: none !important;
 }
+
+.text-primary {
+  color: var(--primary) !important;
+}
