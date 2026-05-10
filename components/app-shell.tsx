@@ -190,7 +190,7 @@ export function AppShell() {
                     <Settings className="w-5 h-5" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="z-[9999] bg-popover text-popover-foreground">
                   {user && (
                     <>
                       <DropdownMenuItem className="text-xs text-muted-foreground">

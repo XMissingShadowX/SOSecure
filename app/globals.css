@@ -234,3 +234,36 @@ html.dark [role="combobox"] {
 html.dark [role="option"][data-highlighted] {
   background-color: oklch(0.25 0.02 260) !important;
 }
+
+[data-radix-dropdown-menu-content] {
+  background-color: var(--popover) !important;
+  color: var(--popover-foreground) !important;
+  z-index: 9999 !important;
+}
+
+[data-radix-dropdown-menu-item] {
+  color: var(--popover-foreground) !important;
+}
+
+[data-radix-dropdown-menu-item]:hover,
+[data-radix-dropdown-menu-item][data-highlighted] {
+  background-color: var(--accent) !important;
+  color: var(--accent-foreground) !important;
+}
+
+[role="menuitem"] {
+  color: var(--popover-foreground) !important;
+}
+
+[role="menu"] {
+  background-color: var(--popover) !important;
+  color: var(--popover-foreground) !important;
+}
+
+[data-radix-select-content] {
+  z-index: 9999 !important;
+}
+
+[data-radix-popper-content-wrapper] {
+  z-index: 9999 !important;
+}

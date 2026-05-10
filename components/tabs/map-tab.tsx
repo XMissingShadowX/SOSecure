@@ -93,6 +93,7 @@ export function MapTab() {
   const [refreshing, setRefreshing] = useState(false)
   const [filterSeverity, setFilterSeverity] = useState<IncidentSeverity | 'all'>('all')
   const [filterType, setFilterType] = useState<IncidentType | 'all'>('all')
+  const [filterTime, setFilterTime] = useState<'all' | '1d' | '7d' | '30d'>('all')
   const [isOnline, setIsOnline] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
@@ -240,6 +241,15 @@ export function MapTab() {
   const filteredIncidents = nearbyIncidents.filter(i => {
     if (filterSeverity !== 'all' && i.severity !== filterSeverity) return false
     if (filterType !== 'all' && i.incident_type !== filterType) return false
+    if (filterTime !== 'all') {
+      const now = new Date()
+      const reported = new Date(i.reported_at)
+      const diffMs = now.getTime() - reported.getTime()
+      const diffDays = diffMs / (1000 * 60 * 60 * 24)
+      if (filterTime === '1d' && diffDays > 1) return false
+      if (filterTime === '7d' && diffDays > 7) return false
+      if (filterTime === '30d' && diffDays > 30) return false
+    }
     return true
   })
 
@@ -297,9 +307,9 @@ export function MapTab() {
       </div>
 
       {/* Filtros */}
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-2">
         <Select value={filterSeverity} onValueChange={(v) => setFilterSeverity(v as IncidentSeverity | 'all')}>
-          <SelectTrigger className="w-[130px]">
+          <SelectTrigger className="flex-1">
             <Filter className="w-4 h-4 mr-1" />
             <SelectValue placeholder="Severidad" />
           </SelectTrigger>
@@ -312,7 +322,7 @@ export function MapTab() {
         </Select>
 
         <Select value={filterType} onValueChange={(v) => setFilterType(v as IncidentType | 'all')}>
-          <SelectTrigger className="w-[150px]">
+          <SelectTrigger className="flex-1">
             <SelectValue placeholder="Tipo" />
           </SelectTrigger>
           <SelectContent>
@@ -322,9 +332,24 @@ export function MapTab() {
           </SelectContent>
         </Select>
 
+        <Select value={filterTime} onValueChange={(v) => setFilterTime(v as 'all' | '1d' | '7d' | '30d')}>
+          <SelectTrigger className="flex-1">
+            <SelectValue placeholder="Tiempo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Cualquier fecha</SelectItem>
+            <SelectItem value="1d">Último día</SelectItem>
+            <SelectItem value="7d">Última semana</SelectItem>
+            <SelectItem value="30d">Último mes</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Botón reportar */}
+      <div className="mb-3">
         <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
           <DialogTrigger asChild>
-            <Button className="flex-1">
+            <Button className="w-full">
               <Plus className="w-4 h-4 mr-2" />
               Reportar
             </Button>
