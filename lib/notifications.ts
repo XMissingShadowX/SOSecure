@@ -18,7 +18,7 @@ export function sendAlarmNotification(title: string, body: string, urgent = fals
       body,
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-72.png',
-      tag: urgent ? 'safewalk-sos' : 'safewalk-alert',
+      tag: urgent ? 'sosecure-sos' : 'sosecure-alert',
       requireInteraction: urgent,
       silent: false,
     })

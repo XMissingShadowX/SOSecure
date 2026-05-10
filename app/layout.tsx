@@ -44,7 +44,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{
           __html: `
             (function() {
-              var theme = localStorage.getItem('safewalk-theme') || 'dark';
+              var theme = localStorage.getItem('sosecure-theme') || 'dark';
               document.documentElement.className = theme;
             })();
           `

@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.safewalk.app',
-  appName: 'safewalk',
+  appId: 'com.sosecure.app',
+  appName: 'sosecure',
   webDir: 'out',
   server: {
     url: 'https://safe-walk-ten.vercel.app/',

@@ -1,4 +1,4 @@
-package com.safewalk.app;
+package com.sosecure.app;
 
 import com.getcapacitor.BridgeActivity;
 

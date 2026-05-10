@@ -134,7 +134,7 @@ export const useAppStore = create<AppState>()(
       clearOfflineQueue: () => set({ offlineQueue: [] }),
     }),
     {
-      name: 'safewalk-store',
+      name: 'sosecure-store',
       partialize: (state) => ({
         contacts: state.contacts,
         mapCenter: state.mapCenter,

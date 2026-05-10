@@ -56,7 +56,7 @@ export function DuringTab() {
         const blob = new Blob(audioChunks, { type: 'audio/webm' })
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
-        a.href = url; a.download = `safewalk-audio-${Date.now()}.webm`; a.click()
+        a.href = url; a.download = `sosecure-audio-${Date.now()}.webm`; a.click()
       }
       setAudioChunks([])
     } else {

@@ -78,7 +78,7 @@ export function AppShell() {
   }
 
   useEffect(() => {
-    const saved = localStorage.getItem('safewalk-theme') || 'dark'
+    const saved = localStorage.getItem('sosecure-theme') || 'dark'
     setIsDark(saved === 'dark')
     applyTheme(saved)
   }, [])
@@ -86,7 +86,7 @@ export function AppShell() {
   const toggleTheme = () => {
     const next = isDark ? 'light' : 'dark'
     document.documentElement.className = next
-    localStorage.setItem('safewalk-theme', next)
+    localStorage.setItem('sosecure-theme', next)
     applyTheme(next)
     setIsDark(!isDark)
   }
@@ -98,7 +98,7 @@ export function AppShell() {
   }, [coordinates, setCurrentLocation])
 
   useEffect(() => {
-    const saved = localStorage.getItem('safewalk-theme') || 'dark'
+    const saved = localStorage.getItem('sosecure-theme') || 'dark'
     setTimeout(() => applyTheme(saved), 50)
   }, [activeTab])
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'safewalk-v2'
+const CACHE_NAME = 'sosecure-v2'
 const STATIC_URLS = [
   '/',
   '/auth/login',
@@ -60,7 +60,7 @@ self.addEventListener('push', (event) => {
       body: data.body || 'Nueva alerta de seguridad',
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-72.png',
-      tag: data.tag || 'safewalk',
+      tag: data.tag || 'sosecure',
       requireInteraction: data.urgent || false,
     })
   )

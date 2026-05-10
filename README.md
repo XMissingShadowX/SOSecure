@@ -165,7 +165,7 @@ Los siguientes permisos se añaden al `AndroidManifest.xml` de forma automática
 ## Estructura del Proyecto
 
 ```
-safewalk/
+sosecure/
 ├── app/
 │   ├── page.tsx              # Inicio (verificación de autenticación en cliente)
 │   ├── globals.css           # Variables CSS del tema oscuro
