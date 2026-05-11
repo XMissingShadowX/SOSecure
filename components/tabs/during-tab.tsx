@@ -24,7 +24,7 @@ export function DuringTab() {
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null)
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null)
   const [audioRecorder, setAudioRecorder] = useState<MediaRecorder | null>(null)
-  const [audioChunks, setAudioChunks] = useState<Blob[]>([])
+  const audioChunksRef = useRef<Blob[]>([])
   const [lastRecording, setLastRecording] = useState<RecordingMeta | null>(null)
   const [recordingStatus, setRecordingStatus] = useState<'idle' | 'saving' | 'sending' | 'uploading' | 'done'>('idle')
   const [statusMsg, setStatusMsg] = useState('')
@@ -32,6 +32,7 @@ export function DuringTab() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const tapCountRef = useRef(0)
   const tapTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const [tapCountDisplay, setTapCountDisplay] = useState(0)
 
   useEffect(() => {
     const update = () => setIsOnline(navigator.onLine)
@@ -44,10 +45,15 @@ export function DuringTab() {
   // Secret button tap sequence (5 taps to activate SOS)
   const handleSecretTap = useCallback(() => {
     tapCountRef.current += 1
+    setTapCountDisplay(tapCountRef.current)
     if (tapTimerRef.current) clearTimeout(tapTimerRef.current)
-    tapTimerRef.current = setTimeout(() => { tapCountRef.current = 0 }, 3000)
+    tapTimerRef.current = setTimeout(() => {
+      tapCountRef.current = 0
+      setTapCountDisplay(0)
+    }, 3000)
     if (tapCountRef.current >= 5) {
       tapCountRef.current = 0
+      setTapCountDisplay(0)
       window.dispatchEvent(new CustomEvent('sosecure:activate'))
     }
   }, [])
@@ -60,8 +66,8 @@ export function DuringTab() {
       setAudioRecorder(null)
       setIsRecordingAudio(false)
 
-      if (audioChunks.length) {
-        const blob = new Blob(audioChunks, { type: 'audio/webm' })
+      if (audioChunksRef.current.length) {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
         const meta: RecordingMeta = {
           id: generateRecordingId(),
           blob,
@@ -75,16 +81,15 @@ export function DuringTab() {
         setLastRecording(meta)
         setStatusMsg('Grabación lista. ¿Qué deseas hacer?')
       }
-      setAudioChunks([])
     } else {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
         setAudioStream(stream)
         audioStartRef.current = Date.now()
         const recorder = new MediaRecorder(stream)
-        const chunks: Blob[] = []
-        recorder.ondataavailable = (e) => chunks.push(e.data)
-        recorder.onstop = () => setAudioChunks(chunks)
+        audioChunksRef.current = []
+        recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
+        recorder.onstop = () => {}
         recorder.start()
         setAudioRecorder(recorder)
         setIsRecordingAudio(true)
@@ -94,7 +99,7 @@ export function DuringTab() {
         sendAlarmNotification('⚠️ SOSecure', 'No se pudo acceder al micrófono')
       }
     }
-  }, [isRecordingAudio, audioRecorder, audioStream, audioChunks, coordinates])
+  }, [isRecordingAudio, audioRecorder, audioStream, coordinates])
 
   // Guardar localmente
   const handleSaveLocally = useCallback(() => {
@@ -138,17 +143,30 @@ export function DuringTab() {
       videoStream?.getTracks().forEach(t => t.stop())
       setVideoStream(null)
       setIsRecordingVideo(false)
+      // Generar grabación de video
+      setLastRecording({
+        id: generateRecordingId(),
+        blob: new Blob([], { type: 'video/webm' }),
+        type: 'video',
+        mimeType: 'video/webm',
+        durationMs: 0,
+        createdAt: new Date().toISOString(),
+        latitude: coordinates?.latitude,
+        longitude: coordinates?.longitude,
+      })
+      setStatusMsg('Video listo. ¿Qué deseas hacer?')
     } else {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: true })
         setVideoStream(stream)
-        if (videoRef.current) videoRef.current.srcObject = stream
         setIsRecordingVideo(true)
+        setLastRecording(null)
+        setStatusMsg('')
       } catch {
         sendAlarmNotification('⚠️ SOSecure', 'No se pudo acceder a la cámara')
       }
     }
-  }, [isRecordingVideo, videoStream])
+  }, [isRecordingVideo, videoStream, coordinates])
 
   const lastLocations = locationHistory.slice(-5)
 
@@ -205,13 +223,16 @@ export function DuringTab() {
           </div>
 
           {/* Secret tap button */}
-          <Button
-            variant="outline"
-            className="w-full border-dashed"
+          <button
             onClick={handleSecretTap}
+            className="w-full py-3 px-4 rounded-lg border-2 border-dashed border-warning bg-warning/10 text-warning font-medium text-sm hover:bg-warning/20 active:scale-95 transition-all flex items-center justify-center gap-2"
           >
-            Toque secreto ({5 - tapCountRef.current > 0 ? 5 - tapCountRef.current : 0} restantes)
-          </Button>
+            <span className="text-lg">👆</span>
+            Toque secreto
+            <span className="ml-auto bg-warning text-warning-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+              {Math.max(0, 5 - tapCountDisplay)}
+            </span>
+          </button>
         </CardContent>
       </Card>
 
@@ -224,14 +245,26 @@ export function DuringTab() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {isRecordingVideo && (
-            <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-              <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
+          <div className="relative aspect-video bg-black rounded-lg overflow-hidden" style={{ display: isRecordingVideo ? 'block' : 'none' }}>
+            <video
+              ref={(el) => {
+                (videoRef as React.MutableRefObject<HTMLVideoElement | null>).current = el
+                if (el && videoStream) {
+                  el.srcObject = videoStream
+                  el.play().catch(() => {})
+                }
+              }}
+              autoPlay
+              muted
+              playsInline
+              className="w-full h-full object-cover"
+            />
+            {isRecordingVideo && (
               <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 bg-destructive rounded text-xs text-white font-bold">
                 <div className="w-2 h-2 rounded-full bg-white animate-pulse" /> REC
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           <div className="flex gap-3">
             <Button

@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'sosecure',
   webDir: 'out',
   server: {
-    url: 'https://safe-walk-ten.vercel.app/',
+    url: 'https://sosecure-ten.vercel.app/',
     cleartext: true,
     androidScheme: 'https',
   },

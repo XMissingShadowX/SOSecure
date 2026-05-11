@@ -180,43 +180,50 @@ export function BeforeTab() {
       {/* Safe Zones */}
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <ShieldCheck className="w-5 h-5 text-safe" />
-              Zonas Seguras Cercanas
-            </CardTitle>
-            <Button variant="ghost" size="sm" onClick={() => setShowSafeZones(!showSafeZones)}>
-              <Eye className="w-4 h-4 mr-1" />
-              {showSafeZones ? 'Ocultar' : 'Ver'}
-            </Button>
-          </div>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ShieldCheck className="w-5 h-5 text-safe" />
+            Zonas Seguras Cercanas
+          </CardTitle>
         </CardHeader>
-        {showSafeZones && (
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Locales donde puedes refugiarte en caso de emergencia:
-            </p>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Locales donde puedes refugiarte en caso de emergencia:
+          </p>
+          {coordinates ? (
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { label: '💊 Farmacia', query: 'farmacia' },
+                { label: '👮 Policía', query: 'ministerio+publico' },
+                { label: '🏥 Hospital', query: 'hospital' },
+                { label: '🏪 Tienda 24h', query: 'tienda+24+horas' },
+              ].map((z) => (
+                <button
+                  key={z.query}
+                  onClick={() => window.open(`https://www.google.com/maps/search/${z.query}/@${coordinates.latitude},${coordinates.longitude},15z`, '_blank')}
+                  className="p-3 bg-muted/50 rounded-lg flex items-center gap-2 hover:bg-muted transition-colors text-left w-full"
+                >
+                  <span className="text-lg">{z.label.split(' ')[0]}</span>
+                  <div>
+                    <p className="text-xs font-medium text-foreground">{z.label.split(' ').slice(1).join(' ')}</p>
+                    <p className="text-xs text-muted-foreground">Ver en mapa</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
             <div className="grid grid-cols-2 gap-2">
               {SAFE_ZONE_TYPES.map((z) => (
                 <div key={z.type} className="p-3 bg-muted/50 rounded-lg flex items-center gap-2">
                   <span className="text-lg">{z.label.split(' ')[0]}</span>
                   <div>
                     <p className="text-xs font-medium">{z.label.split(' ').slice(1).join(' ')}</p>
-                    <p className="text-xs text-muted-foreground">Ver en mapa</p>
+                    <p className="text-xs text-muted-foreground">Activa ubicación</p>
                   </div>
                 </div>
               ))}
             </div>
-            {coordinates && (
-              <Button variant="outline" className="w-full" onClick={() => {
-                window.open(`https://www.google.com/maps/search/farmacia/@${coordinates.latitude},${coordinates.longitude},15z`, '_blank')
-              }}>
-                <MapPin className="w-4 h-4 mr-2" />
-                Buscar zonas seguras en Google Maps
-              </Button>
-            )}
-          </CardContent>
-        )}
+          )}
+        </CardContent>
       </Card>
 
       {/* Tracking */}
@@ -269,7 +276,7 @@ export function BeforeTab() {
           ) : (
             <div className="flex flex-wrap gap-2">
               {contacts.map((c) => (
-                <Badge key={c.id} variant="secondary" className="text-sm">
+                <Badge key={c.id} variant="secondary" className="text-sm !text-black dark:!text-white">
                   {c.name} · {c.importance === 'primary' ? '🔴' : c.importance === 'secondary' ? '🟡' : '🔵'}
                 </Badge>
               ))}

@@ -57,7 +57,12 @@ export function SOSButton() {
     sendAlarmNotification('🚨 SOSecure SOS Activado', 'Alerta de emergencia enviada a tus contactos', true)
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true }).catch(
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: { facingMode: { ideal: 'environment' } }
+      }).catch(
+        () => navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+      ).catch(
         () => navigator.mediaDevices.getUserMedia({ audio: true })
       )
       setRecordingStream(stream)
@@ -325,7 +330,12 @@ export function SOSButton() {
                   <button
                     onClick={async () => {
                       try {
-                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true }).catch(
+                        const stream = await navigator.mediaDevices.getUserMedia({
+                          audio: true,
+                          video: { facingMode: { ideal: 'environment' } }
+                        }).catch(
+                          () => navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+                        ).catch(
                           () => navigator.mediaDevices.getUserMedia({ audio: true })
                         )
                         setRecordingStream(stream)

@@ -12,27 +12,13 @@ export interface PermissionState {
 const isNative = () => typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.()
 
 export function usePermissions() {
-  const [permissions, setPermissions] = useState<PermissionState>(() => {
-    if (typeof window === 'undefined') return {
-      geolocation: 'unknown', notifications: 'unknown', camera: 'unknown', microphone: 'unknown',
-    }
-    const notifState = typeof Notification !== 'undefined'
-      ? Notification.permission as PermissionStatus['state']
-      : 'unknown'
-    return {
-      geolocation: 'unknown',
-      notifications: notifState,
-      camera: 'unknown',
-      microphone: 'unknown',
-    }
+  const [permissions, setPermissions] = useState<PermissionState>({
+    geolocation: 'unknown',
+    notifications: 'unknown',
+    camera: 'unknown',
+    microphone: 'unknown',
   })
-  const [allGranted, setAllGranted] = useState(() => {
-    if (typeof window === 'undefined') return false
-    // Chequeo síncrono rápido — solo notificaciones son sincrónamente disponibles
-    const notifGranted = typeof Notification !== 'undefined' && Notification.permission === 'granted'
-    // Si notificaciones ya están granted, asumimos que el resto también y dejamos que el useEffect confirme
-    return notifGranted
-  })
+  const [allGranted, setAllGranted] = useState(false)
 
   const requestGeolocation = useCallback(async () => {
     try {

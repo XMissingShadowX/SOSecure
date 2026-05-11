@@ -39,7 +39,7 @@ export function AfterTab() {
       const { data } = await supabase
         .from('incidents')
         .select('*')
-        .eq('verified', false)
+        .eq('is_verified', false)
         .eq('is_active', true)
         .order('reported_at', { ascending: false })
         .limit(20)
@@ -67,7 +67,7 @@ export function AfterTab() {
   const verifyIncident = async (incident: Incident, verified: boolean) => {
     const supabase = createClient()
     if (verified) {
-      await supabase.from('incidents').update({ verified: true }).eq('id', incident.id)
+      await supabase.from('incidents').update({ is_verified: true }).eq('id', incident.id)
     } else {
       // Mark as false alarm and deactivate
       await supabase.from('incidents').update({ is_active: false, resolved_at: new Date().toISOString() }).eq('id', incident.id)
@@ -141,7 +141,7 @@ export function AfterTab() {
               <CheckCircle className="w-5 h-5 text-primary" />
               Verificar Incidentes
             </CardTitle>
-            <Badge variant="secondary">{incidentsToVerify.length} pendientes</Badge>
+            <Badge variant="secondary" className="!text-black dark:!text-white">{incidentsToVerify.length} pendientes</Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">

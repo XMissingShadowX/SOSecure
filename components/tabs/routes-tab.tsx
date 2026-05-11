@@ -189,7 +189,7 @@ export function RoutesTab() {
                   {suggestions.map((s, i) => (
                     <button
                       key={i}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-muted border-b border-border last:border-0"
+                      className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted-foreground border-b border-border last:border-0"
                       onClick={() => {
                         setDestinationInput(s.display_name)
                         setRouteDestination({ latitude: parseFloat(s.lat), longitude: parseFloat(s.lon) })
