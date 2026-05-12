@@ -4,6 +4,12 @@ import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Shield, MapPin, Clock, AlertTriangle } from 'lucide-react'
 
+export async function generateStaticParams() {
+  return []
+}
+
+export const dynamic = 'force-dynamic'
+
 export default async function EmergencyPage({ params }: { params: Promise<{ alertId: string }> }) {
   const { alertId } = await params
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null)
