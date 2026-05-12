@@ -162,7 +162,7 @@ export function SOSButton() {
     }
 
     updateLocation()
-    const interval = setInterval(updateLocation, 10000)
+    const interval = setInterval(updateLocation, 2000)
     return () => clearInterval(interval)
   }, [sosActive, coordinates, activeAlertId])
 
