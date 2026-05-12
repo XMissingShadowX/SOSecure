@@ -5,9 +5,6 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  exportPathMap: async function() {
-    return {}
-  },
-}
 
+}
 export default nextConfig
