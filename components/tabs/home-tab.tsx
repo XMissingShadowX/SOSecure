@@ -54,7 +54,13 @@ export function HomeTab() {
   const { setCurrentLocation, contacts, setContacts, nearbyIncidents, frequentPlaces, addFrequentPlace, removeFrequentPlace } = useAppStore()
   const [showAddContact, setShowAddContact] = useState(false)
   const [showAddPlace, setShowAddPlace] = useState(false)
-  const [newContact, setNewContact] = useState({ name: '', phone: '', relationship: '', importance: 'secondary' as EmergencyContact['importance'] })
+  const [newContact, setNewContact] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    relationship: '',
+    importance: 'secondary' as EmergencyContact['importance']
+  })
   const [newPlace, setNewPlace] = useState<{ label: string; type: string; address: string; lat?: string; lon?: string }>({ label: '', type: 'home', address: '' })
   const [placeSuggestions, setPlaceSuggestions] = useState<{ display_name: string; lat: string; lon: string }[]>([])
   const [loading, setLoading] = useState(true)
@@ -94,6 +100,7 @@ export function HomeTab() {
           user_id: user.id,
           name: newContact.name,
           phone: newContact.phone,
+          email: newContact.email || null,
           relationship: newContact.relationship || null,
           priority: contacts.length + 1,
           importance: newContact.importance,
@@ -102,7 +109,7 @@ export function HomeTab() {
         .single()
       if (data && !error) {
         setContacts([...contacts, data])
-        setNewContact({ name: '', phone: '', relationship: '', importance: 'secondary' })
+        setNewContact({ name: '', phone: '', email: '', relationship: '', importance: 'secondary'})
         setShowAddContact(false)
       }
     }
@@ -398,6 +405,15 @@ export function HomeTab() {
                   <Field>
                     <FieldLabel>Teléfono</FieldLabel>
                     <Input type="tel" placeholder="+52 555 000 0000" value={newContact.phone} onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })} />
+                  </Field>
+                  <Field>
+                    <FieldLabel>Email (para alertas automáticas)</FieldLabel>
+                    <Input
+                      type="email"
+                      placeholder="correo@ejemplo.com"
+                      value={newContact.email || ''}
+                      onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
+                    />
                   </Field>
                   <Field>
                     <FieldLabel>Relación (Opcional)</FieldLabel>

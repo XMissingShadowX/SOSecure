@@ -14,6 +14,51 @@ import {
   generateRecordingId,
   type RecordingMeta,
 } from '@/lib/recordings'
+async function reverseGeocode(lat: number, lng: number): Promise<string> {
+  try {
+    const res = await fetch(
+      `https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}&limit=1`,
+      { headers: { Accept: 'application/json' } }
+    )
+    if (!res.ok) throw new Error('photon error')
+    const data = await res.json()
+    const f = data.features?.[0]
+    if (!f) return `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+    const p = f.properties ?? {}
+    const street   = p.street ?? p.name ?? ''
+    const number   = p.housenumber ?? ''
+    const district = p.district ?? p.suburb ?? ''
+    const city     = p.city ?? p.town ?? p.village ?? ''
+    if (street) {
+      const parts = [street + (number ? ' ' + number : ''), district || city].filter(Boolean)
+      return parts.join(', ')
+    }
+    return [p.name, city].filter(Boolean).join(', ') || `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+  } catch {
+    return `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+  }
+}
+
+function useStreetNames(locationHistory: { coordinates: { latitude: number; longitude: number }; timestamp: number }[]) {
+  const [streetNames, setStreetNames] = useState<Record<string, string>>({})
+  const pendingRef = useRef<Set<string>>(new Set())
+  const last5 = locationHistory.slice(-5)
+
+  useEffect(() => {
+    for (const loc of last5) {
+      const key = `${loc.coordinates.latitude.toFixed(5)},${loc.coordinates.longitude.toFixed(5)}`
+      if (streetNames[key] || pendingRef.current.has(key)) continue
+      pendingRef.current.add(key)
+      reverseGeocode(loc.coordinates.latitude, loc.coordinates.longitude).then((name) => {
+        setStreetNames(prev => ({ ...prev, [key]: name }))
+        pendingRef.current.delete(key)
+      })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationHistory.length])
+
+  return { streetNames, last5 }
+}
 
 export function DuringTab() {
   const { sosActive, setSosActive, contacts, locationHistory } = useAppStore()
@@ -202,8 +247,7 @@ export function DuringTab() {
     }
   }, [isRecordingVideo, videoStream, coordinates])
 
-  const lastLocations = locationHistory.slice(-5)
-
+  const { streetNames, last5: lastLocations } = useStreetNames(locationHistory)
   return (
     <div className="flex flex-col gap-6 pb-40">
       {/* Status */}
@@ -406,8 +450,7 @@ export function DuringTab() {
               {lastLocations.reverse().map((loc, i) => (
                 <div key={i} className="flex items-center gap-2 p-2 bg-muted/50 rounded text-xs">
                   <Badge variant="outline" className="text-xs">{i === 0 ? 'Ahora' : `Hace ${Math.round((Date.now() - loc.timestamp) / 60000)} min`}</Badge>
-                  <span className="font-mono text-muted-foreground">{loc.coordinates.latitude.toFixed(5)}, {loc.coordinates.longitude.toFixed(5)}</span>
-                </div>
+<span className="text-muted-foreground">{streetNames[`${loc.coordinates.latitude.toFixed(5)},${loc.coordinates.longitude.toFixed(5)}`] ?? '📍 Cargando...'}</span>                </div>
               ))}
             </div>
           )}

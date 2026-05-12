@@ -48,31 +48,7 @@ export function SOSButton() {
 
   const activateSOS = useCallback(async () => {
     if (!coordinates) return
-
-    setSosActive(true)
-    setIsRecording(true)
-    setMinimized(false)
-
-    playAlarmSound()
-    sendAlarmNotification('🚨 SOSecure SOS Activado', 'Alerta de emergencia enviada a tus contactos', true)
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: { facingMode: { ideal: 'environment' } }
-      }).catch(
-        () => navigator.mediaDevices.getUserMedia({ audio: true, video: true })
-      ).catch(
-        () => navigator.mediaDevices.getUserMedia({ audio: true })
-      )
-      setRecordingStream(stream)
-      const recorder = new MediaRecorder(stream)
-      recorder.start()
-      setMediaRecorder(recorder)
-    } catch {
-      // Recording not available
-    }
-
+    const coords = coordinates
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -85,7 +61,37 @@ export function SOSButton() {
         contacts_notified: contacts.map(c => c.name),
       }).select().single()
 
-      if (alert) setSosAlert(alert)
+      if (alert) {
+        setSosAlert(alert)
+
+        // Insertar ubicación inicial
+        await supabase.from('sos_locations').insert({
+          alert_id: alert.id,
+          user_id: user.id,
+          latitude: coordinates.latitude,
+          longitude: coordinates.longitude,
+        })
+
+        // Cargar contactos con email desde Supabase
+        const { data: contactsWithEmail } = await supabase
+          .from('emergency_contacts')
+          .select('*')
+          .eq('user_id', user.id)
+
+        // Llamar Edge Function para mandar emails
+        if (contactsWithEmail?.some(c => c.email)) {
+          await supabase.functions.invoke('notify-contacts', {
+            body: {
+              alert_id: alert.id,
+              user_id: user.id,
+              user_name: user.user_metadata?.full_name || user.email,
+              latitude: coordinates.latitude,
+              longitude: coordinates.longitude,
+              contacts: contactsWithEmail,
+            },
+          })
+        }
+      }
 
       await supabase.from('incidents').insert({
         user_id: user.id,
@@ -97,9 +103,6 @@ export function SOSButton() {
         longitude: coordinates.longitude,
       })
     }
-
-    setContactsNotified(contacts.map(c => c.name))
-    if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200])
   }, [coordinates, contacts, setSosActive, setSosAlert])
 
   // Conectar stream al <video> oculto para mantenerlo vivo al minimizar
@@ -109,6 +112,40 @@ export function SOSButton() {
       videoPreviewRef.current.play().catch(() => {})
     }
   }, [recordingStream])
+
+  // Actualizar ubicación en Supabase cada 10 segundos mientras SOS está activo
+  useEffect(() => {
+    if (!sosActive || !coordinates) return
+    const supabase = createClient()
+
+    const updateLocation = async () => {
+      if (!coordinates) return
+      const { data: alertData } = await supabase
+        .from('sos_alerts')
+        .select('id')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (alertData) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          await supabase.from('sos_locations').upsert({
+            alert_id: alertData.id,
+            user_id: user.id,
+            latitude: coordinates.latitude,
+            longitude: coordinates.longitude,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'alert_id' })
+        }
+      }
+    }
+
+    updateLocation()
+    const interval = setInterval(updateLocation, 10000)
+    return () => clearInterval(interval)
+  }, [sosActive, coordinates])
 
   // Secret tap sequence
   const handleSecretTap = useCallback(() => {

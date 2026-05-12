@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
+import { ErrorBoundary } from '@/components/error-boundary'
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
@@ -51,10 +52,12 @@ export default function RootLayout({
         }} />
       </head>
       <body className="font-sans antialiased">
-        <script dangerouslySetInnerHTML={{
-          __html: `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js') }`,
-        }} />
-        {children}
+        <ErrorBoundary>
+          <script dangerouslySetInnerHTML={{
+            __html: `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js') }`,
+          }} />
+          {children}
+        </ErrorBoundary>
       </body>
     </html>
   )
