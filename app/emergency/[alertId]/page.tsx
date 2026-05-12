@@ -3,9 +3,10 @@
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Shield, MapPin, Clock, AlertTriangle } from 'lucide-react'
+import { use } from 'react'
 
-export default async function EmergencyPage({ params }: { params: Promise<{ alertId: string }> }) {
-  const { alertId } = await params
+export default function EmergencyPage({ params }: { params: Promise<{ alertId: string }> }) {
+  const { alertId } = use(params)
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null)
   const [alert, setAlert] = useState<any>(null)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
@@ -44,7 +45,6 @@ export default async function EmergencyPage({ params }: { params: Promise<{ aler
     loadAlert()
     loadLocation()
 
-    // Suscripción en tiempo real
     const channel = supabase
       .channel(`sos-location-${alertId}`)
       .on('postgres_changes', {
@@ -63,7 +63,6 @@ export default async function EmergencyPage({ params }: { params: Promise<{ aler
     return () => { supabase.removeChannel(channel) }
   }, [alertId])
 
-  // Inicializar mapa Leaflet
   useEffect(() => {
     if (!location || !mapRef.current || typeof window === 'undefined') return
 
@@ -122,7 +121,6 @@ export default async function EmergencyPage({ params }: { params: Promise<{ aler
         }
       `}</style>
 
-      {/* Header */}
       <div className="bg-red-600 text-white px-4 py-6">
         <div className="max-w-lg mx-auto">
           <div className="flex items-center gap-3 mb-2">
@@ -136,7 +134,6 @@ export default async function EmergencyPage({ params }: { params: Promise<{ aler
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
-        {/* Estado */}
         <div className="bg-white rounded-xl border-2 border-red-200 p-4">
           <div className="flex items-center gap-3">
             <AlertTriangle className="w-6 h-6 text-red-500 flex-shrink-0" />
@@ -149,7 +146,6 @@ export default async function EmergencyPage({ params }: { params: Promise<{ aler
           </div>
         </div>
 
-        {/* Última actualización */}
         {lastUpdate && (
           <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
             <Clock className="w-5 h-5 text-gray-400 flex-shrink-0" />
@@ -160,7 +156,6 @@ export default async function EmergencyPage({ params }: { params: Promise<{ aler
           </div>
         )}
 
-        {/* Mapa */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
             <MapPin className="w-4 h-4 text-red-500" />
@@ -183,14 +178,13 @@ export default async function EmergencyPage({ params }: { params: Promise<{ aler
           )}
         </div>
 
-        {/* Botón Google Maps */}
         {location && (
-          <a
+          <a>
             href={`https://maps.google.com/?q=${location.latitude},${location.longitude}`}
             target="_blank"
             rel="noopener noreferrer"
             className="block w-full bg-blue-600 text-white text-center py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
-          >
+          
             🗺️ Abrir en Google Maps
           </a>
         )}
