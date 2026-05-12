@@ -69,6 +69,7 @@ export default async function EmergencyPage({ params }: { params: Promise<{ aler
 
     const initMap = async () => {
       const L = (await import('leaflet')).default
+      // @ts-ignore
       await import('leaflet/dist/leaflet.css')
 
       if (!mapInstanceRef.current) {
