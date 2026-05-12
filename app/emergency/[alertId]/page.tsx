@@ -45,23 +45,8 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
     loadAlert()
     loadLocation()
 
-    const channel = supabase
-      .channel(`sos-location-${alertId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'sos_locations',
-        filter: `alert_id=eq.${alertId}`,
-      }, (payload: any) => {
-        if (payload.new) {
-          setLocation({ latitude: payload.new.latitude, longitude: payload.new.longitude })
-          setLastUpdate(new Date(payload.new.updated_at))
-        }
-      })
-      .subscribe((status) => {
-        console.log('Realtime status:', status)
-      })
-    return () => { supabase.removeChannel(channel) }
+    const interval = setInterval(loadLocation, 2000)
+    return () => clearInterval(interval)
   }, [alertId])
 
   useEffect(() => {
