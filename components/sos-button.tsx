@@ -34,6 +34,7 @@ export function SOSButton() {
   const [recordingStream, setRecordingStream] = useState<MediaStream | null>(null)
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
   const [minimized, setMinimized] = useState(false)
+  const [activeAlertId, setActiveAlertId] = useState<string | null>(null)
 
   const holdTimerRef = useRef<NodeJS.Timeout | null>(null)
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -49,49 +50,79 @@ export function SOSButton() {
   const activateSOS = useCallback(async () => {
     if (!coordinates) return
     const coords = coordinates
+
+    setSosActive(true)
+    setIsRecording(true)
+    setMinimized(false)
+
+    playAlarmSound()
+    sendAlarmNotification('🚨 SOSecure SOS Activado', 'Alerta de emergencia enviada a tus contactos', true)
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: { facingMode: { ideal: 'environment' } }
+      }).catch(
+        () => navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+      ).catch(
+        () => navigator.mediaDevices.getUserMedia({ audio: true })
+      )
+      setRecordingStream(stream)
+      const recorder = new MediaRecorder(stream)
+      recorder.start()
+      setMediaRecorder(recorder)
+    } catch { /* sin permisos */ }
+
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200])
+
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (user) {
       const { data: alert } = await supabase.from('sos_alerts').insert({
         user_id: user.id,
-        latitude: coordinates.latitude,
-        longitude: coordinates.longitude,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
         status: 'active',
         contacts_notified: contacts.map(c => c.name),
       }).select().single()
 
       if (alert) {
         setSosAlert(alert)
+        setActiveAlertId(alert.id)
 
-        // Insertar ubicación inicial
         await supabase.from('sos_locations').insert({
           alert_id: alert.id,
           user_id: user.id,
-          latitude: coordinates.latitude,
-          longitude: coordinates.longitude,
+          latitude: coords.latitude,
+          longitude: coords.longitude,
         })
 
-        // Cargar contactos con email desde Supabase
         const { data: contactsWithEmail } = await supabase
           .from('emergency_contacts')
           .select('*')
           .eq('user_id', user.id)
 
-        // Llamar Edge Function para mandar emails
-        if (contactsWithEmail?.some(c => c.email)) {
-          await supabase.functions.invoke('notify-contacts', {
-            body: {
+        if (contactsWithEmail?.some((c: any) => c.email)) {
+          await fetch('https://mtpbgfumbqfiiqgyjcey.supabase.co/functions/v1/notify-contacts', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            },
+            body: JSON.stringify({
               alert_id: alert.id,
               user_id: user.id,
               user_name: user.user_metadata?.full_name || user.email,
-              latitude: coordinates.latitude,
-              longitude: coordinates.longitude,
+              latitude: coords.latitude,
+              longitude: coords.longitude,
               contacts: contactsWithEmail,
-            },
+            }),
           })
         }
       }
+
+      setContactsNotified(contacts.map(c => c.name))
 
       await supabase.from('incidents').insert({
         user_id: user.id,
@@ -99,13 +130,12 @@ export function SOSButton() {
         description: 'SOS de emergencia activado',
         incident_type: 'other',
         severity: 'high',
-        latitude: coordinates.latitude,
-        longitude: coordinates.longitude,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
       })
     }
   }, [coordinates, contacts, setSosActive, setSosAlert])
 
-  // Conectar stream al <video> oculto para mantenerlo vivo al minimizar
   useEffect(() => {
     if (recordingStream && videoPreviewRef.current) {
       videoPreviewRef.current.srcObject = recordingStream
@@ -113,41 +143,29 @@ export function SOSButton() {
     }
   }, [recordingStream])
 
-  // Actualizar ubicación en Supabase cada 10 segundos mientras SOS está activo
   useEffect(() => {
-    if (!sosActive || !coordinates) return
+    if (!sosActive || !coordinates || !activeAlertId) return
     const supabase = createClient()
 
     const updateLocation = async () => {
-      if (!coordinates) return
-      const { data: alertData } = await supabase
-        .from('sos_alerts')
-        .select('id')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
-
-      if (alertData) {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          await supabase.from('sos_locations').upsert({
-            alert_id: alertData.id,
-            user_id: user.id,
-            latitude: coordinates.latitude,
-            longitude: coordinates.longitude,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'alert_id' })
-        }
+      if (!coordinates || !activeAlertId) return
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await supabase.from('sos_locations').upsert({
+          alert_id: activeAlertId,
+          user_id: user.id,
+          latitude: coordinates.latitude,
+          longitude: coordinates.longitude,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'alert_id' })
       }
     }
 
     updateLocation()
     const interval = setInterval(updateLocation, 10000)
     return () => clearInterval(interval)
-  }, [sosActive, coordinates])
+  }, [sosActive, coordinates, activeAlertId])
 
-  // Secret tap sequence
   const handleSecretTap = useCallback(() => {
     const now = Date.now()
     tapTimesRef.current = [...tapTimesRef.current.filter(t => now - t < SECRET_TAP_WINDOW), now]
@@ -157,14 +175,12 @@ export function SOSButton() {
     }
   }, [activateSOS])
 
-  // Escucha activaciones externas (durante-tab)
   useEffect(() => {
     const handler = () => { if (!sosActive) activateSOS() }
     window.addEventListener('sosecure:activate', handler)
     return () => window.removeEventListener('sosecure:activate', handler)
   }, [sosActive, activateSOS])
 
-  // Voice activation
   useEffect(() => {
     if (sosActive || voiceListeningRef.current) return
     if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) return
@@ -236,6 +252,7 @@ export function SOSButton() {
     setContactsNotified([])
     setShowCancelDialog(false)
     setMinimized(false)
+    setActiveAlertId(null)
   }, [setSosActive, setSosAlert, mediaRecorder, recordingStream])
 
   useEffect(() => () => clearTimers(), [clearTimers])
@@ -243,7 +260,6 @@ export function SOSButton() {
   if (sosActive) {
     return (
       <>
-        {/* Video oculto siempre en el DOM — mantiene el stream vivo al minimizar */}
         <video
           ref={videoPreviewRef}
           autoPlay
@@ -252,19 +268,16 @@ export function SOSButton() {
           className="fixed -top-[9999px] -left-[9999px] w-px h-px"
         />
 
-        {/* OVERLAY completo */}
         {!minimized && (
           <div className="fixed inset-0 z-[200] bg-destructive/10 backdrop-blur-sm overflow-y-auto">
             <div className="flex flex-col items-center justify-center min-h-full px-6 py-8">
               <div className="w-full max-w-sm space-y-4">
 
-                {/* Cabecera */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-destructive">
                     <div className="w-3 h-3 rounded-full bg-destructive animate-pulse" />
                     <span className="font-semibold">SOS ACTIVO</span>
                   </div>
-                  {/* Botón minimizar invisible — mantiene el layout centrado */}
                   <button
                     onClick={() => setMinimized(true)}
                     className="opacity-0 pointer-events-none flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs"
@@ -273,7 +286,6 @@ export function SOSButton() {
                   </button>
                 </div>
 
-                {/* Video preview */}
                 <div className="relative aspect-video bg-black rounded-lg overflow-hidden border-2 border-destructive">
                   {recordingStream ? (
                     <video
@@ -308,7 +320,6 @@ export function SOSButton() {
                   )}
                 </div>
 
-                {/* Ubicación */}
                 {coordinates && (
                   <div className="p-3 bg-card rounded-lg border border-border">
                     <p className="text-xs text-muted-foreground mb-0.5">Tu ubicación</p>
@@ -318,7 +329,6 @@ export function SOSButton() {
                   </div>
                 )}
 
-                {/* Contactos notificados */}
                 {contactsNotified.length > 0 && (
                   <div className="p-3 bg-card rounded-lg border border-border">
                     <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
@@ -333,7 +343,6 @@ export function SOSButton() {
                   </div>
                 )}
 
-                {/* Ver en Mapa */}
                 <button
                   onClick={() => { setMinimized(true); setActiveTab('map') }}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-primary font-medium text-sm hover:bg-primary/90 transition-colors !text-black dark:!text-white"
@@ -341,7 +350,6 @@ export function SOSButton() {
                   Ver en Mapa
                 </button>
 
-                {/* Guardar y cerrar */}
                 <button
                   onClick={() => setMinimized(true)}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-card border border-border text-foreground font-medium text-sm hover:bg-muted transition-colors"
@@ -349,7 +357,6 @@ export function SOSButton() {
                   Guardar y cerrar alerta
                 </button>
 
-                {/* Detener / Reanudar grabación */}
                 {recordingStream ? (
                   <button
                     onClick={() => {
@@ -389,7 +396,6 @@ export function SOSButton() {
                   </button>
                 )}
 
-                {/* Falsa alarma */}
                 <button
                   onClick={() => setShowCancelDialog(true)}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-destructive text-destructive font-medium text-sm hover:bg-destructive hover:text-destructive-foreground transition-colors"
@@ -403,7 +409,6 @@ export function SOSButton() {
           </div>
         )}
 
-        {/* BURBUJA FLOTANTE cuando está minimizado */}
         {minimized && (
           <button
             onClick={() => setMinimized(false)}
@@ -415,7 +420,6 @@ export function SOSButton() {
           </button>
         )}
 
-        {/* DIÁLOGO falsa alarma */}
         <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
           <AlertDialogContent className="z-[300]">
             <AlertDialogHeader>

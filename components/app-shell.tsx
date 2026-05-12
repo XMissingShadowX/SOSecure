@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { PermissionGate } from './permission-gate'
 import { BottomNavigation } from './bottom-navigation'
 import { SOSButton } from './sos-button'
+import { EmergencyChat } from './emergency-chat'
 import { HomeTab } from './tabs/home-tab'
 import { MapTab } from './tabs/map-tab'
 import { RoutesTab } from './tabs/routes-tab'
@@ -226,6 +227,7 @@ export function AppShell() {
         </main>
 
         <SOSButton />
+        <EmergencyChat />
         <BottomNavigation />
       </div>
     </PermissionGate>
