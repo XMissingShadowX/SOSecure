@@ -45,7 +45,7 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
     loadAlert()
     loadLocation()
 
-    const interval = setInterval(loadLocation, 2000)
+    const interval = setInterval(loadLocation, 1000)
     return () => clearInterval(interval)
   }, [alertId])
 
