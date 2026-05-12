@@ -4,8 +4,8 @@ import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Shield, MapPin, Clock, AlertTriangle } from 'lucide-react'
 
-export default function EmergencyPage({ params }: { params: { alertId: string } }) {
-  const { alertId } = params
+export default async function EmergencyPage({ params }: { params: Promise<{ alertId: string }> }) {
+  const { alertId } = await params
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null)
   const [alert, setAlert] = useState<any>(null)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
