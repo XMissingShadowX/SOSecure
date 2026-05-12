@@ -58,8 +58,9 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
           setLastUpdate(new Date(payload.new.updated_at))
         }
       })
-      .subscribe()
-
+      .subscribe((status) => {
+        console.log('Realtime status:', status)
+      })
     return () => { supabase.removeChannel(channel) }
   }, [alertId])
 
