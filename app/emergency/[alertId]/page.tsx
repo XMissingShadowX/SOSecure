@@ -165,12 +165,12 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
         </div>
 
         {location && (
-          <a>
+          <a
             href={`https://maps.google.com/?q=${location.latitude},${location.longitude}`}
             target="_blank"
             rel="noopener noreferrer"
             className="block w-full bg-blue-600 text-white text-center py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
-          
+          >
             🗺️ Abrir en Google Maps
           </a>
         )}
