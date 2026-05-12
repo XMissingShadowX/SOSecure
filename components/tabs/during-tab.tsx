@@ -30,6 +30,9 @@ export function DuringTab() {
   const [statusMsg, setStatusMsg] = useState('')
   const audioStartRef = useRef<number>(0)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const videoRecorderRef = useRef<MediaRecorder | null>(null)
+  const videoChunksRef = useRef<Blob[]>([])
+  const videoStartRef = useRef<number>(0)
   const tapCountRef = useRef(0)
   const tapTimerRef = useRef<NodeJS.Timeout | null>(null)
   const [tapCountDisplay, setTapCountDisplay] = useState(0)
@@ -65,32 +68,37 @@ export function DuringTab() {
       setAudioStream(null)
       setAudioRecorder(null)
       setIsRecordingAudio(false)
-
-      if (audioChunksRef.current.length) {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-        const meta: RecordingMeta = {
-          id: generateRecordingId(),
-          blob,
-          type: 'audio',
-          mimeType: 'audio/webm',
-          durationMs: Date.now() - audioStartRef.current,
-          createdAt: new Date().toISOString(),
-          latitude: coordinates?.latitude,
-          longitude: coordinates?.longitude,
-        }
-        setLastRecording(meta)
-        setStatusMsg('Grabación lista. ¿Qué deseas hacer?')
-      }
+      // Los chunks llegan en onstop — no hacer nada aquí
     } else {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
         setAudioStream(stream)
         audioStartRef.current = Date.now()
-        const recorder = new MediaRecorder(stream)
         audioChunksRef.current = []
-        recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
-        recorder.onstop = () => {}
-        recorder.start()
+        const recorder = new MediaRecorder(stream)
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) audioChunksRef.current.push(e.data)
+        }
+        recorder.onstop = () => {
+          if (audioChunksRef.current.length) {
+            const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+            const meta: RecordingMeta = {
+              id: generateRecordingId(),
+              blob,
+              type: 'audio',
+              mimeType: 'audio/webm',
+              durationMs: Date.now() - audioStartRef.current,
+              createdAt: new Date().toISOString(),
+              latitude: coordinates?.latitude,
+              longitude: coordinates?.longitude,
+            }
+            setLastRecording(meta)
+            setStatusMsg('Grabación lista. ¿Qué deseas hacer?')
+            setRecordingStatus('idle')
+          }
+          audioChunksRef.current = []
+        }
+        recorder.start(100) // chunk cada 100ms para asegurar datos
         setAudioRecorder(recorder)
         setIsRecordingAudio(true)
         setLastRecording(null)
@@ -140,28 +148,54 @@ export function DuringTab() {
 
   const toggleVideo = useCallback(async () => {
     if (isRecordingVideo) {
+      videoRecorderRef.current?.stop()
       videoStream?.getTracks().forEach(t => t.stop())
       setVideoStream(null)
       setIsRecordingVideo(false)
-      // Generar grabación de video
-      setLastRecording({
-        id: generateRecordingId(),
-        blob: new Blob([], { type: 'video/webm' }),
-        type: 'video',
-        mimeType: 'video/webm',
-        durationMs: 0,
-        createdAt: new Date().toISOString(),
-        latitude: coordinates?.latitude,
-        longitude: coordinates?.longitude,
-      })
-      setStatusMsg('Video listo. ¿Qué deseas hacer?')
     } else {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: true })
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } },
+          audio: true
+        })
         setVideoStream(stream)
         setIsRecordingVideo(true)
         setLastRecording(null)
         setStatusMsg('')
+        videoChunksRef.current = []
+        videoStartRef.current = Date.now()
+
+        const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+          ? 'video/webm;codecs=vp9'
+          : MediaRecorder.isTypeSupported('video/webm')
+          ? 'video/webm'
+          : 'video/mp4'
+
+        const recorder = new MediaRecorder(stream, { mimeType })
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) videoChunksRef.current.push(e.data)
+        }
+        recorder.onstop = () => {
+          if (videoChunksRef.current.length) {
+            const blob = new Blob(videoChunksRef.current, { type: mimeType })
+            const meta: RecordingMeta = {
+              id: generateRecordingId(),
+              blob,
+              type: 'video',
+              mimeType,
+              durationMs: Date.now() - videoStartRef.current,
+              createdAt: new Date().toISOString(),
+              latitude: coordinates?.latitude,
+              longitude: coordinates?.longitude,
+            }
+            setLastRecording(meta)
+            setStatusMsg('Video listo. ¿Qué deseas hacer?')
+            setRecordingStatus('idle')
+          }
+          videoChunksRef.current = []
+        }
+        recorder.start(100)
+        videoRecorderRef.current = recorder
       } catch {
         sendAlarmNotification('⚠️ SOSecure', 'No se pudo acceder a la cámara')
       }

@@ -22,7 +22,7 @@ export function generateRecordingId(): string {
 }
 
 export function saveRecordingLocally(meta: RecordingMeta): string {
-  const ext = meta.type === 'audio' ? 'webm' : 'mp4'
+  const ext = meta.mimeType.includes('mp4') ? 'mp4' : 'webm'
   const filename = `safewalk-${meta.type}-${meta.id}.${ext}`
   const url = URL.createObjectURL(meta.blob)
   const a = document.createElement('a')
@@ -42,20 +42,20 @@ export async function sendRecordingToContacts(
 ): Promise<{ success: boolean; method: string }> {
   if (!contacts.length) return { success: false, method: 'none' }
 
-  const ext = meta.type === 'audio' ? 'webm' : 'mp4'
+  const ext = meta.mimeType.includes('mp4') ? 'mp4' : 'webm'
   const filename = `safewalk-${meta.type}-${meta.id}.${ext}`
   const file = new File([meta.blob], filename, { type: meta.mimeType })
 
   const shareText =
     message ??
-    `🚨 ALERTA SafeWalk — ${new Date(meta.createdAt).toLocaleString('es-MX')}` +
+    `🚨 ALERTA SOSecure — ${new Date(meta.createdAt).toLocaleString('es-MX')}` +
     (meta.latitude ? `\n📍 https://maps.google.com/?q=${meta.latitude},${meta.longitude}` : '')
 
   // Intento con Web Share API (funciona en móvil/Capacitor)
   if (typeof navigator !== 'undefined' && 'share' in navigator && 'canShare' in navigator) {
     try {
-      if (navigator.canShare({ files: [file] })) {
-        await navigator.share({ title: '🚨 Grabación SOSecure', text: shareText, files: [file] })
+      if ((navigator as any).canShare({ files: [file] })) {
+        await (navigator as any).share({ title: '🚨 Grabación SOSecure', text: shareText, files: [file] })
         return { success: true, method: 'share' }
       }
     } catch (err: unknown) {
@@ -63,7 +63,34 @@ export async function sendRecordingToContacts(
     }
   }
 
-  // Fallback: abrir WhatsApp del contacto principal
+  // Fallback: subir a Supabase y compartir link por WhatsApp
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (user) {
+    const storagePath = `${user.id}/${meta.id}.${ext}`
+    const { error: uploadError } = await supabase.storage
+      .from('recordings')
+      .upload(storagePath, meta.blob, { contentType: meta.mimeType, upsert: true })
+
+    if (!uploadError) {
+      const { data: urlData } = supabase.storage.from('recordings').getPublicUrl(storagePath)
+      const publicUrl = urlData?.publicUrl
+
+      if (publicUrl) {
+        const primary = contacts.find(c => c.importance === 'primary') ?? contacts[0]
+        const phone = primary.phone.replace(/\D/g, '')
+        const fullMessage = `${shareText}\n🎥 Grabación: ${publicUrl}`
+        if (phone) {
+          window.open(`https://wa.me/${phone}?text=${encodeURIComponent(fullMessage)}`, '_blank', 'noopener')
+          return { success: true, method: 'whatsapp+url' }
+        }
+        return { success: true, method: 'url' }
+      }
+    }
+  }
+
+  // Último fallback: solo WhatsApp con texto
   const primary = contacts.find(c => c.importance === 'primary') ?? contacts[0]
   const phone = primary.phone.replace(/\D/g, '')
   if (phone) {
@@ -79,7 +106,7 @@ export async function uploadRecordingToDB(meta: RecordingMeta) {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { publicUrl: null, dbRecord: null, error: 'No autenticado' }
 
-  const ext = meta.type === 'audio' ? 'webm' : 'mp4'
+  const ext = meta.mimeType.includes('mp4') ? 'mp4' : 'webm'
   const storagePath = `${user.id}/${meta.id}.${ext}`
 
   const { error: uploadError } = await supabase.storage

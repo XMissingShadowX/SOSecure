@@ -188,7 +188,7 @@ export function HomeTab() {
               <span>{locationError}</span>
             </div>
           ) : coordinates ? (
-            <div className="space-y-2">
+            <div className="space-y-2 bg-muted">
               <p className="font-mono text-sm bg-muted px-3 py-2 rounded">
                 {coordinates.latitude.toFixed(6)}, {coordinates.longitude.toFixed(6)}
               </p>
@@ -352,7 +352,7 @@ export function HomeTab() {
               <p className="text-sm text-muted-foreground">Agrega hasta {MAX_CONTACTS} contactos</p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 bg-muted">
               {contacts.map((contact, index) => (
                 <div key={contact.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                   <div className="flex items-center gap-3">
