@@ -179,6 +179,7 @@ export function MapTab() {
         severity: newIncident.severity,
         latitude: coordinates.latitude,
         longitude: coordinates.longitude,
+        is_verified: false,
       })
       setNewIncident({ title: '', description: '', incident_type: 'suspicious', severity: 'medium' })
       setShowReportDialog(false)
@@ -486,7 +487,7 @@ export function MapTab() {
                   <p className="text-xs text-muted-foreground">{new Date(incident.reported_at).toLocaleString()}</p>
                 </div>
                 <div className="flex items-center gap-1">
-                  {incident.verified && <Badge variant="outline" className="text-xs text-safe border-safe">✓</Badge>}
+                  {incident.is_verified && <Badge variant="outline" className="text-xs text-safe border-safe">✓</Badge>}
                   {incident.user_id === currentUserId && (
                     <>
                       <button onClick={() => handleEdit(incident)} className="p-1 hover:text-primary transition-colors">
