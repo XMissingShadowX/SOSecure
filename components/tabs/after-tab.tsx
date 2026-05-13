@@ -46,8 +46,7 @@ type VoteCounts = Record<string, { real: number; fake: number }>
 export function AfterTab() {
   const { nearbyIncidents, locationHistory, contacts } = useAppStore()
   const [incidentsToVerify, setIncidentsToVerify] = useState<Incident[]>([])
-  const [votedIds, setVotedIds] = useState<Set<string>>(() => getVotedIds())
-  // Conteo de votos: { [incidentId]: { real: number, fake: number } }
+  const [votedIds, setVotedIds] = useState<Set<string>>(new Set())  // ← vacío, sin getVotedIds()
   const [voteCounts, setVoteCounts] = useState<VoteCounts>({})
   const [securityPin, setSecurityPin] = useState('')
   const [pinInput, setPinInput] = useState('')
@@ -56,6 +55,16 @@ export function AfterTab() {
   const [pinSaved, setPinSaved] = useState(false)
   const [showPinDialog, setShowPinDialog] = useState(false)
   const [dangerZones, setDangerZones] = useState<{ lat: number; lng: number; count: number }[]>([])
+
+  // Cargar sessionStorage/localStorage solo en el cliente
+  useEffect(() => {
+    setVotedIds(getVotedIds())
+    const storedPin = localStorage.getItem('safewalk_security_pin')
+    if (storedPin) {
+      setSecurityPin(storedPin)
+      setPinSaved(true)
+    }
+  }, [])
 
   useEffect(() => {
     const loadUnverified = async () => {
@@ -70,9 +79,6 @@ export function AfterTab() {
       if (data) {
         const alreadyVoted = getVotedIds()
         setIncidentsToVerify(data.filter((inc) => !alreadyVoted.has(inc.id)))
-
-        // Inicializar conteos desde los campos de la DB si existen,
-        // o en 0 si la tabla no tiene esas columnas aún
         const counts: VoteCounts = {}
         for (const inc of data) {
           counts[inc.id] = {
