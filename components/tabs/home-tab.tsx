@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Shield, MapPin, Users, Plus, Trash2, AlertCircle, Star, Home, Briefcase, BookOpen, Heart, Navigation } from 'lucide-react'
+import { Shield, MapPin, Users, Plus, Trash2, AlertCircle, Star, Home, Briefcase, BookOpen, Heart, Navigation, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/lib/store'
 import { useGeolocation } from '@/hooks/use-geolocation'
@@ -54,7 +54,15 @@ export function HomeTab() {
   const { setCurrentLocation, contacts, setContacts, nearbyIncidents, frequentPlaces, addFrequentPlace, removeFrequentPlace } = useAppStore()
   const [showAddContact, setShowAddContact] = useState(false)
   const [showAddPlace, setShowAddPlace] = useState(false)
+  const [editingContact, setEditingContact] = useState<EmergencyContact | null>(null)
   const [newContact, setNewContact] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    relationship: '',
+    importance: 'secondary' as EmergencyContact['importance']
+  })
+  const [editContact, setEditContact] = useState({
     name: '',
     phone: '',
     email: '',
@@ -109,9 +117,41 @@ export function HomeTab() {
         .single()
       if (data && !error) {
         setContacts([...contacts, data])
-        setNewContact({ name: '', phone: '', email: '', relationship: '', importance: 'secondary'})
+        setNewContact({ name: '', phone: '', email: '', relationship: '', importance: 'secondary' })
         setShowAddContact(false)
       }
+    }
+  }
+
+  const openEditContact = (contact: EmergencyContact) => {
+    setEditingContact(contact)
+    setEditContact({
+      name: contact.name,
+      phone: contact.phone,
+      email: (contact as any).email || '',
+      relationship: contact.relationship || '',
+      importance: contact.importance,
+    })
+  }
+
+  const saveEditContact = async () => {
+    if (!editingContact || !editContact.name || !editContact.phone) return
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('emergency_contacts')
+      .update({
+        name: editContact.name,
+        phone: editContact.phone,
+        email: editContact.email || null,
+        relationship: editContact.relationship || null,
+        importance: editContact.importance,
+      })
+      .eq('id', editingContact.id)
+      .select()
+      .single()
+    if (data && !error) {
+      setContacts(contacts.map(c => c.id === editingContact.id ? data : c))
+      setEditingContact(null)
     }
   }
 
@@ -377,13 +417,30 @@ export function HomeTab() {
                       {contact.relationship && <p className="text-xs text-muted-foreground">{contact.relationship}</p>}
                     </div>
                   </div>
-                  <Button variant="ghost" size="icon" onClick={() => removeContact(contact)} className="text-destructive hover:text-destructive hover:bg-destructive/10">
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  {/* Botones editar + eliminar */}
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => openEditContact(contact)}
+                      className="text-muted-foreground hover:text-primary hover:bg-primary/10"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeContact(contact)}
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
           )}
+
           {contacts.length < MAX_CONTACTS && (
             <Dialog open={showAddContact} onOpenChange={setShowAddContact}>
               <DialogTrigger asChild>
@@ -454,6 +511,71 @@ export function HomeTab() {
               </DialogContent>
             </Dialog>
           )}
+
+          {/* Dialog editar contacto */}
+          <Dialog open={!!editingContact} onOpenChange={(open) => { if (!open) setEditingContact(null) }}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Editar Contacto</DialogTitle>
+                <DialogDescription>Modifica los datos del contacto de emergencia.</DialogDescription>
+              </DialogHeader>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel>Nombre</FieldLabel>
+                  <Input placeholder="Nombre del contacto" value={editContact.name} onChange={(e) => setEditContact({ ...editContact, name: e.target.value })} />
+                </Field>
+                <Field>
+                  <FieldLabel>Teléfono</FieldLabel>
+                  <Input type="tel" placeholder="+52 555 000 0000" value={editContact.phone} onChange={(e) => setEditContact({ ...editContact, phone: e.target.value })} />
+                </Field>
+                <Field>
+                  <FieldLabel>Email</FieldLabel>
+                  <Input
+                    type="email"
+                    placeholder="correo@ejemplo.com"
+                    value={editContact.email || ''}
+                    onChange={(e) => setEditContact({ ...editContact, email: e.target.value })}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel>Relación (Opcional)</FieldLabel>
+                  <Select value={editContact.relationship} onValueChange={(v) => setEditContact({ ...editContact, relationship: v })}>
+                    <SelectTrigger><SelectValue placeholder="Selecciona relación" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="parent">Padre/Madre</SelectItem>
+                      <SelectItem value="spouse">Esposo/a</SelectItem>
+                      <SelectItem value="sibling">Hermano/a</SelectItem>
+                      <SelectItem value="friend">Amigo/a</SelectItem>
+                      <SelectItem value="partner">Pareja</SelectItem>
+                      <SelectItem value="other">Otro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field>
+                  <FieldLabel>Importancia</FieldLabel>
+                  <div className="flex gap-2">
+                    {importanceLevels.map((level) => (
+                      <button
+                        key={level.value}
+                        type="button"
+                        onClick={() => setEditContact({ ...editContact, importance: level.value })}
+                        className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
+                          editContact.importance === level.value ? level.color : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                        }`}
+                      >
+                        {level.label}
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+              </FieldGroup>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setEditingContact(null)}>Cancelar</Button>
+                <Button onClick={saveEditContact} disabled={!editContact.name || !editContact.phone}>Guardar cambios</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
         </CardContent>
       </Card>
 
