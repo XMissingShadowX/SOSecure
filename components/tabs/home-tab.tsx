@@ -302,7 +302,7 @@ export function HomeTab() {
                         {placeSuggestions.map((s, i) => (
                           <button
                             key={i}
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-muted border-b border-border last:border-0"
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-muted-foreground border-b border-border last:border-0"
                             onClick={() => {
                               setNewPlace({ ...newPlace, address: s.display_name, lat: s.lat, lon: s.lon })
                               setPlaceSuggestions([])

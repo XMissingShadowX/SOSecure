@@ -11,6 +11,7 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
   const [alert, setAlert] = useState<any>(null)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [loading, setLoading] = useState(true)
+  const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
   const markerRef = useRef<any>(null)
@@ -24,7 +25,10 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
         .select('*')
         .eq('id', alertId)
         .single()
-      if (data) setAlert(data)
+      if (data) {
+        setAlert(data)
+        if (data.video_url) setVideoUrl(data.video_url)
+      }
       setLoading(false)
     }
 
@@ -46,7 +50,17 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
     loadLocation()
 
     const interval = setInterval(loadLocation, 1000)
-    return () => clearInterval(interval)
+
+    const refreshVideo = setInterval(async () => {
+      const { data } = await supabase
+        .from('sos_alerts')
+        .select('video_url')
+        .eq('id', alertId)
+        .single()
+      if (data?.video_url) setVideoUrl(data.video_url)
+    }, 5000)
+
+    return () => { clearInterval(interval); clearInterval(refreshVideo) }
   }, [alertId])
 
   useEffect(() => {
@@ -164,8 +178,26 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
           )}
         </div>
 
+        {videoUrl && (
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+              <span className="text-lg">🎥</span>
+              <p className="font-medium text-gray-800">Video grabado durante la alerta</p>
+            </div>
+            <div className="p-4">
+              <video
+                src={videoUrl}
+                controls
+                playsInline
+                className="w-full rounded-lg bg-black"
+                style={{ maxHeight: '320px' }}
+              />
+            </div>
+          </div>
+        )}
+
         {location && (
-          <a
+          
             href={`https://maps.google.com/?q=${location.latitude},${location.longitude}`}
             target="_blank"
             rel="noopener noreferrer"

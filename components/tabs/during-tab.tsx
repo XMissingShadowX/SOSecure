@@ -90,7 +90,7 @@ export function DuringTab() {
     return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update) }
   }, [])
 
-  // Secret button tap sequence (5 taps to activate SOS)
+  // Secret button tap sequence (3 taps to activate SOS)
   const handleSecretTap = useCallback(() => {
     tapCountRef.current += 1
     setTapCountDisplay(tapCountRef.current)
@@ -99,7 +99,7 @@ export function DuringTab() {
       tapCountRef.current = 0
       setTapCountDisplay(0)
     }, 3000)
-    if (tapCountRef.current >= 5) {
+    if (tapCountRef.current >= 3) {
       tapCountRef.current = 0
       setTapCountDisplay(0)
       window.dispatchEvent(new CustomEvent('sosecure:activate'))
@@ -308,7 +308,7 @@ export function DuringTab() {
             <span className="text-lg">👆</span>
             Toque secreto
             <span className="ml-auto bg-warning text-warning-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
-              {Math.max(0, 5 - tapCountDisplay)}
+              {Math.max(0, 3 - tapCountDisplay)}
             </span>
           </button>
         </CardContent>

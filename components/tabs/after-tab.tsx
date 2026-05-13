@@ -1,7 +1,8 @@
+//after-tab.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CheckCircle, MapPin, AlertTriangle, Lock, Key, Clock, Eye, EyeOff } from 'lucide-react'
+import { CheckCircle, MapPin, AlertTriangle, Lock, Key, Clock, Eye, EyeOff, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { createClient } from '@/lib/supabase/client'
 import { sendAlarmNotification } from '@/lib/notifications'
@@ -21,9 +22,33 @@ import {
 } from '@/components/ui/dialog'
 import type { Incident } from '@/lib/types'
 
+
+const SESSION_VOTED_KEY = 'safewalk_voted_incidents'
+
+function getVotedIds(): Set<string> {
+  try {
+    const raw = sessionStorage.getItem(SESSION_VOTED_KEY)
+    return new Set(raw ? (JSON.parse(raw) as string[]) : [])
+  } catch {
+    return new Set()
+  }
+}
+
+function markVoted(id: string): void {
+  const ids = getVotedIds()
+  ids.add(id)
+  sessionStorage.setItem(SESSION_VOTED_KEY, JSON.stringify([...ids]))
+}
+
+// Tipo para rastrear conteos de votos por incidente
+type VoteCounts = Record<string, { real: number; fake: number }>
+
 export function AfterTab() {
   const { nearbyIncidents, locationHistory, contacts } = useAppStore()
   const [incidentsToVerify, setIncidentsToVerify] = useState<Incident[]>([])
+  const [votedIds, setVotedIds] = useState<Set<string>>(() => getVotedIds())
+  // Conteo de votos: { [incidentId]: { real: number, fake: number } }
+  const [voteCounts, setVoteCounts] = useState<VoteCounts>({})
   const [securityPin, setSecurityPin] = useState('')
   const [pinInput, setPinInput] = useState('')
   const [pinUnlocked, setPinUnlocked] = useState(false)
@@ -33,7 +58,6 @@ export function AfterTab() {
   const [dangerZones, setDangerZones] = useState<{ lat: number; lng: number; count: number }[]>([])
 
   useEffect(() => {
-    // Load unverified incidents for moderation
     const loadUnverified = async () => {
       const supabase = createClient()
       const { data } = await supabase
@@ -43,13 +67,26 @@ export function AfterTab() {
         .eq('is_active', true)
         .order('reported_at', { ascending: false })
         .limit(20)
-      if (data) setIncidentsToVerify(data)
+      if (data) {
+        const alreadyVoted = getVotedIds()
+        setIncidentsToVerify(data.filter((inc) => !alreadyVoted.has(inc.id)))
+
+        // Inicializar conteos desde los campos de la DB si existen,
+        // o en 0 si la tabla no tiene esas columnas aún
+        const counts: VoteCounts = {}
+        for (const inc of data) {
+          counts[inc.id] = {
+            real: inc.votes_real ?? 0,
+            fake: inc.votes_fake ?? 0,
+          }
+        }
+        setVoteCounts(counts)
+      }
     }
     loadUnverified()
   }, [])
 
   useEffect(() => {
-    // Group high incidents into danger zones
     const high = nearbyIncidents.filter(i => i.severity === 'high')
     const zones = high.reduce<{ lat: number; lng: number; count: number }[]>((acc, inc) => {
       const existing = acc.find(z => Math.abs(z.lat - inc.latitude) < 0.005 && Math.abs(z.lng - inc.longitude) < 0.005)
@@ -58,21 +95,48 @@ export function AfterTab() {
     }, [])
     setDangerZones(zones)
 
-    // Notify if near danger zone
     if (zones.length > 0) {
       sendAlarmNotification('⚠️ Zona de Peligro', `Hay ${zones.length} zona(s) de alerta cercanas`)
     }
   }, [nearbyIncidents])
 
   const verifyIncident = async (incident: Incident, verified: boolean) => {
-    const supabase = createClient()
-    if (verified) {
-      await supabase.from('incidents').update({ is_verified: true }).eq('id', incident.id)
-    } else {
-      // Mark as false alarm and deactivate
-      await supabase.from('incidents').update({ is_active: false, resolved_at: new Date().toISOString() }).eq('id', incident.id)
-    }
+    if (votedIds.has(incident.id)) return
+
+    // Optimistic update
+    setVoteCounts(prev => ({
+      ...prev,
+      [incident.id]: {
+        real: (prev[incident.id]?.real ?? 0) + (verified ? 1 : 0),
+        fake: (prev[incident.id]?.fake ?? 0) + (verified ? 0 : 1),
+      },
+    }))
+    markVoted(incident.id)
+    setVotedIds(prev => new Set([...prev, incident.id]))
     setIncidentsToVerify(prev => prev.filter(i => i.id !== incident.id))
+
+    const supabase = createClient()
+
+    if (verified) {
+      await supabase.rpc('increment_votes', {
+        incident_id: incident.id,
+        vote_column: 'votes_real',
+      })
+      // Marcar verificado aparte
+      await supabase
+        .from('incidents')
+        .update({ is_verified: true })
+        .eq('id', incident.id)
+    } else {
+      await supabase.rpc('increment_votes', {
+        incident_id: incident.id,
+        vote_column: 'votes_fake',
+      })
+      await supabase
+        .from('incidents')
+        .update({ is_active: false, resolved_at: new Date().toISOString() })
+        .eq('id', incident.id)
+    }
   }
 
   const savePin = () => {
@@ -146,36 +210,94 @@ export function AfterTab() {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-xs text-muted-foreground">
-            Ayuda a verificar incidentes para evitar falsas alarmas en la comunidad
+            Ayuda a verificar incidentes para evitar falsas alarmas en la comunidad.{' '}
+            <span className="font-medium text-foreground">Solo puedes votar una vez por incidente en esta sesión.</span>
           </p>
           {incidentsToVerify.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-3">Sin incidentes pendientes de verificación</p>
+            <div className="flex flex-col items-center gap-2 py-4 text-center">
+              <CheckCircle className="w-8 h-8 text-safe/60" />
+              <p className="text-sm text-muted-foreground">
+                {votedIds.size > 0
+                  ? `Ya votaste en ${votedIds.size} incidente${votedIds.size > 1 ? 's' : ''} esta sesión. ¡Gracias!`
+                  : 'Sin incidentes pendientes de verificación'}
+              </p>
+            </div>
           ) : (
-            incidentsToVerify.slice(0, 5).map((inc) => (
-              <div key={inc.id} className="p-3 bg-muted/50 rounded-lg space-y-2">
-                <div className="flex items-start gap-2">
-                  <span className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
-                    style={{ background: inc.severity === 'high' ? '#ef4444' : inc.severity === 'medium' ? '#f59e0b' : '#3b82f6' }} />
-                  <div>
-                    <p className="text-sm font-medium">{inc.title}</p>
-                    <p className="text-xs text-muted-foreground">{new Date(inc.reported_at).toLocaleString()}</p>
+            incidentsToVerify.slice(0, 5).map((inc) => {
+              const alreadyVoted = votedIds.has(inc.id)
+              const counts = voteCounts[inc.id] ?? { real: 0, fake: 0 }
+              const totalVotes = counts.real + counts.fake
+
+              return (
+                <div
+                  key={inc.id}
+                  className={`p-3 rounded-lg space-y-2 transition-opacity ${alreadyVoted ? 'opacity-50 bg-muted/30' : 'bg-muted/50'}`}
+                >
+                  <div className="flex items-start gap-2">
+                    <span className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
+                      style={{ background: inc.severity === 'high' ? '#ef4444' : inc.severity === 'medium' ? '#f59e0b' : '#3b82f6' }} />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{inc.title}</p>
+                      <p className="text-xs text-muted-foreground">{new Date(inc.reported_at).toLocaleString()}</p>
+                    </div>
+                    {alreadyVoted && (
+                      <Badge variant="secondary" className="text-xs shrink-0">Ya votado</Badge>
+                    )}
                   </div>
+
+                  {/* Badges de conteo de votos */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {totalVotes} {totalVotes === 1 ? 'voto' : 'votos'}:
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className="flex items-center gap-1 text-xs border-green-500/50 text-green-600 dark:text-green-400 px-2 py-0.5"
+                    >
+                      <ThumbsUp className="w-3 h-3" />
+                      {counts.real} real
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className="flex items-center gap-1 text-xs border-red-400/50 text-red-500 dark:text-red-400 px-2 py-0.5"
+                    >
+                      <ThumbsDown className="w-3 h-3" />
+                      {counts.fake} falso
+                    </Badge>
+                  </div>
+
+                  {alreadyVoted ? (
+                    <p className="text-xs text-muted-foreground text-center py-1">
+                      Ya enviaste tu voto sobre este incidente esta sesión
+                    </p>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-safe border-safe hover:bg-safe/10"
+                        onClick={() => verifyIncident(inc, true)}
+                      >
+                        ✓ Real
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-destructive border-destructive hover:bg-destructive/10"
+                        onClick={() => verifyIncident(inc, false)}
+                      >
+                        ✗ Falso
+                      </Button>
+                    </div>
+                  )}
                 </div>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" className="flex-1 text-safe border-safe hover:bg-safe/10" onClick={() => verifyIncident(inc, true)}>
-                    ✓ Real
-                  </Button>
-                  <Button size="sm" variant="outline" className="flex-1 text-destructive border-destructive hover:bg-destructive/10" onClick={() => verifyIncident(inc, false)}>
-                    ✗ Falso
-                  </Button>
-                </div>
-              </div>
-            ))
+              )
+            })
           )}
         </CardContent>
       </Card>
 
-      {/* Location history (last 10 min anti-kidnapping) */}
+      {/* Location history */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">

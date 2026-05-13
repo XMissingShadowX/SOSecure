@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { AlertTriangle, X, Bell, Mic, Video, StopCircle, Minimize2, ChevronUp } from 'lucide-react'
+import { AlertTriangle, X, Bell, Mic, Video, StopCircle, Minimize2, ChevronUp, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/lib/store'
 import { useGeolocation } from '@/hooks/use-geolocation'
@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
-const HOLD_DURATION = 2000
+const HOLD_DURATION = 1000
 const SECRET_TAP_COUNT = 5
 const SECRET_TAP_WINDOW = 3000
 
@@ -35,6 +35,13 @@ export function SOSButton() {
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
   const [minimized, setMinimized] = useState(false)
   const [activeAlertId, setActiveAlertId] = useState<string | null>(null)
+  const [savedToCloud, setSavedToCloud]   = useState(false)
+  const [downloadReady, setDownloadReady] = useState(false)
+  const [isSaving, setIsSaving]           = useState(false)
+
+  const recordingChunksRef = useRef<Blob[]>([])
+  const recordingMimeRef   = useRef<string>('video/webm')
+  const recordingStartRef  = useRef<number>(0)
 
   const holdTimerRef = useRef<NodeJS.Timeout | null>(null)
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -68,8 +75,25 @@ export function SOSButton() {
         () => navigator.mediaDevices.getUserMedia({ audio: true })
       )
       setRecordingStream(stream)
-      const recorder = new MediaRecorder(stream)
-      recorder.start()
+
+      const mimeType = (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus'))
+        ? 'video/webm;codecs=vp9,opus'
+        : (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('video/webm'))
+        ? 'video/webm'
+        : 'video/mp4'
+
+      recordingMimeRef.current   = mimeType
+      recordingChunksRef.current = []
+      recordingStartRef.current  = Date.now()
+
+      const recorder = new MediaRecorder(stream, { mimeType })
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) recordingChunksRef.current.push(e.data)
+      }
+      recorder.onstop = () => {
+        if (recordingChunksRef.current.length > 0) setDownloadReady(true)
+      }
+      recorder.start(500)
       setMediaRecorder(recorder)
     } catch { /* sin permisos */ }
 
@@ -233,6 +257,76 @@ export function SOSButton() {
     setHoldProgress(0)
   }, [clearTimers])
 
+  const downloadRecording = () => {
+    const chunks = recordingChunksRef.current
+    if (!chunks.length) return
+    const mime     = recordingMimeRef.current
+    const ext      = mime.includes('mp4') ? 'mp4' : 'webm'
+    const dt       = new Date()
+    const datePart = dt.toLocaleDateString('sv-SE')
+    const timePart = dt.toLocaleTimeString('sv-SE').replace(/:/g, '-')
+    const filename = `safewalk-sos-${datePart}_${timePart}.${ext}`
+    const blob     = new Blob(chunks, { type: mime })
+    const url      = URL.createObjectURL(blob)
+    const a        = document.createElement('a')
+    a.href = url; a.download = filename; a.style.display = 'none'
+    document.body.appendChild(a); a.click()
+    setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a) }, 2000)
+  }
+
+  const saveRecordingToCloud = async (alertId: string) => {
+    const chunks = recordingChunksRef.current
+    if (!chunks.length) return
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const mime  = recordingMimeRef.current
+      const ext   = mime.includes('mp4') ? 'mp4' : 'webm'
+      const recId = crypto.randomUUID()
+      const blob  = new Blob(chunks, { type: mime })
+      const path  = `${user.id}/${recId}.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from('recordings')
+        .upload(path, blob, { contentType: mime, upsert: false })
+      if (upErr) { console.error('Upload error:', upErr.message); return }
+      await supabase.from('recordings').insert({
+        id: recId, user_id: user.id, storage_path: path,
+        recording_type: 'video', mime_type: mime,
+        duration_ms: Date.now() - recordingStartRef.current,
+        file_size_bytes: blob.size,
+        latitude:  coordinates?.latitude  ?? null,
+        longitude: coordinates?.longitude ?? null,
+        sos_alert_id: alertId,
+      })
+      const { data: { publicUrl } } = supabase.storage.from('recordings').getPublicUrl(path)
+      await supabase.from('sos_alerts').update({ video_url: publicUrl }).eq('id', alertId)
+      setSavedToCloud(true)
+    } catch (err) { console.error('saveRecordingToCloud failed:', err) }
+  }
+
+  const handleSaveAndClose = useCallback(async () => {
+    setIsSaving(true)
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      await new Promise<void>((resolve) => {
+        const orig = mediaRecorder.onstop
+        mediaRecorder.onstop = (e) => {
+          if (recordingChunksRef.current.length > 0) setDownloadReady(true)
+          if (orig) orig.call(mediaRecorder, e)
+          resolve()
+        }
+        mediaRecorder.stop()
+      })
+    }
+    if (recordingStream) recordingStream.getTracks().forEach(t => t.stop())
+    setRecordingStream(null)
+    setIsRecording(false)
+    downloadRecording()
+    if (activeAlertId) await saveRecordingToCloud(activeAlertId)
+    setIsSaving(false)
+    setMinimized(true)
+  }, [mediaRecorder, recordingStream, activeAlertId])
+
   const cancelSOS = useCallback(async () => {
     if (mediaRecorder) { try { mediaRecorder.stop() } catch { /* ignore */ } }
     if (recordingStream) { recordingStream.getTracks().forEach(t => t.stop()) }
@@ -253,6 +347,9 @@ export function SOSButton() {
     setShowCancelDialog(false)
     setMinimized(false)
     setActiveAlertId(null)
+    setSavedToCloud(false)
+    setDownloadReady(false)
+    recordingChunksRef.current = []
   }, [setSosActive, setSosAlert, mediaRecorder, recordingStream])
 
   useEffect(() => () => clearTimers(), [clearTimers])
@@ -351,10 +448,21 @@ export function SOSButton() {
                 </button>
 
                 <button
-                  onClick={() => setMinimized(true)}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-card border border-border text-foreground font-medium text-sm hover:bg-muted transition-colors"
+                  onClick={handleSaveAndClose}
+                  disabled={isSaving}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-card border border-border text-foreground font-medium text-sm hover:bg-muted transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  Guardar y cerrar alerta
+                  {isSaving ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      {savedToCloud ? '✅ Guardado — cerrar alerta' : 'Guardar y cerrar alerta'}
+                    </>
+                  )}
                 </button>
 
                 {recordingStream ? (
