@@ -1,3 +1,4 @@
+//map-tab.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -120,9 +121,7 @@ export function MapTab() {
   }, [])
 
   useEffect(() => {
-    if (isOnline && offlineQueue.length > 0) {
-      syncOfflineQueue()
-    }
+    if (isOnline && offlineQueue.length > 0) syncOfflineQueue()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnline])
 
@@ -245,8 +244,7 @@ export function MapTab() {
     if (filterTime !== 'all') {
       const now = new Date()
       const reported = new Date(i.reported_at)
-      const diffMs = now.getTime() - reported.getTime()
-      const diffDays = diffMs / (1000 * 60 * 60 * 24)
+      const diffDays = (now.getTime() - reported.getTime()) / (1000 * 60 * 60 * 24)
       if (filterTime === '1d' && diffDays > 1) return false
       if (filterTime === '7d' && diffDays > 7) return false
       if (filterTime === '30d' && diffDays > 30) return false
@@ -261,16 +259,20 @@ export function MapTab() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] pb-24">
+    // flex-col que ocupa exactamente el viewport menos la nav, sin scroll externo
+    <div className="flex flex-col h-[calc(100vh-4rem)] pb-24 gap-2">
+
+      {/* Banner offline — solo aparece si no hay internet, altura fija */}
       {!isOnline && (
-        <div className="mb-2 px-3 py-2 bg-warning/20 text-warning rounded-lg text-sm flex items-center gap-2">
+        <div className="flex-none px-3 py-2 bg-warning/20 text-warning rounded-lg text-sm flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
           Sin internet — los reportes se guardan localmente y se enviarán al reconectarte.
           {offlineQueue.length > 0 && <Badge variant="secondary">{offlineQueue.length} pendientes</Badge>}
         </div>
       )}
 
-      <div className="flex-1 relative rounded-lg overflow-hidden mb-4">
+      {/* ── MAPA ── flex-1 + min-h-0 es la clave: ocupa todo el espacio sobrante */}
+      <div className="relative flex-1 min-h-0 rounded-lg overflow-hidden">
         {loading ? (
           <div className="h-full w-full flex items-center justify-center bg-muted rounded-lg">
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -290,12 +292,20 @@ export function MapTab() {
           />
         )}
 
-        <div className="absolute top-3 right-3 z-[1000] flex flex-col gap-2">
-          <Button size="icon" variant="secondary" className="shadow-lg bg-card text-foreground border border-border hover:bg-muted" onClick={handleRefresh} disabled={refreshing}>
+        {/* Refresh — flotante arriba derecha */}
+        <div className="absolute top-3 right-3 z-[1000]">
+          <Button
+            size="icon"
+            variant="secondary"
+            className="shadow-lg bg-card text-foreground border border-border hover:bg-muted"
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>
         </div>
 
+        {/* Leyenda — flotante abajo izquierda */}
         <div className="absolute bottom-3 left-3 z-[1000] bg-card/95 backdrop-blur-sm rounded-lg p-3 shadow-lg">
           <p className="text-xs font-medium mb-2">Severidad</p>
           <div className="flex flex-col gap-1.5">
@@ -305,10 +315,78 @@ export function MapTab() {
             <div className="flex items-center gap-2 text-xs"><ShieldCheck className="w-3 h-3 text-safe" /><span>Zona segura</span></div>
           </div>
         </div>
+
+        {/* Botón Reportar — flotante abajo derecha sobre el mapa */}
+        <div className="absolute bottom-3 right-3 z-[1000]">
+          <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="shadow-lg">
+                <Plus className="w-4 h-4 mr-1" />
+                Reportar
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="z-[2000]">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-warning" />
+                  Reportar un Incidente
+                </DialogTitle>
+                <DialogDescription>
+                  Ayuda a mantener segura tu comunidad reportando incidentes en tu zona.
+                  {!isOnline && ' (Sin internet — se guardará localmente)'}
+                </DialogDescription>
+              </DialogHeader>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel>¿Qué pasó?</FieldLabel>
+                  <Input placeholder="Descripción breve" value={newIncident.title} onChange={(e) => setNewIncident({ ...newIncident, title: e.target.value })} />
+                </Field>
+                <Field>
+                  <FieldLabel>Tipo de Incidente</FieldLabel>
+                  <Select value={newIncident.incident_type} onValueChange={(v) => setNewIncident({ ...newIncident, incident_type: v as IncidentType })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {incidentTypesForm.map((type) => <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field>
+                  <FieldLabel>Severidad</FieldLabel>
+                  <div className="flex gap-2">
+                    {severityLevels.map((level) => (
+                      <button key={level.value} type="button"
+                        onClick={() => setNewIncident({ ...newIncident, severity: level.value })}
+                        className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
+                          newIncident.severity === level.value ? level.color : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                        }`}
+                      >{level.label}</button>
+                    ))}
+                  </div>
+                </Field>
+                <Field>
+                  <FieldLabel>Detalles (Opcional)</FieldLabel>
+                  <Textarea placeholder="Detalles adicionales..." rows={3} value={newIncident.description} onChange={(e) => setNewIncident({ ...newIncident, description: e.target.value })} />
+                </Field>
+                {coordinates && (
+                  <div className="p-3 bg-muted rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">Se registrará tu ubicación actual:</p>
+                    <p className="font-mono text-sm">{coordinates.latitude.toFixed(6)}, {coordinates.longitude.toFixed(6)}</p>
+                  </div>
+                )}
+              </FieldGroup>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowReportDialog(false)}>Cancelar</Button>
+                <Button onClick={reportIncident} disabled={!newIncident.title || !coordinates}>
+                  {isOnline ? 'Enviar Reporte' : 'Guardar Localmente'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
-      {/* Filtros */}
-      <div className="flex items-center gap-2 mb-2">
+      {/* ── Filtros — flex-none, altura fija ── */}
+      <div className="flex-none flex items-center gap-2">
         <Select value={filterSeverity} onValueChange={(v) => setFilterSeverity(v as IncidentSeverity | 'all')}>
           <SelectTrigger className="flex-1">
             <Filter className="w-4 h-4 mr-1" />
@@ -346,75 +424,44 @@ export function MapTab() {
         </Select>
       </div>
 
-      {/* Botón reportar */}
-      <div className="mb-3">
-        <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
-          <DialogTrigger asChild>
-            <Button className="w-full">
-              <Plus className="w-4 h-4 mr-2" />
-              Reportar
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="z-[2000]">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-warning" />
-                Reportar un Incidente
-              </DialogTitle>
-              <DialogDescription>
-                Ayuda a mantener segura tu comunidad reportando incidentes en tu zona.
-                {!isOnline && ' (Sin internet — se guardará localmente)'}
-              </DialogDescription>
-            </DialogHeader>
-
-            <FieldGroup>
-              <Field>
-                <FieldLabel>¿Qué pasó?</FieldLabel>
-                <Input placeholder="Descripción breve" value={newIncident.title} onChange={(e) => setNewIncident({ ...newIncident, title: e.target.value })} />
-              </Field>
-              <Field>
-                <FieldLabel>Tipo de Incidente</FieldLabel>
-                <Select value={newIncident.incident_type} onValueChange={(v) => setNewIncident({ ...newIncident, incident_type: v as IncidentType })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {incidentTypesForm.map((type) => <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field>
-                <FieldLabel>Severidad</FieldLabel>
-                <div className="flex gap-2">
-                  {severityLevels.map((level) => (
-                    <button key={level.value} type="button"
-                      onClick={() => setNewIncident({ ...newIncident, severity: level.value })}
-                      className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
-                        newIncident.severity === level.value ? level.color : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                      }`}
-                    >{level.label}</button>
-                  ))}
+      {/* ── Incidentes recientes — flex-none, scroll interno ── */}
+      <Card className="flex-none">
+        <CardHeader className="py-3">
+          <CardTitle className="text-sm flex items-center justify-between">
+            Incidentes Recientes
+            <Badge variant="secondary" className="!text-black dark:!text-white">{filteredIncidents.length}</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="max-h-[130px] overflow-y-auto space-y-2 pb-3">
+          {filteredIncidents.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">Sin incidentes reportados cerca</p>
+          ) : (
+            filteredIncidents.slice(0, 5).map((incident) => (
+              <div key={incident.id} className="flex items-center gap-3 p-2 bg-muted/50 rounded-lg">
+                <span className="w-2 h-2 rounded-full flex-shrink-0"
+                  style={{ background: incident.severity === 'high' ? '#ef4444' : incident.severity === 'medium' ? '#f59e0b' : '#3b82f6' }} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{incident.title}</p>
+                  <p className="text-xs text-muted-foreground">{new Date(incident.reported_at).toLocaleString()}</p>
                 </div>
-              </Field>
-              <Field>
-                <FieldLabel>Detalles (Opcional)</FieldLabel>
-                <Textarea placeholder="Detalles adicionales..." rows={3} value={newIncident.description} onChange={(e) => setNewIncident({ ...newIncident, description: e.target.value })} />
-              </Field>
-              {coordinates && (
-                <div className="p-3 bg-muted rounded-lg">
-                  <p className="text-xs text-muted-foreground mb-1">Se registrará tu ubicación actual:</p>
-                  <p className="font-mono text-sm">{coordinates.latitude.toFixed(6)}, {coordinates.longitude.toFixed(6)}</p>
+                <div className="flex items-center gap-1">
+                  {incident.is_verified && <Badge variant="outline" className="text-xs text-safe border-safe">✓</Badge>}
+                  {incident.user_id === currentUserId && (
+                    <>
+                      <button onClick={() => handleEdit(incident)} className="p-1 hover:text-primary transition-colors">
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                      <button onClick={() => handleDelete(incident.id)} className="p-1 hover:text-destructive transition-colors">
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </>
+                  )}
                 </div>
-              )}
-            </FieldGroup>
-
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowReportDialog(false)}>Cancelar</Button>
-              <Button onClick={reportIncident} disabled={!newIncident.title || !coordinates}>
-                {isOnline ? 'Enviar Reporte' : 'Guardar Localmente'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
 
       {/* Dialog de edición */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
@@ -465,45 +512,6 @@ export function MapTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Incidentes recientes */}
-      <Card className="flex-shrink-0">
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm flex items-center justify-between">
-            Incidentes Recientes
-            <Badge variant="secondary" className="!text-black dark:!text-white">{filteredIncidents.length}</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="max-h-[150px] overflow-y-auto space-y-2 pb-3">
-          {filteredIncidents.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">Sin incidentes reportados cerca</p>
-          ) : (
-            filteredIncidents.slice(0, 5).map((incident) => (
-              <div key={incident.id} className="flex items-center gap-3 p-2 bg-muted/50 rounded-lg">
-                <span className="w-2 h-2 rounded-full flex-shrink-0"
-                  style={{ background: incident.severity === 'high' ? '#ef4444' : incident.severity === 'medium' ? '#f59e0b' : '#3b82f6' }} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{incident.title}</p>
-                  <p className="text-xs text-muted-foreground">{new Date(incident.reported_at).toLocaleString()}</p>
-                </div>
-                <div className="flex items-center gap-1">
-                  {incident.is_verified && <Badge variant="outline" className="text-xs text-safe border-safe">✓</Badge>}
-                  {incident.user_id === currentUserId && (
-                    <>
-                      <button onClick={() => handleEdit(incident)} className="p-1 hover:text-primary transition-colors">
-                        <Pencil className="w-3 h-3" />
-                      </button>
-                      <button onClick={() => handleDelete(incident.id)} className="p-1 hover:text-destructive transition-colors">
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
     </div>
   )
 }
