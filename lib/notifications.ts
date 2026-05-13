@@ -1,19 +1,29 @@
 // Utility to send notifications instead of calls
 
-export function sendAlarmNotification(title: string, body: string, urgent = false) {
+export async function sendAlarmNotification(title: string, body: string, urgent = false) {
   if (typeof window === 'undefined') return
 
   // Vibration pattern
   if (navigator.vibrate) {
-    if (urgent) {
-      navigator.vibrate([400, 100, 400, 100, 400, 100, 400])
-    } else {
-      navigator.vibrate([200, 100, 200])
-    }
+    navigator.vibrate(urgent ? [400, 100, 400, 100, 400, 100, 400] : [200, 100, 200])
   }
 
   // Browser notification
-  if (Notification.permission === 'granted') {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+
+  if (navigator.serviceWorker?.controller) {
+    // Móvil / PWA: new Notification() no está permitido, usar ServiceWorker
+    const reg = await navigator.serviceWorker.ready
+    await reg.showNotification(title, {
+      body,
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-72.png',
+      tag: urgent ? 'sosecure-sos' : 'sosecure-alert',
+      requireInteraction: urgent,
+      silent: false,
+    })
+  } else {
+    // Desktop: new Notification() funciona directo
     const notif = new Notification(title, {
       body,
       icon: '/icons/icon-192.png',
@@ -22,9 +32,7 @@ export function sendAlarmNotification(title: string, body: string, urgent = fals
       requireInteraction: urgent,
       silent: false,
     })
-    if (urgent) {
-      notif.onclick = () => window.focus()
-    }
+    if (urgent) notif.onclick = () => window.focus()
     return notif
   }
 }
@@ -36,7 +44,6 @@ export function sendSOSNotification(contactName: string, location: { latitude: n
     `Alerta enviada a ${contactName}. Tu ubicación ha sido compartida.`,
     true
   )
-  // Also try to send SMS via intent on mobile
   return mapsUrl
 }
 
