@@ -197,7 +197,7 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
         )}
 
         {location && (
-          
+          <a
             href={`https://maps.google.com/?q=${location.latitude},${location.longitude}`}
             target="_blank"
             rel="noopener noreferrer"
