@@ -40,7 +40,7 @@ export function usePermissions() {
         const result = await LocalNotifications.requestPermissions()
         return result.display === 'granted'
       }
-      if (typeof Notification !== 'undefined') {
+      if (typeof window !== 'undefined' && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
         const result = await Notification.requestPermission()
         return result === 'granted'
       }
