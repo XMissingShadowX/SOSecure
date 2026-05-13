@@ -1,3 +1,5 @@
+//page.tsx
+
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
@@ -107,10 +109,11 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
       <div className="text-center">
         <Shield className="w-16 h-16 mx-auto text-gray-400 mb-4" />
         <h1 className="text-xl font-bold text-gray-700">Alerta no encontrada</h1>
-        <p className="text-gray-500 mt-2">Esta alerta no existe o ya fue cancelada.</p>
+        <p className="text-gray-500 mt-2">Esta alerta no existe o ya fue eliminada del sistema.</p>
       </div>
     </div>
   )
+  // Alerta resuelta: mostrar interfaz completa con mapa y video, no bloquear acceso
 
   return (
     <div className="min-h-screen bg-red-50">
@@ -125,7 +128,9 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
         <div className="max-w-lg mx-auto">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-3 h-3 rounded-full bg-white animate-pulse" />
-            <h1 className="text-2xl font-bold">🚨 ALERTA SOS ACTIVA</h1>
+            <h1 className="text-2xl font-bold">
+              {alert.status === 'active' ? '🚨 ALERTA SOS ACTIVA' : '📋 ALERTA SOS — RESUELTA'}
+            </h1>
           </div>
           <p className="text-red-100 text-sm">
             Activada el {new Date(alert.created_at).toLocaleString('es-MX')}
@@ -138,10 +143,19 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
           <div className="flex items-center gap-3">
             <AlertTriangle className="w-6 h-6 text-red-500 flex-shrink-0" />
             <div>
-              <p className="font-semibold text-gray-800">Esta persona necesita ayuda</p>
-              <p className="text-sm text-gray-500">
-                Estado: <span className="font-medium text-red-600">{alert.status === 'active' ? 'Alerta activa' : 'Resuelta'}</span>
+              <p className="font-semibold text-gray-800">
+                {alert.status === 'active' ? 'Esta persona necesita ayuda' : 'Esta alerta ya fue resuelta'}
               </p>
+              <p className="text-sm text-gray-500">
+                Estado: <span className={`font-medium ${alert.status === 'active' ? 'text-red-600' : 'text-green-600'}`}>
+                  {alert.status === 'active' ? 'Alerta activa' : 'Resuelta'}
+                </span>
+              </p>
+              {alert.status !== 'active' && (
+                <p className="text-xs text-gray-400 mt-1">
+                  Puedes ver la última ubicación registrada y el video grabado durante la emergencia.
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -159,7 +173,9 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
             <MapPin className="w-4 h-4 text-red-500" />
-            <p className="font-medium text-gray-800">Ubicación en tiempo real</p>
+            <p className="font-medium text-gray-800">
+              {alert.status === 'active' ? 'Ubicación en tiempo real' : 'Última ubicación registrada'}
+            </p>
             {location && (
               <span className="ml-auto text-xs text-gray-400 font-mono">
                 {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}
