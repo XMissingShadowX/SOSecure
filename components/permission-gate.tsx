@@ -10,11 +10,16 @@ interface PermissionGateProps {
   children: React.ReactNode
 }
 
-const permissionItems = [
+// Solo los permisos requeridos se muestran en la pantalla inicial.
+// Cámara y micrófono se piden bajo demanda cuando el usuario los necesita.
+const requiredPermissionItems = [
   { key: 'geolocation', icon: MapPin, label: 'Ubicación', desc: 'Para rastrearte y alertarte de zonas peligrosas', required: true },
   { key: 'notifications', icon: Bell, label: 'Notificaciones', desc: 'Para alertas de seguridad y emergencias', required: true },
-  { key: 'camera', icon: Camera, label: 'Cámara', desc: 'Para grabación durante emergencias SOS', required: false },
-  { key: 'microphone', icon: Mic, label: 'Micrófono', desc: 'Para grabación de audio en emergencias', required: false },
+] as const
+
+const optionalPermissionItems = [
+  { key: 'camera', icon: Camera, label: 'Cámara', desc: 'Se pedirá al activar grabación SOS', required: false },
+  { key: 'microphone', icon: Mic, label: 'Micrófono', desc: 'Se pedirá al activar grabación SOS', required: false },
 ] as const
 
 export function PermissionGate({ children }: PermissionGateProps) {
@@ -28,7 +33,6 @@ export function PermissionGate({ children }: PermissionGateProps) {
     setRequesting(false)
   }
 
-  // Show gate only on first load if required permissions not granted
   if (allGranted || dismissed) return <>{children}</>
 
   const requiredMissing = permissions.geolocation === 'denied' || permissions.notifications === 'denied'
@@ -43,12 +47,13 @@ export function PermissionGate({ children }: PermissionGateProps) {
           </div>
           <h1 className="text-2xl font-bold">SOSecure necesita permisos</h1>
           <p className="text-sm text-muted-foreground text-center">
-            Para protegerte correctamente, necesitamos acceso a los siguientes permisos:
+            Para protegerte correctamente necesitamos acceso a tu ubicación y notificaciones.
           </p>
         </div>
 
+        {/* Permisos requeridos */}
         <div className="space-y-3">
-          {permissionItems.map((item) => {
+          {requiredPermissionItems.map((item) => {
             const Icon = item.icon
             const state = permissions[item.key]
             const granted = state === 'granted'
@@ -61,7 +66,7 @@ export function PermissionGate({ children }: PermissionGateProps) {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <p className="font-medium text-sm">{item.label}</p>
-                      {item.required && <span className="text-xs text-destructive font-medium">Requerido</span>}
+                      <span className="text-xs text-destructive font-medium">Requerido</span>
                     </div>
                     <p className="text-xs text-muted-foreground">{item.desc}</p>
                   </div>
@@ -71,6 +76,23 @@ export function PermissionGate({ children }: PermissionGateProps) {
                   }
                 </CardContent>
               </Card>
+            )
+          })}
+        </div>
+
+        {/* Permisos opcionales — solo informativos, sin botón propio */}
+        <div className="rounded-lg bg-muted/50 p-3 space-y-2">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Se pedirán cuando los necesites</p>
+          {optionalPermissionItems.map((item) => {
+            const Icon = item.icon
+            return (
+              <div key={item.key} className="flex items-center gap-2">
+                <Icon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <div>
+                  <span className="text-xs font-medium">{item.label}</span>
+                  <span className="text-xs text-muted-foreground"> — {item.desc}</span>
+                </div>
+              </div>
             )
           })}
         </div>

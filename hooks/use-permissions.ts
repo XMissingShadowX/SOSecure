@@ -48,6 +48,8 @@ export function usePermissions() {
     } catch { return false }
   }, [])
 
+  // Cámara y micrófono se piden SOLO cuando el usuario los necesita (SOS, grabar)
+  // No se llaman en requestAll
   const requestCamera = useCallback(async () => {
     try {
       if (isNative()) {
@@ -57,33 +59,42 @@ export function usePermissions() {
       }
       const stream = await navigator.mediaDevices.getUserMedia({ video: true })
       stream.getTracks().forEach(t => t.stop())
+      setPermissions(prev => ({ ...prev, camera: 'granted' }))
       return true
-    } catch { return false }
+    } catch {
+      setPermissions(prev => ({ ...prev, camera: 'denied' }))
+      return false
+    }
   }, [])
 
   const requestMicrophone = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       stream.getTracks().forEach(t => t.stop())
+      setPermissions(prev => ({ ...prev, microphone: 'granted' }))
       return true
-    } catch { return false }
+    } catch {
+      setPermissions(prev => ({ ...prev, microphone: 'denied' }))
+      return false
+    }
   }, [])
 
+  // requestAll solo pide lo estrictamente necesario para que la app funcione:
+  // ubicación y notificaciones. Cámara y micrófono se piden bajo demanda.
   const requestAll = useCallback(async () => {
     const geo = await requestGeolocation()
     const notif = await requestNotifications()
-    const cam = await requestCamera()
 
     const newState: PermissionState = {
       geolocation: geo ? 'granted' : 'denied',
       notifications: notif ? 'granted' : 'denied',
-      camera: cam ? 'granted' : 'denied',
-      microphone: 'granted',
+      camera: permissions.camera,    // mantener estado actual, no pedir
+      microphone: permissions.microphone, // mantener estado actual, no pedir
     }
     setPermissions(newState)
     setAllGranted(geo && notif)
     return newState
-  }, [requestGeolocation, requestNotifications, requestCamera])
+  }, [requestGeolocation, requestNotifications, permissions.camera, permissions.microphone])
 
   useEffect(() => {
     const check = async () => {
@@ -106,7 +117,7 @@ export function usePermissions() {
           setPermissions(state)
           setAllGranted(state.geolocation === 'granted' && state.notifications === 'granted')
         } else {
-          // Web browser fallback — usar Permissions API para verificar sin pedir
+          // Solo verificar estado actual sin disparar popups
           const results = await Promise.all([
             navigator.permissions.query({ name: 'geolocation' }),
             navigator.permissions.query({ name: 'notifications' }),
@@ -125,7 +136,6 @@ export function usePermissions() {
             setPermissions(state)
             setAllGranted(geo.state === 'granted' && notif.state === 'granted')
           } else {
-            // Fallback si Permissions API no está disponible
             const notifState = typeof Notification !== 'undefined'
               ? Notification.permission === 'granted' ? 'granted'
                 : Notification.permission === 'denied' ? 'denied' : 'prompt'
