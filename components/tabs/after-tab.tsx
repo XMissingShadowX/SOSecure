@@ -86,6 +86,8 @@ export function AfterTab() {
     loadUnverified()
   }, [])
 
+  const [notifiedZoneCount, setNotifiedZoneCount] = useState(-1)
+
   useEffect(() => {
     const high = nearbyIncidents.filter(i => i.severity === 'high')
     const zones = high.reduce<{ lat: number; lng: number; count: number }[]>((acc, inc) => {
@@ -95,8 +97,10 @@ export function AfterTab() {
     }, [])
     setDangerZones(zones)
 
-    if (zones.length > 0) {
+    // Solo notifica si el número de zonas cambió desde la última notificación
+    if (zones.length > 0 && zones.length !== notifiedZoneCount) {
       sendAlarmNotification('⚠️ Zona de Peligro', `Hay ${zones.length} zona(s) de alerta cercanas`)
+      setNotifiedZoneCount(zones.length)
     }
   }, [nearbyIncidents])
 

@@ -35,8 +35,13 @@ export function PermissionGate({ children }: PermissionGateProps) {
 
   if (allGranted || dismissed) return <>{children}</>
 
-  const requiredMissing = permissions.geolocation === 'denied' || permissions.notifications === 'denied'
-  if (!requiredMissing) return <>{children}</>
+  const hasRequired =
+    permissions.geolocation === 'granted' && permissions.notifications === 'granted'
+  const hardDenied =
+    permissions.geolocation === 'denied' || permissions.notifications === 'denied'
+
+  // Mostrar gate si: aún no tiene los permisos requeridos Y no los ha descartado
+  if (hasRequired || dismissed) return <>{children}</>
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
@@ -97,9 +102,20 @@ export function PermissionGate({ children }: PermissionGateProps) {
           })}
         </div>
 
-        <Button className="w-full" onClick={handleRequest} disabled={requesting}>
-          {requesting ? 'Solicitando permisos...' : 'Conceder permisos'}
-        </Button>
+        {hardDenied ? (
+          <div className="text-center space-y-2">
+            <p className="text-sm text-destructive">
+              Permisos bloqueados. Ve a Configuración de tu navegador/dispositivo para habilitarlos.
+            </p>
+            <Button variant="outline" className="w-full" onClick={() => setDismissed(true)}>
+              Continuar de todas formas
+            </Button>
+          </div>
+        ) : (
+          <Button className="w-full" onClick={handleRequest} disabled={requesting}>
+            {requesting ? 'Solicitando permisos...' : 'Conceder permisos'}
+          </Button>
+        )}
 
         <button
           className="w-full text-sm text-muted-foreground underline"
