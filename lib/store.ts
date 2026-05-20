@@ -1,31 +1,45 @@
+/*
+  Este archivo define el estado global de la aplicación utilizando Zustand, una biblioteca de gestión de estado para 
+  React. El estado incluye información sobre la navegación, la ubicación del usuario, los incidentes cercanos, los 
+  contactos de emergencia, el estado de las alertas SOS, las rutas y los lugares frecuentes. Además, se implementa 
+  la persistencia del estado en el almacenamiento local del navegador para mantener la información entre sesiones. 
+  Este enfoque centralizado facilita el acceso y la actualización del estado en toda la aplicación, mejorando la 
+  experiencia del usuario y permitiendo una gestión eficiente de los datos relacionados con la seguridad personal.
+*/
+
+// Importar las funciones `create` y `persist` de la biblioteca Zustand para crear el estado global de la aplicación y
+// persistirlo en el almacenamiento local del navegador. También se importan los tipos necesarios desde el módulo de tipos.
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { TabId, Coordinates, Incident, EmergencyContact, SOSAlert, FrequentPlace, LocationHistory } from './types'
 
+// Definir la interfaz `AppState` que describe la estructura del estado global de la aplicación, incluyendo propiedades 
+// y funciones para manejar la navegación, la ubicación, los incidentes, los contactos, las alertas SOS, las rutas, 
+// los lugares frecuentes, el temporizador de seguridad y la cola de incidentes sin conexión.
 interface AppState {
-  // Navigation
+  // Navegacion
   activeTab: TabId
   setActiveTab: (tab: TabId) => void
 
-  // Location
+  // Ubicación
   currentLocation: Coordinates | null
   setCurrentLocation: (location: Coordinates) => void
 
-  // Location history (last 10 min for anti-kidnapping)
+  // Historial de ubicación — mantener últimos 10 min
   locationHistory: LocationHistory[]
   addLocationHistory: (loc: Coordinates) => void
 
-  // Map
+  // Mapa
   mapCenter: Coordinates
   mapZoom: number
   setMapCenter: (center: Coordinates) => void
   setMapZoom: (zoom: number) => void
 
-  // Incidents
+  // Incidentes
   nearbyIncidents: Incident[]
   setNearbyIncidents: (incidents: Incident[]) => void
 
-  // Contacts
+  // Contactos
   contacts: EmergencyContact[]
   setContacts: (contacts: EmergencyContact[]) => void
 
@@ -35,44 +49,48 @@ interface AppState {
   sosAlert: SOSAlert | null
   setSosAlert: (alert: SOSAlert | null) => void
 
-  // Routes
+  // Rutas
   routeOrigin: Coordinates | null
   routeDestination: Coordinates | null
   setRouteOrigin: (origin: Coordinates | null) => void
   setRouteDestination: (destination: Coordinates | null) => void
 
-  // Frequent places
+  // Lugares frecuentes
   frequentPlaces: FrequentPlace[]
   setFrequentPlaces: (places: FrequentPlace[]) => void
   addFrequentPlace: (place: FrequentPlace) => void
   removeFrequentPlace: (id: string) => void
 
-  // Security timer
+  // Temporizador de seguridad
   securityTimerActive: boolean
   securityTimerEnd: number | null
   setSecurityTimer: (active: boolean, endTime: number | null) => void
 
-  // Offline queue (incidents to send when back online)
+  // Cola sin conexión (incidentes para enviar cuando se vuelva en línea)
   offlineQueue: Incident[]
   addToOfflineQueue: (incident: Omit<Incident, 'id' | 'reported_at' | 'is_active' | 'resolved_at'>) => void
   clearOfflineQueue: () => void
 }
 
+// Crear el estado global de la aplicación utilizando Zustand y persistirlo en el almacenamiento local del navegador con 
+// la clave 'sosecure-store'.
 export const useAppStore = create<AppState>()(
+  // Persistir solo partes del estado que son relevantes para mantener entre sesiones, como los contactos, 
+  // la configuración del mapa, los lugares frecuentes, el historial de ubicación y la cola sin conexión.
   persist(
     (set, get) => ({
       // Navigation
       activeTab: 'home',
       setActiveTab: (tab) => set({ activeTab: tab }),
 
-      // Location
+      // Ubicacion 
       currentLocation: null,
       setCurrentLocation: (location) => {
         set({ currentLocation: location })
         get().addLocationHistory(location)
       },
 
-      // Location history — keep last 10 min
+      // Historial de ubicación — mantener últimos 10 min
       locationHistory: [],
       addLocationHistory: (loc) => {
         const now = Date.now()
@@ -82,17 +100,17 @@ export const useAppStore = create<AppState>()(
         set({ locationHistory: history })
       },
 
-      // Map
+      // Mapa
       mapCenter: { latitude: 20.9674, longitude: -89.6231 },
       mapZoom: 14,
       setMapCenter: (center) => set({ mapCenter: center }),
       setMapZoom: (zoom) => set({ mapZoom: zoom }),
 
-      // Incidents
+      // Incidentes
       nearbyIncidents: [],
       setNearbyIncidents: (incidents) => set({ nearbyIncidents: incidents }),
 
-      // Contacts
+      // Contactos
       contacts: [],
       setContacts: (contacts) => set({ contacts }),
 
@@ -102,24 +120,24 @@ export const useAppStore = create<AppState>()(
       sosAlert: null,
       setSosAlert: (alert) => set({ sosAlert: alert }),
 
-      // Routes
+      // Rutas
       routeOrigin: null,
       routeDestination: null,
       setRouteOrigin: (origin) => set({ routeOrigin: origin }),
       setRouteDestination: (destination) => set({ routeDestination: destination }),
 
-      // Frequent places
+      // Lugares frecuentes
       frequentPlaces: [],
       setFrequentPlaces: (places) => set({ frequentPlaces: places }),
       addFrequentPlace: (place) => set({ frequentPlaces: [...get().frequentPlaces, place] }),
       removeFrequentPlace: (id) => set({ frequentPlaces: get().frequentPlaces.filter(p => p.id !== id) }),
 
-      // Security timer
+      // Temporizador de seguridad
       securityTimerActive: false,
       securityTimerEnd: null,
       setSecurityTimer: (active, endTime) => set({ securityTimerActive: active, securityTimerEnd: endTime }),
 
-      // Offline queue
+      // Cola sin conexión
       offlineQueue: [],
       addToOfflineQueue: (incident) => {
         const full = {

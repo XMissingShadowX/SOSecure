@@ -1,3 +1,11 @@
+/*
+  Componente de alerta
+  Este componente de alerta se basa en la biblioteca Radix UI y proporciona una estructura para crear alertas 
+  interactivas en una aplicación React. La alerta se utiliza para mostrar mensajes importantes o notificaciones 
+  al usuario. El componente incluye estilos personalizados y se compone de tres partes principales: Alert, 
+  AlertTitle y AlertDescription, cada una con su propia funcionalidad y estilo.
+*/
+
 import * as React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
 

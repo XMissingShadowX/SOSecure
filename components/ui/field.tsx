@@ -1,3 +1,7 @@
+/*
+  * This file is part of the 2FAS iOS app (https://2fas.com)
+*/
+
 import * as React from "react"
 import { cn } from "@/lib/utils"
 

@@ -1,3 +1,12 @@
+/*
+  Componente de calendario
+  Este componente de calendario se basa en la biblioteca react-day-picker y proporciona una estructura para crear 
+  calendarios interactivos en una aplicación React. El calendario se utiliza para mostrar fechas, permitir la 
+  selección de fechas y navegar entre meses. El componente incluye estilos personalizados y se compone de varias 
+  partes principales, como Calendar, CalendarDayButton, y otros componentes personalizados para personalizar la 
+  apariencia y funcionalidad del calendario.
+*/
+
 'use client'
 
 import * as React from 'react'

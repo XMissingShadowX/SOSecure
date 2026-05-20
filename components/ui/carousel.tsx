@@ -1,3 +1,13 @@
+/*
+  Componente de carrusel
+  Este componente de carrusel se basa en la biblioteca embla-carousel-react y proporciona una estructura para crear 
+  carruseles interactivos en una aplicación React. El carrusel se utiliza para mostrar una serie de elementos, como 
+  imágenes o tarjetas, que los usuarios pueden navegar horizontal o verticalmente. El componente incluye estilos 
+  personalizados y se compone de varias partes principales, como Carousel, CarouselContent, CarouselItem, 
+  CarouselPrevious y CarouselNext, cada una con su propia funcionalidad y estilo para facilitar la navegación y la 
+  interacción del usuario con el carrusel.
+*/
+
 'use client'
 
 import * as React from 'react'

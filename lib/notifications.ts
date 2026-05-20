@@ -1,5 +1,14 @@
-// Utility to send notifications instead of calls
+/*
+  Este módulo define funciones para enviar notificaciones de alarma y SOS al usuario utilizando la API de 
+  Notificaciones del navegador. La función `sendAlarmNotification` envía una notificación de alarma con un 
+  título, cuerpo y una opción para marcarla como urgente. Si la notificación es urgente, también se activa un 
+  patrón de vibración más intenso. La función `sendSOSNotification` envía una notificación de SOS a un contacto 
+  específico y comparte la ubicación del usuario. Además, la función `playAlarmSound` reproduce un sonido de 
+  alarma utilizando la API de Audio del navegador. Estas funciones son útiles para alertar al usuario en 
+  situaciones de emergencia o para enviar notificaciones importantes relacionadas con la seguridad.
+*/
 
+// Función para enviar una notificación de alarma al usuario, con opciones para marcarla como urgente y activar vibración.
 export async function sendAlarmNotification(title: string, body: string, urgent = false) {
   if (typeof window === 'undefined') return
 
@@ -37,6 +46,7 @@ export async function sendAlarmNotification(title: string, body: string, urgent 
   }
 }
 
+// Función para enviar una notificación de SOS a un contacto específico, compartiendo la ubicación del usuario.
 export function sendSOSNotification(contactName: string, location: { latitude: number; longitude: number }) {
   const mapsUrl = `https://maps.google.com/?q=${location.latitude},${location.longitude}`
   sendAlarmNotification(
@@ -47,6 +57,7 @@ export function sendSOSNotification(contactName: string, location: { latitude: n
   return mapsUrl
 }
 
+// Función para reproducir un sonido de alarma utilizando la API de Audio del navegador.
 export function playAlarmSound() {
   try {
     const ctx = new AudioContext()

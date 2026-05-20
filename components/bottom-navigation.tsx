@@ -1,3 +1,12 @@
+/*
+  BottomNavigation es el componente que renderiza la barra de navegación inferior en la aplicación.
+- Define las pestañas principales de la aplicación (Inicio, Antes, Mapa, Durante, Después, Rutas, Apoyo)
+- Permite al usuario cambiar entre las diferentes secciones de la app
+- Resalta la pestaña activa para mejorar la experiencia de navegación
+- Es un componente fijo que siempre está accesible en la parte inferior de la pantalla, incluso al hacer scroll
+- Utiliza íconos para una identificación visual rápida de cada sección
+*/
+
 'use client'
 
 import { Home, Map, Route, Brain, ShieldCheck, Radio, CheckCircle } from 'lucide-react'

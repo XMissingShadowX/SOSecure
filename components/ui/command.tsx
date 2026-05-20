@@ -1,3 +1,13 @@
+/*
+  Componente de comando
+  Este componente de comando se basa en la biblioteca cmdk y proporciona una estructura para crear paletas de comandos 
+  interactivas en una aplicación React. La paleta de comandos se utiliza para permitir a los usuarios buscar y ejecutar 
+  comandos de manera rápida y eficiente. El componente incluye estilos personalizados y se compone de varias partes 
+  principales, como Command, CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, 
+  CommandShortcut y CommandSeparator, cada una con su propia funcionalidad y estilo para facilitar la interacción del 
+  usuario con la paleta de comandos.
+*/
+
 'use client'
 
 import * as React from 'react'

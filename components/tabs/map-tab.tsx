@@ -1,6 +1,13 @@
-//map-tab.tsx
+/*
+  Componente principal para la pestaña de mapa, que muestra un mapa interactivo con los incidentes reportados 
+  cerca del usuario, permite reportar nuevos incidentes, editar o eliminar los propios, y aplicar filtros para 
+  visualizar solo ciertos tipos o severidades de incidentes. 
+  También maneja la sincronización de reportes cuando el usuario está offline, mostrando un banner de estado y 
+  guardando los reportes localmente hasta que se pueda enviar al servidor.
+*/
 'use client'
 
+// Importaciones de React, componentes dinámicos, iconos, hooks personalizados, cliente de Supabase, y componentes de UI.
 import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { Plus, RefreshCw, AlertTriangle, Filter, ShieldCheck, Pencil, Trash2 } from 'lucide-react'
@@ -31,6 +38,9 @@ import { FieldGroup, Field, FieldLabel } from '@/components/ui/field'
 import { Badge } from '@/components/ui/badge'
 import type { Incident, IncidentType, IncidentSeverity } from '@/lib/types'
 
+// Carga dinámica del componente de mapa para evitar problemas con la renderización del lado del servidor, 
+// mostrando un indicador de carga mientras se carga el mapa. El componente de mapa se importa desde 
+// '@/components/incident-map' y se renderiza solo en el cliente.
 const IncidentMap = dynamic(
   () => import('@/components/incident-map').then(mod => mod.IncidentMap),
   {
@@ -46,6 +56,9 @@ const IncidentMap = dynamic(
   }
 )
 
+// Definición de los tipos de incidentes y niveles de severidad disponibles para los reportes, que se utilizan 
+// tanto en el formulario de reporte como en los filtros para mostrar u ocultar ciertos incidentes en el mapa y 
+// la lista de incidentes recientes.
 const incidentTypes: { value: IncidentType | 'all'; label: string }[] = [
   { value: 'all', label: 'Todos los tipos' },
   { value: 'theft', label: 'Robo' },
@@ -56,6 +69,8 @@ const incidentTypes: { value: IncidentType | 'all'; label: string }[] = [
   { value: 'other', label: 'Otro' },
 ]
 
+// Estos mismos tipos se definen nuevamente para el formulario de reporte, sin la opción "all", ya que no es 
+// relevante en ese contexto.
 const incidentTypesForm: { value: IncidentType; label: string }[] = [
   { value: 'theft', label: 'Robo' },
   { value: 'assault', label: 'Asalto' },
@@ -65,12 +80,17 @@ const incidentTypesForm: { value: IncidentType; label: string }[] = [
   { value: 'other', label: 'Otro' },
 ]
 
+// Definición de los niveles de severidad para los incidentes, con etiquetas y clases de color asociadas para su 
+// visualización en el formulario de reporte y en la leyenda del mapa.
 const severityLevels: { value: IncidentSeverity; label: string; color: string }[] = [
   { value: 'high', label: 'Alto', color: 'bg-destructive text-destructive-foreground' },
   { value: 'medium', label: 'Medio', color: 'bg-warning text-warning-foreground' },
   { value: 'low', label: 'Bajo', color: 'bg-primary text-primary-foreground' },
 ]
 
+// Componente principal para la pestaña de mapa, que maneja la visualización del mapa con los incidentes, el reporte 
+// de nuevos incidentes, la edición y eliminación de incidentes propios, la aplicación de filtros, y la sincronización 
+// de reportes cuando el usuario está offline.
 export function MapTab() {
   const { coordinates } = useGeolocation({ watch: true })
   const [mapTheme, setMapTheme] = useState(() => {
@@ -78,6 +98,8 @@ export function MapTab() {
     return document.documentElement.className === 'dark' ? 'dark' : 'light'
   })
 
+  // Efecto para detectar cambios en el tema (clase 'dark' en el elemento raíz) y actualizar el estado del tema del 
+  // mapa en consecuencia, lo que permite que el mapa cambie entre modo claro y oscuro según el tema actual de la aplicación.
   useEffect(() => {
     const observer = new MutationObserver(() => {
       setMapTheme(document.documentElement.className === 'dark' ? 'dark' : 'light')
@@ -86,6 +108,8 @@ export function MapTab() {
     return () => observer.disconnect()
   }, [])
 
+  // Uso del estado global para manejar los incidentes cercanos, la ubicación actual del usuario, y la cola de reportes
+  // offline.
   const { nearbyIncidents, setNearbyIncidents, currentLocation, addToOfflineQueue, offlineQueue } = useAppStore()
   const [showReportDialog, setShowReportDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
@@ -98,6 +122,8 @@ export function MapTab() {
   const [isOnline, setIsOnline] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
+  // Estado local para manejar el formulario de reporte de nuevos incidentes, que incluye el título, descripción, 
+  // tipo y severidad del incidente a reportar.
   const [newIncident, setNewIncident] = useState({
     title: '',
     description: '',
@@ -105,6 +131,8 @@ export function MapTab() {
     severity: 'medium' as IncidentSeverity,
   })
 
+  // Efecto para obtener el ID del usuario actual desde Supabase Auth al montar el componente, lo que permite 
+  // identificar qué incidentes fueron reportados por el usuario para permitir la edición y eliminación de esos incidentes.
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -112,6 +140,9 @@ export function MapTab() {
     })
   }, [])
 
+  // Efecto para detectar cambios en el estado de conexión a internet del navegador, actualizando el estado 'isOnline' 
+  // en consecuencia. Esto permite mostrar un banner de estado cuando el usuario está offline, y manejar la 
+  // sincronización de reportes guardados localmente cuando el usuario vuelve a estar online.
   useEffect(() => {
     const update = () => setIsOnline(navigator.onLine)
     window.addEventListener('online', update)
@@ -120,11 +151,17 @@ export function MapTab() {
     return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update) }
   }, [])
 
+  // Efecto para sincronizar la cola de reportes offline con el servidor cuando el usuario vuelve a estar online, 
+  // llamando a la función 'syncOfflineQueue' que envía cada reporte guardado localmente al servidor, y luego 
+  // limpia la cola de reportes offline y recarga los incidentes cercanos para reflejar los nuevos reportes enviados.
   useEffect(() => {
     if (isOnline && offlineQueue.length > 0) syncOfflineQueue()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnline])
 
+  // Función para sincronizar la cola de reportes offline con el servidor. Obtiene el usuario actual desde Supabase 
+  // Auth, y para cada reporte en la cola offline, envía una solicitud de inserción a la tabla 'incidents' en 
+  // Supabase con los datos del reporte.
   const syncOfflineQueue = async () => {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -138,6 +175,11 @@ export function MapTab() {
     loadIncidents()
   }
 
+  // Función para cargar los incidentes activos desde la base de datos, ordenados por fecha de reporte, y 
+  // actualizando el estado de 'nearbyIncidents' con los datos obtenidos. Esta función se llama al montar el 
+  // componente para cargar los incidentes iniciales, y también se llama cada vez que se detecta un cambio en 
+  // la tabla 'incidents' a través de la suscripción a cambios en tiempo real de Supabase, lo que permite 
+  // mantener la lista de incidentes actualizada en tiempo real sin necesidad de recargar la página.
   const loadIncidents = async () => {
     const supabase = createClient()
     const { data } = await supabase
@@ -149,7 +191,10 @@ export function MapTab() {
     if (data) setNearbyIncidents(data)
   }
 
+  // Efecto para cargar los incidentes al montar el componente, y para suscribirse a cambios en la tabla 'incidents'
   useEffect(() => {
+    // Cargar los incidentes al montar el componente, y luego establecer 'loading' en false para indicar que la carga 
+    // ha terminado.
     loadIncidents().finally(() => setLoading(false))
     const supabase = createClient()
     const channel = supabase
@@ -157,18 +202,36 @@ export function MapTab() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'incidents' }, () => loadIncidents())
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Función para manejar la acción de refrescar los incidentes, que establece el estado de 'refreshing' en true, 
+  // llama a la función 'loadIncidents' para recargar los incidentes desde la base de datos, y luego establece 
+  // 'refreshing' en false una vez que la carga ha terminado. Esto permite mostrar un indicador de carga en el 
+  // botón de refrescar mientras se están cargando los incidentes.
   const handleRefresh = async () => {
     setRefreshing(true)
     await loadIncidents()
     setRefreshing(false)
   }
 
+  // Función para manejar el reporte de un nuevo incidente. Verifica que se haya proporcionado un título y que 
+  // haya coordenadas disponibles, y luego, si el usuario está offline, agrega el reporte a la cola de reportes 
+  // offline para que se envíe al servidor cuando el usuario vuelva a estar online. Si el usuario está online, 
+  // envía una solicitud de inserción a la tabla 'incidents' en Supabase con los datos del nuevo incidente, y 
+  // luego recarga los incidentes para reflejar el nuevo reporte. Además, si el reporte se envió correctamente 
+  // al servidor, invoca una función de Supabase para notificar a los usuarios cercanos sobre el nuevo incidente reportado.
   const reportIncident = async () => {
+    // Verificar que se haya proporcionado un título para el incidente y que haya coordenadas disponibles 
+    // antes de continuar con el reporte. Si falta alguno de estos datos, no se puede reportar el incidente, 
+    // por lo que la función simplemente retorna sin hacer nada.
     if (!newIncident.title || !coordinates) return
 
+    // Si el usuario está offline, se agrega el nuevo incidente a la cola de reportes offline utilizando la 
+    // función 'addToOfflineQueue' del estado global. El incidente se guarda con los datos proporcionados en 
+    // el formulario, junto con las coordenadas actuales del usuario, y se marca como no verificado. Luego, se 
+    // limpia el formulario de nuevo incidente y se cierra el diálogo de reporte, ya que el reporte se ha 
+    // guardado localmente y se enviará al servidor cuando el usuario vuelva a estar online.
     if (!isOnline) {
       addToOfflineQueue({
         user_id: null,
@@ -185,9 +248,15 @@ export function MapTab() {
       return
     }
 
+    // Si el usuario está online, se crea una instancia del cliente de Supabase, se obtiene el usuario actual 
+    // desde Supabase Auth, y luego se envía una solicitud de inserción a la tabla 'incidents' con los datos del 
+    // nuevo incidente.
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
+    // Se inserta el nuevo incidente en la tabla 'incidents' con los datos proporcionados en el formulario, junto con 
+    // las coordenadas actuales del usuario, y se marca como no verificado. Luego, se limpia el formulario de nuevo 
+    // incidente, se cierra el diálogo de reporte, y se recarga la lista de incidentes para reflejar el nuevo reporte.
     const { data, error } = await supabase.from('incidents').insert({
       user_id: user?.id || null,
       title: newIncident.title,
@@ -199,12 +268,19 @@ export function MapTab() {
       is_verified: false,
     }).select().single()
 
+    // Si no hubo error al insertar el nuevo incidente, se limpia el formulario, se cierra el diálogo, y se recarga 
+    // la lista de incidentes. Además, si el incidente se insertó correctamente y se obtuvo el ID del nuevo incidente, 
+    // se invoca una función de Supabase para notificar a los usuarios cercanos sobre el nuevo incidente reportado, 
+    // enviando el ID del incidente, las coordenadas, el título y la severidad como parte de la notificación.
     if (!error) {
       setNewIncident({ title: '', description: '', incident_type: 'suspicious', severity: 'medium' })
       setShowReportDialog(false)
       loadIncidents()
     }
 
+    // Si el incidente se insertó correctamente y se obtuvo el ID del nuevo incidente, se invoca una función de 
+    // Supabase para notificar a los usuarios cercanos sobre el nuevo incidente reportado, enviando el ID del 
+    // incidente, las coordenadas, el título y la severidad como parte de la notificación.
     if (!error && data) {
       await supabase.functions.invoke('notify-nearby-users', {
         body: { incident_id: data.id, incident_lat: coordinates.latitude, incident_lng: coordinates.longitude, title: newIncident.title, severity: newIncident.severity }
@@ -212,11 +288,19 @@ export function MapTab() {
     }
   }
 
+  // Función para manejar la acción de editar un incidente. Recibe el incidente a editar como argumento, establece el 
+  // estado de 'editingIncident' con el incidente seleccionado, y luego muestra el diálogo de edición estableciendo 
+  // 'showEditDialog' en true. Esto permite que el usuario edite los detalles del incidente seleccionado en un 
+  // formulario dentro del diálogo.
   const handleEdit = (incident: Incident) => {
     setEditingIncident(incident)
     setShowEditDialog(true)
   }
 
+  // Función para guardar los cambios realizados en un incidente editado. Verifica que haya un incidente seleccionado 
+  // para editar, y luego envía una solicitud de actualización a la tabla 'incidents' en Supabase con los datos 
+  // actualizados del incidente. Después de guardar los cambios, se cierra el diálogo de edición, se limpia el estado 
+  // de 'editingIncident', y se recarga la lista de incidentes para reflejar los cambios realizados.
   const saveEdit = async () => {
     if (!editingIncident) return
     const supabase = createClient()
@@ -231,6 +315,11 @@ export function MapTab() {
     loadIncidents()
   }
 
+  // Función para manejar la acción de eliminar un incidente. Recibe el ID del incidente a eliminar como argumento, 
+  // muestra una confirmación al usuario para asegurarse de que desea eliminar el incidente, y si el usuario 
+  // confirma, envía una solicitud de eliminación a la tabla 'incidents' en Supabase para eliminar el incidente 
+  // con el ID especificado. Después de eliminar el incidente, se recarga la lista de incidentes para reflejar 
+  // la eliminación.
   const handleDelete = async (incidentId: string) => {
     if (!confirm('¿Seguro que quieres eliminar este incidente?')) return
     const supabase = createClient()
@@ -238,6 +327,7 @@ export function MapTab() {
     loadIncidents()
   }
 
+  // Filtrar los incidentes cercanos según los filtros de severidad, tipo y tiempo seleccionados por el usuario.
   const filteredIncidents = nearbyIncidents.filter(i => {
     if (filterSeverity !== 'all' && i.severity !== filterSeverity) return false
     if (filterType !== 'all' && i.incident_type !== filterType) return false
@@ -252,12 +342,19 @@ export function MapTab() {
     return true
   })
 
+  // Calcular la cantidad de incidentes cercanos por nivel de severidad para mostrar en la leyenda del mapa y 
+  // en el banner de estado.
   const incidentCounts = {
     high: nearbyIncidents.filter(i => i.severity === 'high').length,
     medium: nearbyIncidents.filter(i => i.severity === 'medium').length,
     low: nearbyIncidents.filter(i => i.severity === 'low').length,
   }
 
+  // Renderizar la UI de la pestaña de mapa, que incluye un banner de estado cuando el usuario está offline, el mapa 
+  // con los incidentes filtrados, un botón flotante para refrescar los incidentes, una leyenda flotante para mostrar 
+  // la severidad de los incidentes, y un botón flotante para reportar nuevos incidentes. Además, se incluyen diálogos 
+  // para reportar nuevos incidentes y editar incidentes existentes, con formularios para ingresar los detalles del 
+  // incidente a reportar o editar.
   return (
     // flex-col que ocupa exactamente el viewport menos la nav, sin scroll externo
     <div className="flex flex-col h-[calc(100vh-4rem)] pb-24 gap-2">

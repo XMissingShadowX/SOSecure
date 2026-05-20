@@ -1,3 +1,11 @@
+/*
+  Componente de checkbox
+  Este componente de checkbox se basa en la biblioteca Radix UI y proporciona una estructura para crear checkboxes 
+  interactivos en una aplicación React. El checkbox se utiliza para permitir a los usuarios seleccionar o deseleccionar 
+  opciones. El componente incluye estilos personalizados y se compone de una sola parte principal: Checkbox, que se 
+  encarga de aplicar los estilos y la funcionalidad deseada al checkbox que se le pase como hijo.
+*/
+
 'use client'
 
 import * as React from 'react'

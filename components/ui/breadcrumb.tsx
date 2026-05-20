@@ -1,3 +1,13 @@
+/*
+  Componente de breadcrumb
+  Este componente de breadcrumb se basa en la biblioteca Radix UI y proporciona una estructura para crear breadcrumbs 
+  interactivos en una aplicación React. El breadcrumb se utiliza para mostrar la ubicación actual del usuario dentro 
+  de una jerarquía de navegación y permite a los usuarios navegar fácilmente a niveles anteriores. El componente 
+  incluye estilos personalizados y se compone de varias partes principales, como Breadcrumb, BreadcrumbList, 
+  BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator y BreadcrumbEllipsis, cada una con su 
+  propia funcionalidad y estilo.
+*/
+
 import * as React from 'react'
 import { Slot } from '@radix-ui/react-slot'
 import { ChevronRight, MoreHorizontal } from 'lucide-react'

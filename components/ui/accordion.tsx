@@ -1,3 +1,12 @@
+/*
+  Componente de acordeón
+  Este componente de acordeón se basa en la biblioteca Radix UI y proporciona una estructura para crear acordeones 
+  interactivos en una aplicación React. El acordeón permite mostrar u ocultar contenido adicional al hacer clic 
+  en un encabezado. El componente incluye estilos personalizados y animaciones para mejorar la experiencia del 
+  usuario. Se compone de cuatro partes principales: Accordion, AccordionItem, AccordionTrigger y AccordionContent, 
+  cada una con su propia funcionalidad y estilo.
+*/
+
 'use client'
 
 import * as React from 'react'

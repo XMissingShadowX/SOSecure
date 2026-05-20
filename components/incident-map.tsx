@@ -1,4 +1,12 @@
-//incident-map.tsx
+/*
+  IncidentMap es el componente encargado de renderizar el mapa interactivo con los incidentes reportados.
+- Utiliza React Leaflet para mostrar un mapa con marcadores personalizados según la gravedad del incidente
+- Permite a los usuarios verificar la autenticidad de los incidentes votando si son reales o falsos
+- Muestra un círculo de calor para incidentes de alta gravedad, ayudando a identificar zonas peligrosas
+- Sincroniza los votos en tiempo real con Supabase, pero también mantiene un estado local para una experiencia fluida
+- Permite a los usuarios propietarios de incidentes editarlos o eliminarlos directamente desde el popup del marcador
+- Se adapta automáticamente al tema claro u oscuro cambiando las capas de tiles del mapa
+*/
 'use client'
 
 import { useEffect, useMemo, useState, useCallback } from 'react'

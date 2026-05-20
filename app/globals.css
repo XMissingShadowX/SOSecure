@@ -5,7 +5,10 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Dark theme — default */
+/*
+Definir variables CSS para colores y estilos, utilizando la función oklch para una mejor gestión de colores y 
+soporte de modo oscuro
+*/
 :root {
   --background: oklch(0.13 0.01 260);
   --foreground: oklch(0.95 0.01 260);
@@ -46,7 +49,10 @@
   --sidebar-ring: oklch(0.75 0.15 180);
 }
 
-/* Light mode override */
+/* 
+Definir variables CSS para el modo claro, utilizando la función oklch para mantener la consistencia de colores
+y estilos, y asegurando que los colores sean adecuados para un fondo claro
+*/
 html.light {
   --background: oklch(0.98 0.005 260);
   --foreground: oklch(0.15 0.01 260);
@@ -86,6 +92,11 @@ html.light {
   --sidebar-ring: oklch(0.55 0.15 180);
 }
 
+/*
+Definir variables CSS para el tema inline, que se utilizarán en los componentes de la aplicación para 
+mantener la consistencia de estilos y colores, y permitir una fácil personalización y mantenimiento del 
+diseño de la aplicación
+*/
 @theme inline {
   --font-sans: 'Geist', 'Geist Fallback', system-ui, sans-serif;
   --font-mono: 'Geist Mono', 'Geist Mono Fallback', monospace;
@@ -131,6 +142,10 @@ html.light {
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/*
+Aplicar estilos globales utilizando Tailwind CSS y las variables CSS definidas, asegurando que los colores 
+y estilos se apliquen de manera consistente en toda la aplicación, y que el diseño sea coherente
+*/
 @layer base {
   * {
     @apply border-border;
@@ -140,7 +155,11 @@ html.light {
   }
 }
 
-/* PWA safe area handling */
+/*
+Utilizar la función env() para aplicar padding en dispositivos con áreas seguras (safe areas) como iPhones con notch,
+asegurando que el contenido no quede oculto o cortado en estos dispositivos, y proporcionando una mejor experiencia 
+de usuario en pantallas con características especiales
+*/
 @supports (padding-top: env(safe-area-inset-top)) {
   .safe-area-top {
     padding-top: env(safe-area-inset-top);
@@ -150,7 +169,11 @@ html.light {
   }
 }
 
-/* Leaflet map overrides */
+/*
+Aplicar estilos específicos para el contenedor de Leaflet y los popups, utilizando las variables CSS para mantener la
+consistencia de colores y estilos, y asegurando que el mapa y los popups se integren de manera coherente con 
+el diseño general de la aplicación, tanto en modo oscuro como en modo claro
+*/
 .leaflet-container {
   background: var(--background) !important;
   font-family: var(--font-sans) !important;
@@ -166,7 +189,7 @@ html.light {
   background: var(--card) !important;
 }
 
-/* SOS button pulse animation */
+/* */
 @keyframes sos-pulse {
   0%, 100% {
     box-shadow: 0 0 0 0 oklch(0.55 0.25 25 / 0.7);
@@ -181,7 +204,7 @@ html.light {
   z-index: 50;
 }
 
-/* Recording indicator */
+/* Indicador de grabación */
 @keyframes recording-blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
@@ -213,7 +236,7 @@ html.light .leaflet-tile {
   color: var(--primary) !important;
 }
 
-/* Fix select dropdowns text */
+/* Arreglar estilos de dropdowns */
 [role="listbox"],
 [role="option"],
 [role="combobox"] {
@@ -221,6 +244,7 @@ html.light .leaflet-tile {
   background-color: oklch(1 0 0) !important;
 }
 
+/* Estilos para modo oscuro */
 html.dark [role="listbox"],
 html.dark [role="option"],
 html.dark [role="combobox"] {
@@ -228,43 +252,52 @@ html.dark [role="combobox"] {
   background-color: oklch(0.17 0.01 260) !important;
 }
 
+/* Estilos para opciones resaltadas en dropdowns */
 [role="option"][data-highlighted] {
   background-color: oklch(0.90 0.01 260) !important;
 }
 
+/* Estilos para opciones resaltadas en dropdowns en modo oscuro */
 html.dark [role="option"][data-highlighted] {
   background-color: oklch(0.25 0.02 260) !important;
 }
 
+/* Estilos para contenido de dropdowns */
 [data-radix-dropdown-menu-content] {
   background-color: var(--popover) !important;
   color: var(--popover-foreground) !important;
   z-index: 9999 !important;
 }
 
+/* Estilos para items de dropdowns */
 [data-radix-dropdown-menu-item] {
   color: var(--popover-foreground) !important;
 }
 
+/* Estilos para items de dropdowns resaltados */
 [data-radix-dropdown-menu-item]:hover,
 [data-radix-dropdown-menu-item][data-highlighted] {
   background-color: var(--accent) !important;
   color: var(--accent-foreground) !important;
 }
 
+/* Estilos para items de dropdowns en modo oscuro */
 [role="menuitem"] {
   color: var(--popover-foreground) !important;
 }
 
+/* Estilos para items de dropdowns resaltados en modo oscuro */
 [role="menu"] {
   background-color: var(--popover) !important;
   color: var(--popover-foreground) !important;
 }
 
+/* Estilos para selects */
 [data-radix-select-content] {
   z-index: 9999 !important;
 }
 
+/* Estilos para poppers */
 [data-radix-popper-content-wrapper] {
   z-index: 9999 !important;
 }

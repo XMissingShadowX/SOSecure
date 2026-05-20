@@ -1,3 +1,13 @@
+/*
+  PermissionGate es un componente que se encarga de solicitar los permisos necesarios para el funcionamiento de la aplicación.
+- Muestra una pantalla de bienvenida explicando por qué se necesitan los permisos
+- Lista los permisos requeridos (geolocalización, notificaciones) con su estado actual (concedido, denegado, pendiente)
+- Permite al usuario conceder los permisos directamente desde la pantalla
+- Si el usuario ha denegado algún permiso, muestra un mensaje indicando que debe habilitarlos desde la configuración del navegador/dispositivo
+- También muestra los permisos opcionales (cámara, micrófono) que se solicitarán bajo demanda cuando el usuario los necesite (por ejemplo, al activar la grabación SOS)
+- Solo permite acceder a la aplicación si se conceden los permisos requeridos o si el usuario decide continuar sin ellos (con una advertencia clara sobre las limitaciones)
+*/
+
 'use client'
 
 import { useState } from 'react'

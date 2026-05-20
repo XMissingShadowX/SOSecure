@@ -1,3 +1,11 @@
+/*
+  Componente de botón
+  Este componente de botón se basa en la biblioteca Radix UI y proporciona una estructura para crear botones 
+  interactivos en una aplicación React. El botón se utiliza para realizar acciones o enviar formularios. El 
+  componente incluye estilos personalizados y se compone de una sola parte principal: Button, que se encarga 
+  de aplicar los estilos y la funcionalidad deseada al botón que se le pase como hijo.
+*/
+
 import * as React from 'react'
 import { Slot } from '@radix-ui/react-slot'
 import { cva, type VariantProps } from 'class-variance-authority'

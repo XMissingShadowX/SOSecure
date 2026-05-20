@@ -1,6 +1,14 @@
-//after-tab.tsx
+/*
+  DESPUÉS: Seguimiento y Protección Post-Incidente
+
+  - Verificación de incidentes reportados por la comunidad para reducir falsas alarmas
+  - Historial de ubicación anti-secuestro con acceso protegido por PIN
+  - Alertas de zonas peligrosas basadas en incidentes cercanos
+  - Acceso controlado para contactos de emergencia a datos sensibles
+*/
 'use client'
 
+// React y librerías
 import { useState, useEffect } from 'react'
 import { CheckCircle, MapPin, AlertTriangle, Lock, Key, Clock, Eye, EyeOff, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
@@ -22,28 +30,36 @@ import {
 } from '@/components/ui/dialog'
 import type { Incident } from '@/lib/types'
 
-
+// Clave para almacenar IDs de incidentes votados en sessionStorage
 const SESSION_VOTED_KEY = 'safewalk_voted_incidents'
 
+// Funciones para manejar votos en sessionStorage, evitando votar múltiples veces por incidente en la misma sesión
 function getVotedIds(): Set<string> {
+  // Intentar cargar los IDs de incidentes votados desde sessionStorage
   try {
+    // Si no hay datos, devuelve un Set vacío
     const raw = sessionStorage.getItem(SESSION_VOTED_KEY)
     return new Set(raw ? (JSON.parse(raw) as string[]) : [])
   } catch {
+    // En caso de error (p. ej., JSON mal formado), limpiar el almacenamiento y devolver un Set vacío
     return new Set()
   }
 }
 
+// Agregar un ID de incidente a la lista de votados en sessionStorage
 function markVoted(id: string): void {
+  // Obtener el Set actual de IDs votados, agregar el nuevo ID y guardar de nuevo en sessionStorage
   const ids = getVotedIds()
   ids.add(id)
   sessionStorage.setItem(SESSION_VOTED_KEY, JSON.stringify([...ids]))
 }
 
-// Tipo para rastrear conteos de votos por incidente
+// Tipo para contar votos reales y falsos por incidente
 type VoteCounts = Record<string, { real: number; fake: number }>
 
+// Componente principal para la pestaña "Después"
 export function AfterTab() {
+  // Estado local para incidentes a verificar, votos, PIN de seguridad, zonas de peligro, etc.
   const { nearbyIncidents, locationHistory, contacts } = useAppStore()
   const [incidentsToVerify, setIncidentsToVerify] = useState<Incident[]>([])
   const [votedIds, setVotedIds] = useState<Set<string>>(new Set())  // ← vacío, sin getVotedIds()
@@ -56,19 +72,29 @@ export function AfterTab() {
   const [showPinDialog, setShowPinDialog] = useState(false)
   const [dangerZones, setDangerZones] = useState<{ lat: number; lng: number; count: number }[]>([])
 
-  // Cargar sessionStorage/localStorage solo en el cliente
+  // Al cargar el componente, obtener los IDs de incidentes votados en esta sesión y el PIN de seguridad guardado
   useEffect(() => {
+    // Cargar IDs de incidentes votados en esta sesión para evitar votos múltiples
     setVotedIds(getVotedIds())
+    // Cargar PIN de seguridad guardado en localStorage para proteger el historial de ubicación
     const storedPin = localStorage.getItem('safewalk_security_pin')
+    // Si hay un PIN guardado, cargarlo en el estado y marcar que ya se ha guardado un PIN para mostrar 
+    // opciones de cambio en la UI
     if (storedPin) {
       setSecurityPin(storedPin)
       setPinSaved(true)
     }
   }, [])
 
+  // Al cargar el componente, obtener los incidentes no verificados y sus conteos de votos para mostrar en 
+  // la sección de verificación
   useEffect(() => {
+    // Función para cargar incidentes no verificados desde Supabase
     const loadUnverified = async () => {
+      // Crear cliente de Supabase para hacer consultas a la base de datos
       const supabase = createClient()
+      
+      // Consultar los incidentes que no han sido verificados y que aún están activos, ordenados por fecha de reporte
       const { data } = await supabase
         .from('incidents')
         .select('*')
@@ -76,58 +102,107 @@ export function AfterTab() {
         .eq('is_active', true)
         .order('reported_at', { ascending: false })
         .limit(20)
+      
+      // Si se obtienen datos, procesarlos para mostrar en la UI
       if (data) {
+        // Obtener los IDs de incidentes en los que el usuario ya votó en esta sesión para marcar esos 
+        // incidentes como ya votados
         const alreadyVoted = getVotedIds()
+        
+        // Filtrar los incidentes para mostrar solo aquellos en los que el usuario no ha votado aún
         setIncidentsToVerify(data.filter((inc) => !alreadyVoted.has(inc.id)))
+        
+        // Construir un objeto de conteo de votos para cada incidente, con votos reales y falsos
         const counts: VoteCounts = {}
+        
+        // Recorrer los incidentes obtenidos y llenar el objeto de conteo de votos con los datos de la base de datos
         for (const inc of data) {
+          // Para cada incidente, almacenar el número de votos reales y falsos, usando 0 como valor predeterminado 
+          // si no hay datos
           counts[inc.id] = {
             real: inc.votes_real ?? 0,
             fake: inc.votes_fake ?? 0,
           }
         }
+        // Actualizar el estado con los conteos de votos para mostrar en la UI
         setVoteCounts(counts)
       }
     }
+    // Llamar a la función para cargar los incidentes no verificados al montar el componente
     loadUnverified()
   }, [])
 
+  // Cada vez que cambian los incidentes cercanos, recalcular las zonas de peligro y enviar notificaciones 
+  // si hay nuevas zonas detectadas
   const [notifiedZoneCount, setNotifiedZoneCount] = useState(-1)
 
+  // Recalcular zonas de peligro basadas en incidentes cercanos con severidad alta
   useEffect(() => {
+    // Filtrar los incidentes cercanos para obtener solo aquellos con severidad alta
     const high = nearbyIncidents.filter(i => i.severity === 'high')
+    
+    // Agrupar los incidentes cercanos en zonas basadas en su latitud y longitud, contando cuántos incidentes hay en cada zona
     const zones = high.reduce<{ lat: number; lng: number; count: number }[]>((acc, inc) => {
+      // Buscar si ya existe una zona cercana (dentro de ~500m) para el incidente actual
       const existing = acc.find(z => Math.abs(z.lat - inc.latitude) < 0.005 && Math.abs(z.lng - inc.longitude) < 0.005)
+      
+      // Si existe una zona cercana, incrementar su contador; de lo contrario, agregar una nueva zona al acumulador
       if (existing) { existing.count++ } else { acc.push({ lat: inc.latitude, lng: inc.longitude, count: 1 }) }
+      
+      // Devolver el acumulador actualizado para el siguiente ciclo
       return acc
     }, [])
+    // Actualizar el estado con las zonas de peligro calculadas
     setDangerZones(zones)
 
+    // Si hay zonas de peligro y el número de zonas es diferente al número de zonas notificadas anteriormente, 
+    // enviar una notificación de alarma al usuario indicando cuántas zonas de alerta cercanas hay, y actualizar 
+    // el contador de zonas notificadas para evitar notificaciones repetitivas
+    
     // Solo notifica si el número de zonas cambió desde la última notificación
     if (zones.length > 0 && zones.length !== notifiedZoneCount) {
+      // Enviar una notificación de alarma al usuario indicando cuántas zonas de alerta cercanas hay
       sendAlarmNotification('⚠️ Zona de Peligro', `Hay ${zones.length} zona(s) de alerta cercanas`)
       setNotifiedZoneCount(zones.length)
     }
   }, [nearbyIncidents])
 
+  // Función para manejar la verificación de un incidente, actualizando el conteo de votos y el estado del 
+  // incidente en la base de datos
   const verifyIncident = async (incident: Incident, verified: boolean) => {
+    // Si el usuario ya votó en este incidente en esta sesión, no hacer nada para evitar votos múltiples
     if (votedIds.has(incident.id)) return
 
-    // Optimistic update
+    // Actualizar el conteo de votos en el estado local para reflejar el nuevo voto del usuario, 
+    // incrementando el conteo de votos reales o falsos según corresponda
     setVoteCounts(prev => ({
+      // Mantener los conteos anteriores para otros incidentes, y actualizar solo el incidente votado incrementando
       ...prev,
       [incident.id]: {
+        // Incrementar el conteo de votos reales o falsos según el voto del usuario, usando 0 como valor 
+        // predeterminado si no hay datos anteriores
         real: (prev[incident.id]?.real ?? 0) + (verified ? 1 : 0),
         fake: (prev[incident.id]?.fake ?? 0) + (verified ? 0 : 1),
       },
     }))
+    // Marcar este incidente como votado en sessionStorage para evitar que el usuario vote nuevamente en esta sesión
     markVoted(incident.id)
+
+    // Actualizar el estado local para reflejar que el usuario ha votado en este incidente, agregando su 
+    // ID al Set de IDs votados
     setVotedIds(prev => new Set([...prev, incident.id]))
+    
+    // Eliminar el incidente de la lista de incidentes a verificar para que ya no se muestre en la UI
     setIncidentsToVerify(prev => prev.filter(i => i.id !== incident.id))
 
+    // Crear cliente de Supabase para hacer consultas a la base de datos y actualizar el conteo de votos y 
+    // el estado del incidente
     const supabase = createClient()
 
+    // Llamar a una función RPC en Supabase para incrementar el conteo de votos reales o falsos según el voto del usuario,
+    // pasando el ID del incidente y el tipo de voto (real o falso) como parámetros
     if (verified) {
+      // Incrementar el conteo de votos reales para este incidente en la base de datos usando una función RPC personalizada
       await supabase.rpc('increment_votes', {
         incident_id: incident.id,
         vote_column: 'votes_real',
@@ -138,10 +213,12 @@ export function AfterTab() {
         .update({ is_verified: true })
         .eq('id', incident.id)
     } else {
+      // Incrementar el conteo de votos falsos para este incidente en la base de datos usando una función RPC personalizada
       await supabase.rpc('increment_votes', {
         incident_id: incident.id,
         vote_column: 'votes_fake',
       })
+      // Si el incidente recibe suficientes votos falsos, marcarlo como no activo para que ya no se muestre como incidente activo en la aplicación
       await supabase
         .from('incidents')
         .update({ is_active: false, resolved_at: new Date().toISOString() })
@@ -149,6 +226,8 @@ export function AfterTab() {
     }
   }
 
+  // Función para guardar el PIN de seguridad en localStorage y actualizar el estado para proteger el acceso 
+  // al historial de ubicación
   const savePin = () => {
     if (pinInput.length >= 4) {
       localStorage.setItem('safewalk_security_pin', pinInput)
@@ -159,8 +238,13 @@ export function AfterTab() {
     }
   }
 
+  // Función para verificar el PIN de seguridad ingresado por el usuario y desbloquear el acceso al historial 
+  // de ubicación si el PIN es correcto
   const checkPin = () => {
+    // Obtener el PIN almacenado en localStorage para compararlo con el PIN ingresado por el usuario
     const stored = localStorage.getItem('safewalk_security_pin')
+    
+    // Si el PIN ingresado coincide con el PIN almacenado, desbloquear el acceso al historial de ubicación y
     if (pinInput === stored) {
       setPinUnlocked(true)
       setPinInput('')
@@ -169,8 +253,15 @@ export function AfterTab() {
     }
   }
 
+  // Tomar solo las últimas 10 ubicaciones del historial para mostrar en la sección de historial de ubicación,
+  // ya que generalmente se guardan ubicaciones cada minuto, esto cubriría los últimos 10 minutos de historial
   const lastLocations = locationHistory.slice(-10)
 
+  // Renderizar la UI de la pestaña "Después" con secciones para alertas de zonas peligrosas, verificación de 
+  // incidentes, historial de ubicación protegido por PIN, configuración de PIN de seguridad y acceso de 
+  // contactos a datos sensibles basados en la información y el estado manejados en este componente y en la 
+  // tienda global de la aplicación. La UI incluye tarjetas informativas, botones para acciones, y secciones 
+  // dinámicas que se actualizan según el estado de los incidentes, votos, y configuraciones del usuario.
   return (
     <div className="flex flex-col gap-6 pb-40">
       <Card className="border-safe/50 bg-safe/5">

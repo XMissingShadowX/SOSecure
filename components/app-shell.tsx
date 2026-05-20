@@ -1,3 +1,12 @@
+/*
+  AppShell es el componente raíz que envuelve toda la aplicación. Se encarga de:
+- Gestionar el estado global de la aplicación (ubicación, incidentes cercanos, tema, usuario)
+- Manejar la geolocalización y sincronización de datos con Supabase
+- Renderizar la estructura principal de la UI (header, main, navegación)
+- Proporcionar un contexto para los permisos necesarios para el funcionamiento de la app 
+  (geolocalización, notificaciones, etc.)
+*/
+
 'use client'
 
 import { useEffect, useState } from 'react'

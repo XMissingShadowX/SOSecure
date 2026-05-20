@@ -1,3 +1,13 @@
+/*
+  RouteMap es el componente encargado de mostrar el mapa con las rutas disponibles entre el origen y el destino.
+- Utiliza React Leaflet para renderizar el mapa y las rutas obtenidas de OSRM
+- Muestra el origen y destino con marcadores personalizados
+- Dibuja las rutas alternativas con diferentes colores y resalta la ruta seleccionada
+- Permite al usuario seleccionar una ruta para ver más detalles (distancia, duración)
+- Se adapta automáticamente al tema claro u oscuro cambiando las capas de tiles del mapa
+- Se asegura de que el mapa siempre muestre tanto el origen como el destino ajustando el zoom y centrado automáticamente
+*/
+
 'use client'
 
 import { useEffect, useState } from 'react'

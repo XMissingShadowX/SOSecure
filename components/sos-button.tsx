@@ -1,4 +1,12 @@
-//sos-buttontsx
+/*
+  SOSButton es el componente que maneja la funcionalidad principal de activación de la alerta SOS.
+- Permite activar la alerta SOS manteniendo presionado el botón durante 1 segundo o un gesto secreto de 3 toques rápidos
+- Al activarse, inicia la grabación de audio y video (si se conceden permisos), envía la ubicación actual a Supabase y 
+  notifica a los contactos de emergencia
+- Muestra una interfaz de grabación con opciones para cancelar, minimizar o finalizar la alerta
+- Al finalizar, permite descargar la grabación localmente o guardarla en la nube vinculada a la alerta
+- Si el usuario cancela la alerta, detiene la grabación, elimina la alerta de Supabase y restablece el estado
+*/
 
 'use client'
 

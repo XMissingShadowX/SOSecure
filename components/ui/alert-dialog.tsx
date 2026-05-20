@@ -1,3 +1,14 @@
+/*
+  Componente de cuadro de diálogo de alerta
+  Este componente de cuadro de diálogo de alerta se basa en la biblioteca Radix UI y proporciona una estructura para 
+  crear cuadros de diálogo de alerta interactivos en una aplicación React. El cuadro de diálogo de alerta se utiliza 
+  para mostrar mensajes importantes o solicitar confirmación al usuario. El componente incluye estilos personalizados 
+  y animaciones para mejorar la experiencia del usuario. Se compone de varias partes principales, como AlertDialog, 
+  AlertDialogTrigger, AlertDialogPortal, AlertDialogOverlay, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, 
+  AlertDialogTitle, AlertDialogDescription, AlertDialogAction y AlertDialogCancel, cada una con su propia funcionalidad 
+  y estilo.
+*/
+
 'use client'
 
 import * as React from 'react'

@@ -1,5 +1,19 @@
+/*
+  Este archivo define la página de registro para la aplicación SOSecure. Permite a los usuarios crear una cuenta proporcionando su nombre completo, correo electrónico y contraseña. Utiliza Supabase para manejar la autenticación y Next.js para la navegación. El diseño se basa en componentes de UI personalizados para una experiencia de usuario consistente y atractiva.
+
+  Requisitos:
+  - El formulario debe incluir campos para nombre completo, correo electrónico y contraseña.
+  - La contraseña debe tener una opción para mostrar u ocultar el texto ingresado.
+  - Al enviar el formulario, se debe crear una cuenta en Supabase y manejar cualquier error que pueda ocurrir durante el proceso de registro.
+  - Si el registro es exitoso, el usuario debe ser redirigido a la página principal o a la página de inicio de sesión según la configuración de confirmación de correo electrónico en Supabase.
+
+  Nota: Asegúrate de configurar correctamente las URL de redirección en tu proyecto de Supabase
+  para que apunten a esta página después del registro.
+*/
+
 'use client'
 
+// Importar hooks de React, componentes de UI y la función para crear un cliente de Supabase
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -10,7 +24,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { FieldGroup, Field, FieldLabel } from '@/components/ui/field'
 import { InputGroup, InputGroupInput, InputGroupAddon } from '@/components/ui/input-group'
 
+// Este componente maneja la lógica de registro y renderiza el formulario de creación de cuenta
 export default function SignUpPage() {
+  // Estados para manejar el nombre completo, correo electrónico, contraseña, visibilidad de la contraseña, errores y estado de carga
   const router = useRouter()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
@@ -19,14 +35,18 @@ export default function SignUpPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
+  // Función para manejar el envío del formulario de registro
   const handleSignUp = async (e: React.FormEvent) => {
+    // Prevenir el comportamiento por defecto del formulario y restablecer errores y estado de carga
     e.preventDefault()
     setError(null)
     setLoading(true)
 
+    // Crear una instancia de Supabase para interactuar con la autenticación
     const supabase = createClient()
-    // Sign up without email confirmation
+    // Intentar registrar al usuario con el nombre completo, correo electrónico y contraseña proporcionados
     const { data, error } = await supabase.auth.signUp({
+      // Enviar el nombre completo como parte de los datos adicionales del usuario para que se almacene en el perfil
       email,
       password,
       options: {
@@ -37,6 +57,7 @@ export default function SignUpPage() {
       },
     })
 
+    // Si hay un error durante el registro, mostrar el mensaje de error y detener la carga
     if (error) {
       setError(error.message)
       setLoading(false)
@@ -49,6 +70,7 @@ export default function SignUpPage() {
     }
   }
 
+  // Renderizar el formulario de registro con campos para nombre completo, correo electrónico y contraseña, y mostrar mensajes de error según corresponda
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-sm space-y-6">

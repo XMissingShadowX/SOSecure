@@ -1,3 +1,10 @@
+/*
+  Componente de avatar
+  Este componente de avatar se basa en la biblioteca Radix UI y proporciona una estructura para crear avatares 
+  interactivos en una aplicación React. El avatar se utiliza para mostrar una imagen de perfil o una representación 
+  visual de un usuario. El componente incluye estilos personalizados y se compone de tres partes principales: 
+  Avatar, AvatarImage y AvatarFallback, cada una con su propia funcionalidad y estilo.
+*/
 'use client'
 
 import * as React from 'react'

@@ -1,5 +1,16 @@
+/*
+  Este archivo define el componente HomeTab, que es una de las pestañas principales de la aplicación SOSecure. 
+  En esta pestaña, los usuarios pueden ver su ubicación actual, gestionar sus contactos de emergencia, y administrar 
+  sus lugares frecuentes. El componente utiliza varios hooks personalizados para obtener la geolocalización del
+   usuario, manejar el estado global de la aplicación, y realizar operaciones con la base de datos a través de 
+   Supabase. La interfaz de usuario está construida utilizando componentes de diseño como tarjetas, botones, 
+   diálogos, y selectores para organizar la información y las acciones disponibles para el usuario. Además, se 
+   muestra un banner de estado que indica si hay alertas cercanas basadas en la ubicación del usuario.
+*/
+
 'use client'
 
+// React hooks y librerías de iconos y utilidades para construir la interfaz de usuario y manejar el estado de la aplicación.
 import { useEffect, useState } from 'react'
 import { Shield, MapPin, Users, Plus, Trash2, AlertCircle, Star, Home, Briefcase, BookOpen, Heart, Navigation, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -29,14 +40,19 @@ import { FieldGroup, Field, FieldLabel } from '@/components/ui/field'
 import { Badge } from '@/components/ui/badge'
 import type { EmergencyContact, FrequentPlace } from '@/lib/types'
 
+// Definición de la cantidad máxima de contactos de emergencia que un usuario puede agregar.
 const MAX_CONTACTS = 10
 
+// Niveles de importancia para los contactos de emergencia, cada uno con un valor, etiqueta y color asociado 
+// para la interfaz de usuario.
 const importanceLevels: { value: EmergencyContact['importance']; label: string; color: string }[] = [
   { value: 'primary', label: 'Principal', color: 'bg-destructive text-destructive-foreground' },
   { value: 'secondary', label: 'Secundario', color: 'bg-warning text-warning-foreground' },
   { value: 'tertiary', label: 'Terciario', color: 'bg-primary text-primary-foreground' },
 ]
 
+// Tipos de lugares frecuentes que un usuario puede agregar, cada uno con un valor, etiqueta e ícono 
+// asociado para la interfaz de usuario.
 const placeTypes = [
   { value: 'home', label: 'Casa', icon: Home },
   { value: 'work', label: 'Trabajo', icon: Briefcase },
@@ -45,13 +61,23 @@ const placeTypes = [
   { value: 'other', label: 'Otro', icon: Star },
 ]
 
+// Mapeo de tipos de lugares a sus respectivos íconos para mostrar en la interfaz de usuario.
 const placeIcons: Record<string, React.ElementType> = {
   home: Home, work: Briefcase, school: BookOpen, gym: Heart, other: Star,
 }
 
+// Componente principal para la pestaña "Home" de la aplicación, que muestra la ubicación actual del usuario, 
+// sus contactos de emergencia, y sus lugares frecuentes. Permite a los usuarios agregar, editar y eliminar 
+// contactos de emergencia, así como agregar y eliminar lugares frecuentes. También muestra un banner de estado 
+// que indica si hay alertas cercanas basadas en la ubicación del usuario.
 export function HomeTab() {
+  // Se utilizan varios hooks para manejar la geolocalización del usuario, el estado global de la aplicación, y 
+  // el estado local del componente.
   const { coordinates, loading: locationLoading, error: locationError } = useGeolocation({ watch: true })
   const { setCurrentLocation, contacts, setContacts, nearbyIncidents, frequentPlaces, addFrequentPlace, removeFrequentPlace } = useAppStore()
+  // Estados locales para manejar la visibilidad de los diálogos de agregar contacto y lugar, el contacto que se 
+  // está editando, los datos del nuevo contacto y lugar que se están agregando, las sugerencias de lugares basadas 
+  // en la búsqueda, y el estado de carga de los contactos.
   const [showAddContact, setShowAddContact] = useState(false)
   const [showAddPlace, setShowAddPlace] = useState(false)
   const [editingContact, setEditingContact] = useState<EmergencyContact | null>(null)
@@ -62,6 +88,8 @@ export function HomeTab() {
     relationship: '',
     importance: 'secondary' as EmergencyContact['importance']
   })
+  // El estado editContact se utiliza para almacenar temporalmente los datos del contacto que se está editando, 
+  // permitiendo al usuario modificar los campos antes de guardar los cambios.
   const [editContact, setEditContact] = useState({
     name: '',
     phone: '',
@@ -69,17 +97,28 @@ export function HomeTab() {
     relationship: '',
     importance: 'secondary' as EmergencyContact['importance']
   })
+  // El estado newPlace se utiliza para almacenar temporalmente los datos del nuevo lugar que se está agregando,
   const [newPlace, setNewPlace] = useState<{ label: string; type: string; address: string; lat?: string; lon?: string }>({ label: '', type: 'home', address: '' })
+  // El estado placeSuggestions se utiliza para almacenar las sugerencias de lugares obtenidas a partir de la 
+  // búsqueda de dirección, permitiendo al usuario seleccionar una dirección geocodificada para el nuevo lugar 
+  // que se está agregando.
   const [placeSuggestions, setPlaceSuggestions] = useState<{ display_name: string; lat: string; lon: string }[]>([])
+  // El estado loading se utiliza para indicar si los contactos de emergencia están siendo cargados desde la base de datos,
   const [loading, setLoading] = useState(true)
 
+  // Se utiliza un efecto para actualizar la ubicación actual en el estado global de la aplicación cada vez que 
+  // cambian las coordenadas obtenidas por el hook de geolocalización.
   useEffect(() => {
     if (coordinates) {
       setCurrentLocation(coordinates)
     }
   }, [coordinates, setCurrentLocation])
 
+  // Se utiliza un efecto para cargar los contactos de emergencia desde la base de datos cuando el componente se monta.
   useEffect(() => {
+    // La función loadContacts se encarga de obtener el usuario actual a través de Supabase, y si hay un usuario 
+    // autenticado, realiza una consulta a la tabla 'emergency_contacts' para obtener los contactos asociados al usuario, 
+    // ordenados por prioridad.
     async function loadContacts() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
@@ -91,16 +130,26 @@ export function HomeTab() {
           .order('priority')
         if (data) setContacts(data)
       }
+      // Una vez que se han cargado los contactos, se actualiza el estado de carga para indicar que la operación ha finalizado.
       setLoading(false)
     }
+    // Se llama a la función loadContacts para iniciar el proceso de carga de los contactos de emergencia.
     loadContacts()
   }, [setContacts])
 
+  // Función para agregar un nuevo contacto de emergencia. Verifica que se hayan proporcionado el nombre y 
+  // teléfono del contacto, y que no se haya alcanzado el límite máximo de contactos. Luego, obtiene el usuario 
+  // actual a través de Supabase, y si hay un usuario autenticado, inserta el nuevo contacto en la tabla 
+  // 'emergency_contacts' de la base de datos, asociándolo con el ID del usuario y asignándole una prioridad 
+  // basada en la cantidad actual de contactos.
   const addContact = async () => {
     if (!newContact.name || !newContact.phone) return
     if (contacts.length >= MAX_CONTACTS) return
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
+    // Si hay un usuario autenticado, se inserta el nuevo contacto en la base de datos. Si la inserción es exitosa, 
+    // se actualiza el estado de los contactos para incluir el nuevo contacto, se limpia el formulario de nuevo 
+    // contacto, y se cierra el diálogo de agregar contacto.
     if (user) {
       const { data, error } = await supabase
         .from('emergency_contacts')
@@ -115,6 +164,9 @@ export function HomeTab() {
         })
         .select()
         .single()
+      // Si la inserción en la base de datos es exitosa, se actualiza el estado de los contactos para incluir el 
+      // nuevo contacto, se limpia el formulario de nuevo contacto para prepararlo para la próxima adición, y se 
+      // cierra el diálogo de agregar contacto.
       if (data && !error) {
         setContacts([...contacts, data])
         setNewContact({ name: '', phone: '', email: '', relationship: '', importance: 'secondary' })
@@ -123,6 +175,8 @@ export function HomeTab() {
     }
   }
 
+  // Función para abrir el diálogo de edición de contacto, que establece el contacto que se va a editar en el estado 
+  // local, y llena el formulario de edición con los datos del contacto seleccionado.
   const openEditContact = (contact: EmergencyContact) => {
     setEditingContact(contact)
     setEditContact({
@@ -134,6 +188,11 @@ export function HomeTab() {
     })
   }
 
+  // Función para guardar los cambios realizados en un contacto de emergencia que se está editando. Verifica que haya 
+  // un contacto seleccionado para editar, y que se hayan proporcionado el nombre y teléfono del contacto. Luego, 
+  // realiza una actualización en la tabla 'emergency_contacts' de la base de datos con los nuevos datos del contacto, 
+  // y si la actualización es exitosa, actualiza el estado de los contactos para reflejar los cambios y cierra el 
+  // diálogo de edición.
   const saveEditContact = async () => {
     if (!editingContact || !editContact.name || !editContact.phone) return
     const supabase = createClient()
@@ -155,17 +214,29 @@ export function HomeTab() {
     }
   }
 
+  // Función para eliminar un contacto de emergencia. Realiza una eliminación en la tabla 'emergency_contacts' de la 
+  // base de datos basada en el ID del contacto, y si la eliminación es exitosa, actualiza el estado de los contactos 
+  // para eliminar el contacto de la lista.
   const removeContact = async (contact: EmergencyContact) => {
     const supabase = createClient()
     await supabase.from('emergency_contacts').delete().eq('id', contact.id)
     setContacts(contacts.filter(c => c.id !== contact.id))
   }
 
+  // Función para agregar un nuevo lugar frecuente. Verifica que se haya proporcionado una etiqueta para el lugar, 
+  // y que haya coordenadas disponibles (ya sea a través de la geolocalización o de la dirección geocodificada). 
+  // Luego, construye un objeto de lugar con los datos proporcionados, lo agrega a la lista de lugares frecuentes 
+  // en el estado global, limpia el formulario de nuevo lugar, y cierra el diálogo de agregar lugar.
   const addPlace = async () => {
     if (!newPlace.label || !coordinates) return
 
+    // Si se ha proporcionado una dirección geocodificada con latitud y longitud, se utilizan esas 
+    // coordenadas para el lugar.
     let placeCoordinates = coordinates
 
+    // Si la dirección geocodificada tiene latitud y longitud, se parsean y se asignan a placeCoordinates para que 
+    // el lugar frecuente se guarde con las coordenadas de la dirección seleccionada en lugar de la ubicación actual 
+    // del usuario.
     if (newPlace.lat && newPlace.lon) {
       placeCoordinates = {
         latitude: parseFloat(newPlace.lat),
@@ -173,6 +244,8 @@ export function HomeTab() {
       }
     }
 
+    // Se construye el objeto de lugar frecuente con los datos proporcionados por el usuario, incluyendo la etiqueta, 
+    // el tipo, la dirección (o las coordenadas si no hay dirección), y las coordenadas.
     const place: FrequentPlace = {
       id: Date.now().toString(),
       label: newPlace.label,
@@ -180,12 +253,16 @@ export function HomeTab() {
       address: newPlace.address || `${coordinates.latitude.toFixed(5)}, ${coordinates.longitude.toFixed(5)}`,
       coordinates: placeCoordinates,
     }
+    // Se agrega el nuevo lugar a la lista de lugares frecuentes en el estado global, se limpia el formulario de 
+    // nuevo lugar, y se cierra el diálogo de agregar lugar.
     addFrequentPlace(place)
     setNewPlace({ label: '', type: 'home', address: '' })
     setPlaceSuggestions([])
     setShowAddPlace(false)
   }
 
+  // Se calcula la cantidad de incidentes cercanos que tienen una severidad alta para determinar el estado de 
+  // alerta en el banner de estado.
   const nearbyDangerCount = nearbyIncidents.filter(i => i.severity === 'high').length
   const importanceColor = (importance: string) => {
     if (importance === 'primary') return 'bg-destructive/20 text-destructive'
@@ -193,6 +270,11 @@ export function HomeTab() {
     return 'bg-primary/20 text-primary'
   }
 
+  // Renderizar la UI de la pestaña "Home" con varias secciones, incluyendo una tarjeta informativa sobre el estado 
+  // de alerta basado en la ubicación, una sección para mostrar la ubicación actual del usuario, una sección para  
+  // mostrar y gestionar los lugares frecuentes, y una sección para mostrar y gestionar los contactos de emergencia. 
+  // La UI utiliza componentes de diseño como tarjetas, botones, diálogos, selectores y badges para organizar la 
+  // información y las acciones disponibles para el usuario.
   return (
     <div className="flex flex-col gap-6 pb-40">
       {/* Status Banner */}

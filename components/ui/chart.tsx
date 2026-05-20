@@ -1,3 +1,13 @@
+/*
+  Componente de gráfico
+  Este componente de gráfico se basa en la biblioteca Recharts y proporciona una estructura para crear gráficos 
+  interactivos en una aplicación React. El gráfico se utiliza para visualizar datos de manera clara y atractiva, 
+  lo que facilita la comprensión de la información. El componente incluye estilos personalizados y se compone de 
+  varias partes principales, como ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, 
+  y ChartStyle, cada una con su propia funcionalidad y estilo para personalizar la apariencia y el comportamiento del 
+  gráfico según las necesidades de la aplicación.
+*/
+
 'use client'
 
 import * as React from 'react'

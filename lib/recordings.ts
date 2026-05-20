@@ -1,10 +1,24 @@
-//recordings.ts
+/*
+  * Este módulo define funciones relacionadas con la gestión de grabaciones de audio y video en la aplicación SOSecure.
+  * Incluye la generación de identificadores únicos para las grabaciones, la descarga local de las grabaciones, el envío 
+  * de las grabaciones a los contactos de emergencia a través de diferentes métodos (como la API de Compartir del navegador o WhatsApp), 
+  * y la subida de las grabaciones a la base de datos de Supabase. Estas funciones son esenciales para permitir a los 
+  * usuarios compartir evidencia visual o auditiva en situaciones de emergencia, facilitando así una respuesta más 
+  * rápida y efectiva por parte de sus contactos de confianza.
+*/
 
+// Importar la función `createClient` del módulo de Supabase para interactuar con la base de datos y el almacenamiento 
+// de Supabase.
 import { createClient } from '@/lib/supabase/client'
 import type { EmergencyContact } from '@/lib/types'
 
+// Definir el tipo `RecordingType` que puede ser 'audio' o 'video', y la interfaz `RecordingMeta` que describe los 
+// metadatos de una grabación,
 export type RecordingType = 'audio' | 'video'
 
+// La interfaz `RecordingMeta` describe los metadatos asociados a una grabación, incluyendo su identificador, 
+// blob de datos, tipo, tipo MIME, duración, fecha de creación, ubicación geográfica opcional y un identificador de alerta 
+// SOS opcional.
 export interface RecordingMeta {
   id: string
   blob: Blob
@@ -17,12 +31,16 @@ export interface RecordingMeta {
   sosAlertId?: string
 }
 
+// Función para generar un identificador único para cada grabación utilizando la API de Crypto del navegador o una combinación
+// de la marca de tiempo y un número aleatorio como fallback.
 export function generateRecordingId(): string {
   return crypto.randomUUID
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
+// Función para guardar una grabación localmente en el dispositivo del usuario, creando un enlace de descarga temporal y 
+// simulando un clic para iniciar la descarga.
 export function saveRecordingLocally(meta: RecordingMeta): string {
   const ext = meta.mimeType.includes('mp4') ? 'mp4' : 'webm'
   const filename = `safewalk-${meta.type}-${meta.id}.${ext}`
@@ -37,6 +55,8 @@ export function saveRecordingLocally(meta: RecordingMeta): string {
   return filename
 }
 
+// Función para enviar una grabación a los contactos de emergencia utilizando diferentes métodos, como la API de 
+// Compartir del navegador o WhatsApp,
 export async function sendRecordingToContacts(
   meta: RecordingMeta,
   contacts: EmergencyContact[],

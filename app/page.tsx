@@ -1,29 +1,48 @@
-'use client'
+/*
+  Este archivo define la página principal de la aplicación SOSecure.
+  Aquí se verifica si el usuario está autenticado y se muestra la interfaz principal de la aplicación o una 
+  pantalla de bienvenida con opciones para iniciar sesión o registrarse.
 
+  Nota: Asegúrate de que las rutas de autenticación (login, sign-up) estén correctamente configuradas en tu proyecto para 
+  que los enlaces funcionen correctamente.
+*/
+
+'use client'
+// Importar hooks de React, la función para crear un cliente de Supabase, componentes de UI y otros elementos necesarios
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { AppShell } from '@/components/app-shell'
 import { Shield } from 'lucide-react'
 import Link from 'next/link'
 
+// Este componente maneja la lógica de autenticación y renderiza la interfaz principal o la pantalla de bienvenida según el estado de autenticación del usuario
 export default function HomePage() {
+  // Estados para manejar el estado de carga y autenticación del usuario
   const [loading, setLoading] = useState(true)
   const [authenticated, setAuthenticated] = useState(false)
 
+  // Verificar la sesión del usuario al montar el componente y escuchar cambios en el estado de autenticación
   useEffect(() => {
+    // Crear una instancia de Supabase para interactuar con la autenticación
     const supabase = createClient()
+    // Verificar la sesión del usuario para determinar si está autenticado o no
     supabase.auth.getUser().then(({ data: { user } }) => {
+      // Actualizar el estado de autenticación basado en la presencia de un usuario en la sesión
       setAuthenticated(!!user)
       setLoading(false)
     })
-    // Listen for auth state changes
+    // Escuchar cambios en el estado de autenticación para actualizar la interfaz en consecuencia
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      // Actualizar el estado de autenticación basado en la sesión actual del usuario
       setAuthenticated(!!session?.user)
     })
+    // Limpiar la suscripción al desmontar el componente para evitar fugas de memoria
     return () => subscription.unsubscribe()
   }, [])
 
+  // Renderizar una pantalla de carga mientras se verifica la autenticación, una pantalla de bienvenida si no está autenticado, o la interfaz principal si está autenticado
   if (loading) {
+    // Mostrar una pantalla de carga mientras se verifica la autenticación del usuario
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -36,7 +55,9 @@ export default function HomePage() {
     )
   }
 
+  // Si el usuario no está autenticado, mostrar una pantalla de bienvenida con opciones para iniciar sesión o registrarse
   if (!authenticated) {
+    // Renderizar la pantalla de bienvenida con el logo, título, descripción y enlaces para iniciar sesión o registrarse
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
         <div className="w-full max-w-sm space-y-6 text-center">
@@ -66,5 +87,6 @@ export default function HomePage() {
     )
   }
 
+  // Si el usuario está autenticado, renderizar la interfaz principal de la aplicación
   return <AppShell />
 }

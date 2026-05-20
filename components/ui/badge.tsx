@@ -1,3 +1,11 @@
+/*
+  Componente de insignia
+  Este componente de insignia se basa en la biblioteca Radix UI y proporciona una estructura para crear insignias 
+  interactivas en una aplicación React. La insignia se utiliza para mostrar información adicional o destacar elementos 
+  específicos. El componente incluye estilos personalizados y se compone de una sola parte principal: Badge, que 
+  se encarga de aplicar los estilos y la funcionalidad deseada a la insignia que se le pase como hijo.
+*/
+
 import * as React from 'react'
 import { Slot } from '@radix-ui/react-slot'
 import { cva, type VariantProps } from 'class-variance-authority'

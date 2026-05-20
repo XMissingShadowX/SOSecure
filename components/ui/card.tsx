@@ -1,3 +1,11 @@
+/*
+  Componente de tarjeta
+  Este componente de tarjeta se basa en la biblioteca Radix UI y proporciona una estructura para crear tarjetas 
+  interactivas en una aplicación React. La tarjeta se utiliza para mostrar información de manera organizada y atractiva. 
+  El componente incluye estilos personalizados y se compone de varias partes principales, como Card, CardHeader, CardFooter, 
+  CardTitle, CardAction, CardDescription, CardContent, cada una con su propia funcionalidad y estilo.
+*/
+
 import * as React from 'react'
 
 import { cn } from '@/lib/utils'

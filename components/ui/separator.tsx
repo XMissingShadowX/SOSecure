@@ -1,3 +1,7 @@
+/*
+  * This file is part of the 2FAS iOS app (https://2fas.com)
+*/
+
 'use client'
 
 import * as SeparatorPrimitive from '@radix-ui/react-separator'

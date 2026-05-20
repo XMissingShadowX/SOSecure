@@ -1,3 +1,11 @@
+/*
+  EmergencyChat es el componente encargado de manejar la funcionalidad de chat dentro de la aplicación.
+- Permite a los usuarios comunicarse con sus contactos de emergencia en tiempo real
+- Soporta mensajes de texto, ubicación y alertas SOS automáticas
+- Se integra con Supabase para almacenamiento y sincronización de mensajes
+- Muestra una interfaz de chat intuitiva con diferenciación clara entre mensajes enviados y recibidos
+*/
+
 'use client'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { MessageCircle, X, Send, MapPin, AlertTriangle, Phone } from 'lucide-react'

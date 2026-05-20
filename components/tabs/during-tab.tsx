@@ -1,3 +1,15 @@
+/*
+  Este componente representa la pestaña "Durante" de la aplicación SOSecure, donde el usuario puede activar un modo de 
+  emergencia, grabar audio y video como evidencia, y ver su historial de ubicación reciente. El componente maneja el 
+  estado de la grabación, la conexión a internet, y la interacción con los contactos de emergencia. También incluye 
+  una función de activación secreta para situaciones donde el usuario no puede activar el modo de emergencia de 
+  forma convencional. La UI está diseñada para ser clara y fácil de usar en situaciones de estrés, con indicadores 
+  visuales del estado actual y opciones rápidas para compartir información crítica.
+*/
+
+// Importar hooks de React para manejar el estado, referencias, efectos y callbacks, así como iconos de 
+// la biblioteca lucide-react para la interfaz de usuario. También se importan funciones y componentes personalizados 
+// para manejar la lógica de grabación, geolocalización, notificaciones, y la interfaz de usuario.
 'use client'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Mic, MicOff, Video, VideoOff, AlertTriangle, WifiOff, Wifi, Radio, Save, Send, Upload, CheckCircle } from 'lucide-react'
@@ -14,39 +26,76 @@ import {
   generateRecordingId,
   type RecordingMeta,
 } from '@/lib/recordings'
+
+// Función para realizar geocodificación inversa utilizando la API de Photon, que toma latitud y longitud como entrada
+// y devuelve una dirección legible. Si la API falla o no devuelve resultados, se muestra la latitud y longitud formateadas.
 async function reverseGeocode(lat: number, lng: number): Promise<string> {
+  // Se realiza una solicitud a la API de Photon para obtener la dirección basada en las coordenadas proporcionadas.
   try {
+    // La URL de la API incluye los parámetros de latitud, longitud y un límite de resultados para obtener 
+    // solo la mejor coincidencia.
     const res = await fetch(
       `https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}&limit=1`,
       { headers: { Accept: 'application/json' } }
     )
+    // Si la respuesta no es exitosa, se lanza un error para ser manejado en el bloque catch.
     if (!res.ok) throw new Error('photon error')
+    // Se parsea la respuesta JSON para extraer la información de la dirección. Si no se encuentra una característica
+    // válida, se devuelve la latitud y longitud formateadas. Si se encuentra una característica, se construye una 
+    // dirección legible utilizando los campos disponibles, priorizando el nombre de la calle, número, distrito y ciudad.
     const data = await res.json()
     const f = data.features?.[0]
     if (!f) return `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+    // Se extraen las propiedades relevantes de la característica para construir la dirección. Se priorizan los campos
+    // de la siguiente manera: para la calle se usa 'street' o 'name', para el número se usa 'housenumber', para el distrito
+    // se usa 'district' o 'suburb', y para la ciudad se usa 'city', 'town' o 'village'. Si no hay información de calle,
+    // se muestra el nombre del lugar y la ciudad, o las coordenadas si no hay información disponible.
     const p = f.properties ?? {}
     const street   = p.street ?? p.name ?? ''
     const number   = p.housenumber ?? ''
     const district = p.district ?? p.suburb ?? ''
     const city     = p.city ?? p.town ?? p.village ?? ''
+    
+    // Si hay información de calle, se construye una dirección con el formato "Calle Número, Distrito/Ciudad". 
+    // Si no hay información de calle, se muestra el nombre del lugar y la ciudad, o las coordenadas si no hay 
+    // información disponible.
     if (street) {
       const parts = [street + (number ? ' ' + number : ''), district || city].filter(Boolean)
       return parts.join(', ')
     }
     return [p.name, city].filter(Boolean).join(', ') || `${lat.toFixed(5)}, ${lng.toFixed(5)}`
   } catch {
+    // En caso de cualquier error durante la solicitud o el procesamiento de la respuesta, se devuelve la latitud y
+    // longitud formateadas como fallback.
     return `${lat.toFixed(5)}, ${lng.toFixed(5)}`
   }
 }
 
+// Hook personalizado para manejar la obtención de nombres de calles basados en el historial de ubicaciones. 
+// Este hook toma un array de objetos de historial de ubicación, cada uno con coordenadas y una marca de tiempo, 
+// y devuelve un objeto con los nombres de las calles correspondientes a esas coordenadas, así como los últimos 
+// 5 registros de ubicación para mostrar en la interfaz.
 function useStreetNames(locationHistory: { coordinates: { latitude: number; longitude: number }; timestamp: number }[]) {
+  // Se utiliza un estado local para almacenar un mapa de coordenadas formateadas a nombres de calles, y una referencia para
+  // mantener un conjunto de coordenadas que están actualmente pendientes de geocodificación para evitar solicitudes duplicadas.
   const [streetNames, setStreetNames] = useState<Record<string, string>>({})
   const pendingRef = useRef<Set<string>>(new Set())
   const last5 = locationHistory.slice(-5)
 
+  // Efecto para realizar geocodificación inversa de las últimas 5 ubicaciones en el historial. Para cada ubicación, 
+  // se formatea una clave basada en las coordenadas con 5 decimales de precisión. Si el nombre de la calle para 
+  // esa clave ya está almacenado o está pendiente de geocodificación, se omite. De lo contrario, se agrega a 
+  // la lista de pendientes y se realiza una solicitud de geocodificación inversa. Cuando se recibe el nombre 
+  // de la calle, se actualiza el estado con el nuevo nombre y se elimina la clave de la lista de pendientes.
   useEffect(() => {
+    // Se itera sobre las últimas 5 ubicaciones del historial para obtener los nombres de las calles correspondientes 
+    // a sus coordenadas.
     for (const loc of last5) {
+      // Se formatea una clave única para cada ubicación basada en las coordenadas, con 5 decimales de precisión 
+      // para evitar solicitudes redundantes por pequeñas variaciones en la ubicación.
       const key = `${loc.coordinates.latitude.toFixed(5)},${loc.coordinates.longitude.toFixed(5)}`
+      // Si el nombre de la calle para esta clave ya está almacenado o está pendiente de geocodificación, 
+      // se omite esta ubicación.
       if (streetNames[key] || pendingRef.current.has(key)) continue
       pendingRef.current.add(key)
       reverseGeocode(loc.coordinates.latitude, loc.coordinates.longitude).then((name) => {
@@ -54,12 +103,17 @@ function useStreetNames(locationHistory: { coordinates: { latitude: number; long
         pendingRef.current.delete(key)
       })
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // El efecto se ejecuta cada vez que cambia el historial de ubicaciones, asegurando que se actualicen los nombres 
+  // de las calles
   }, [locationHistory.length])
 
+  // El hook devuelve un objeto con los nombres de las calles correspondientes a las coordenadas del historial de ubicaciones,
   return { streetNames, last5 }
 }
 
+// Componente principal para la pestaña "Durante" de la aplicación SOSecure, que maneja el estado y la lógica 
+// para el modo de emergencia activo, la grabación de audio y video, la conexión a internet, y la interacción 
+// con los contactos de emergencia.
 export function DuringTab() {
   const { sosActive, setSosActive, contacts, locationHistory } = useAppStore()
   const { coordinates } = useGeolocation({ watch: true })
@@ -82,6 +136,7 @@ export function DuringTab() {
   const tapTimerRef = useRef<NodeJS.Timeout | null>(null)
   const [tapCountDisplay, setTapCountDisplay] = useState(0)
 
+  // Efecto para manejar los eventos de conexión y desconexión a internet, actualizando el estado de conexión en consecuencia.
   useEffect(() => {
     const update = () => setIsOnline(navigator.onLine)
     window.addEventListener('online', update)
@@ -90,7 +145,9 @@ export function DuringTab() {
     return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update) }
   }, [])
 
-  // Secret button tap sequence (3 taps to activate SOS)
+  // Función para manejar la secuencia de taps en el botón de activación secreta. Cada tap incrementa un contador 
+  // y muestra el número de taps restantes para activar SOS. Si el usuario no completa la secuencia en 3 segundos, 
+  // el contador se reinicia. Si el usuario completa la secuencia de 5 taps, se activa SOS mediante un evento personalizado.
   const handleSecretTap = useCallback(() => {
     tapCountRef.current += 1
     setTapCountDisplay(tapCountRef.current)
@@ -106,8 +163,15 @@ export function DuringTab() {
     }
   }, [])
 
+  // Función para alternar la grabación de audio. Si ya se está grabando, se detiene la grabación, se liberan 
+  // los recursos del micrófono,
   const toggleAudio = useCallback(async () => {
+    // Si ya se está grabando audio, se detiene la grabación, se liberan los recursos del micrófono, y 
+    // se actualiza el estado para reflejar que no se está grabando.
     if (isRecordingAudio) {
+      // Detener la grabación de audio si ya está activa, liberando los recursos del micrófono y actualizando el 
+      // estado para reflejar que la grabación ha terminado. Los datos de audio grabados se procesarán en el 
+      // evento 'onstop' del MediaRecorder, por lo que no se hace nada adicional aquí.
       audioRecorder?.stop()
       audioStream?.getTracks().forEach(t => t.stop())
       setAudioStream(null)
@@ -115,7 +179,16 @@ export function DuringTab() {
       setIsRecordingAudio(false)
       // Los chunks llegan en onstop — no hacer nada aquí
     } else {
+      // Si no se está grabando, se intenta acceder al micrófono para iniciar una nueva grabación. Si el acceso es 
+      // exitoso, se configura el MediaRecorder para manejar los datos de audio y se actualiza el estado para 
+      // reflejar que la grabación ha comenzado.
       try {
+        // Se solicita acceso al micrófono utilizando la API de getUserMedia. Si el usuario concede el acceso, 
+        // se obtiene un stream de audio que se almacena en el estado. Se inicializan las referencias para el 
+        // tiempo de inicio de la grabación y los chunks de audio, y se crea un MediaRecorder para manejar la 
+        // grabación de audio. Se configuran los eventos 'ondataavailable' para almacenar los chunks de audio a 
+        // medida que se generan, y 'onstop' para procesar los datos de audio grabados cuando se detiene la grabación. 
+        // Finalmente, se inicia la grabación y se actualiza el estado para reflejar que la grabación de audio está activa.
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
         setAudioStream(stream)
         audioStartRef.current = Date.now()
@@ -124,8 +197,14 @@ export function DuringTab() {
         recorder.ondataavailable = (e) => {
           if (e.data.size > 0) audioChunksRef.current.push(e.data)
         }
+        
         recorder.onstop = () => {
+          // Cuando se detiene la grabación, se verifica si hay chunks de audio grabados. Si los hay, 
+          // se crea un Blob con los datos de audio, se construye un objeto de metadatos para la grabación, 
+          // y se actualiza el estado con la información de la última grabación.
           if (audioChunksRef.current.length) {
+            // Se crea un Blob con los datos de audio grabados, y se construye un objeto de metadatos 
+            // que incluye información
             const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
             const meta: RecordingMeta = {
               id: generateRecordingId(),
@@ -137,25 +216,38 @@ export function DuringTab() {
               latitude: coordinates?.latitude,
               longitude: coordinates?.longitude,
             }
+
+            // Se actualiza el estado con la información de la última grabación, y se muestra un mensaje al usuario 
+            // indicando que la grabación está lista y preguntando qué desea hacer con ella.
             setLastRecording(meta)
             setStatusMsg('Grabación lista. ¿Qué deseas hacer?')
             setRecordingStatus('idle')
           }
+
+          // Limpiar los chunks de audio después de procesar la grabación para liberar memoria.
           audioChunksRef.current = []
         }
+        // Iniciar la grabación de audio, configurando el MediaRecorder para generar datos en chunks cada 100ms para 
+        // asegurar que se capturen los datos de audio de manera continua.
         recorder.start(100) // chunk cada 100ms para asegurar datos
         setAudioRecorder(recorder)
         setIsRecordingAudio(true)
         setLastRecording(null)
         setStatusMsg('')
       } catch {
+        // Si ocurre un error al intentar acceder al micrófono (por ejemplo, si el usuario deniega el permiso), 
+        // se envía una notificación de alarma.
         sendAlarmNotification('⚠️ SOSecure', 'No se pudo acceder al micrófono')
       }
     }
   }, [isRecordingAudio, audioRecorder, audioStream, coordinates])
 
-  // Guardar localmente
+  // Guardar localmente 
   const handleSaveLocally = useCallback(() => {
+    // Si no hay una grabación disponible, no se hace nada. Si hay una grabación, se actualiza el estado 
+    // para reflejar que se está guardando la grabación, se llama a la función para guardar la grabación 
+    // localmente, y se muestra un mensaje al usuario indicando que la descarga ha sido iniciada en su dispositivo. 
+    // Finalmente, se actualiza el estado para reflejar que la acción de guardado ha sido completada.
     if (!lastRecording) return
     setRecordingStatus('saving')
     saveRecordingLocally(lastRecording)
@@ -165,6 +257,11 @@ export function DuringTab() {
 
   // Enviar a contactos
   const handleSendToContacts = useCallback(async () => {
+    // Si no hay una grabación disponible, no se hace nada. Si hay una grabación, se actualiza el estado para 
+    // reflejar que se está enviando la grabación, se muestra un mensaje al usuario indicando que se está enviando 
+    // a los contactos, y se llama a la función para enviar la grabación a los contactos de emergencia. Cuando se 
+    // recibe el resultado de la operación, se muestra un mensaje al usuario indicando si el envío fue exitoso o 
+    // si hubo un error, y se actualiza el estado para reflejar que la acción de envío ha sido completada.
     if (!lastRecording) return
     setRecordingStatus('sending')
     setStatusMsg('Enviando a contactos...')
@@ -179,6 +276,11 @@ export function DuringTab() {
 
   // Subir a base de datos
   const handleUploadToDB = useCallback(async () => {
+    // Si no hay una grabación disponible, no se hace nada. Si hay una grabación, se actualiza el estado para 
+    // reflejar que se está subiendo la grabación, se muestra un mensaje al usuario indicando que se está subiendo 
+    // a la nube, y se llama a la función para subir la grabación a la base de datos. Cuando se recibe el resultado 
+    // de la operación, se muestra un mensaje al usuario indicando si la subida fue exitosa o si hubo un error, 
+    // y se actualiza el estado para reflejar que la acción de subida ha sido completada.
     if (!lastRecording) return
     setRecordingStatus('uploading')
     setStatusMsg('Subiendo a la nube...')
@@ -191,18 +293,34 @@ export function DuringTab() {
     setRecordingStatus('done')
   }, [lastRecording])
 
+  // Función para alternar la grabación de video. Si ya se está grabando, se detiene la grabación y se liberan los recursos 
+  // del video. Si no se está grabando, se intenta acceder a la cámara para iniciar una nueva grabación.
   const toggleVideo = useCallback(async () => {
+    // Si ya se está grabando video, se detiene la grabación, se liberan los recursos de la cámara, y se actualiza el estado 
+    // para reflejar que no se está grabando. Los datos de video grabados se procesarán en el evento 'onstop' del MediaRecorder, 
+    // por lo que no se hace nada adicional aquí.
     if (isRecordingVideo) {
       videoRecorderRef.current?.stop()
       videoStream?.getTracks().forEach(t => t.stop())
       setVideoStream(null)
       setIsRecordingVideo(false)
-    } else {
+    } 
+    // Si no se está grabando video, se intenta acceder a la cámara para iniciar una nueva grabación. Si el acceso es exitoso,
+    // se configura el MediaRecorder para manejar los datos de video y se actualiza el estado para reflejar que la grabación ha comenzado.
+    else {
+      // Se solicita acceso a la cámara utilizando la API de getUserMedia, con la configuración para usar la cámara 
+      // trasera y capturar audio. Si el usuario concede el acceso, se obtiene un stream de video que se almacena en 
+      // el estado. Se inicializan las referencias para el tiempo de inicio de la grabación y los chunks de video, y 
+      // se crea un MediaRecorder para manejar la grabación de video. Se configuran los eventos 'ondataavailable' 
+      // para almacenar los chunks de video a medida que se generan, y 'onstop' para procesar los datos de video 
+      // grabados cuando se detiene la grabación. Finalmente, se inicia la grabación y se actualiza el estado para 
+      // reflejar que la grabación de video está activa.
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: 'environment' } },
           audio: true
         })
+        // Si se obtiene el stream de video, se asigna al elemento de video para mostrar la vista previa al usuario.
         setVideoStream(stream)
         setIsRecordingVideo(true)
         setLastRecording(null)
@@ -210,16 +328,23 @@ export function DuringTab() {
         videoChunksRef.current = []
         videoStartRef.current = Date.now()
 
+        // Se asigna el stream al elemento de video para mostrar la vista previa al usuario mientras graba.
         const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
           ? 'video/webm;codecs=vp9'
           : MediaRecorder.isTypeSupported('video/webm')
           ? 'video/webm'
           : 'video/mp4'
 
+        // Se crea un MediaRecorder para manejar la grabación de video, configurando el tipo MIME según lo que sea 
+        // compatible con el navegador.
         const recorder = new MediaRecorder(stream, { mimeType })
         recorder.ondataavailable = (e) => {
           if (e.data.size > 0) videoChunksRef.current.push(e.data)
         }
+        
+        // Cuando se detiene la grabación de video, se verifica si hay chunks de video grabados. Si los hay, se crea un Blob con
+        // los datos de video, se construye un objeto de metadatos para la grabación, y se actualiza el estado con la información 
+        // de la última grabación. Finalmente, se limpia la referencia de los chunks de video para liberar memoria.
         recorder.onstop = () => {
           if (videoChunksRef.current.length) {
             const blob = new Blob(videoChunksRef.current, { type: mimeType })
@@ -247,7 +372,15 @@ export function DuringTab() {
     }
   }, [isRecordingVideo, videoStream, coordinates])
 
+  // Se utiliza el hook personalizado useStreetNames para obtener los nombres de las calles correspondientes 
+  // a las coordenadas del historial de ubicaciones, y se extraen los últimos 5 registros de ubicación para 
+  // mostrar en la interfaz.
   const { streetNames, last5: lastLocations } = useStreetNames(locationHistory)
+
+  // La función principal del componente devuelve la interfaz de usuario para la pestaña "Durante", que incluye un 
+  // indicador del estado de SOS, opciones para activar SOS de forma secreta, y controles para grabar audio y video. 
+  // También muestra el estado de la conexión a internet y proporciona opciones para guardar o compartir las 
+  // grabaciones realizadas durante el modo de emergencia.
   return (
     <div className="flex flex-col gap-6 pb-40">
       {/* Status */}

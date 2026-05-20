@@ -1,5 +1,15 @@
+/*
+  Este archivo define la página de inicio de sesión para la aplicación SOSecure.
+  Permite a los usuarios ingresar su correo electrónico y contraseña para acceder a sus cuentas.
+  También maneja la lógica de autenticación utilizando Supabase y muestra mensajes de error o éxito según corresponda.
+
+  Nota: Asegúrate de configurar correctamente las URL de redirección en tu proyecto de Supabase
+  para que apunten a esta página después del inicio de sesión.
+*/
+
 'use client'
 
+// Importar hooks de React, componentes de UI y la función para crear un cliente de Supabase
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -11,7 +21,9 @@ import { FieldGroup, Field, FieldLabel } from '@/components/ui/field'
 import { InputGroup, InputGroupInput, InputGroupAddon } from '@/components/ui/input-group'
 import { Suspense } from 'react'
 
+// Este componente maneja la lógica de inicio de sesión y renderiza el formulario de autenticación
 function LoginContent() {
+  // Estados para manejar el correo electrónico, contraseña, visibilidad de la contraseña, errores y estado de carga
   const router = useRouter()
   const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
@@ -21,14 +33,19 @@ function LoginContent() {
   const [loading, setLoading] = useState(false)
   const justRegistered = searchParams.get('registered') === '1'
 
+  // Función para manejar el envío del formulario de inicio de sesión
   const handleSignIn = async (e: React.FormEvent) => {
+    // Prevenir el comportamiento por defecto del formulario y restablecer errores y estado de carga
     e.preventDefault()
     setError(null)
     setLoading(true)
 
+    // Crear una instancia de Supabase para interactuar con la autenticación
     const supabase = createClient()
+    // Intentar iniciar sesión con el correo electrónico y contraseña proporcionados
     const { error } = await supabase.auth.signInWithPassword({ email, password })
 
+    // Si hay un error durante el inicio de sesión, mostrar el mensaje de error y detener la carga
     if (error) {
       setError(error.message)
       setLoading(false)
@@ -37,6 +54,7 @@ function LoginContent() {
     }
   }
 
+  // Renderizar el formulario de inicio de sesión con campos para correo electrónico y contraseña, y mostrar mensajes de error o éxito según corresponda
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-sm space-y-6">
