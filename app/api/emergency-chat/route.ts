@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-const SYSTEM_PROMPT = `Eres SafeWalk AI, asistente de seguridad personal integrado en la app SOSecure.
+const SYSTEM_PROMPT = `Eres SOSecure AI, asistente de seguridad personal integrado en la app SOSecure.
 Ayudas a usuarios que pueden estar en situaciones de riesgo o peligro.
 Responde en español de México. Sé conciso, empático y práctico.
 Si el usuario está en peligro inmediato, dile que llame al 911 primero.

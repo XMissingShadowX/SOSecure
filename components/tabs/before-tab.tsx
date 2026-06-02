@@ -66,8 +66,8 @@ export function BeforeTab() {
   const [timerMinutes, setTimerMinutes] = useState('30')
   const [showTimerDialog, setShowTimerDialog] = useState(false)
   const [trackedUsers] = useState<{ name: string; status: string }[]>([])
-  const [routesExpanded, setRoutesExpanded] = useState(true)
-  const [mapExpanded, setMapExpanded] = useState(true)
+  const [routesExpanded, setRoutesExpanded] = useState(false)
+  const [mapExpanded, setMapExpanded] = useState(false)
   useEffect(() => {
     if (!securityTimerActive || !securityTimerEnd) {
       setCountdown(null)

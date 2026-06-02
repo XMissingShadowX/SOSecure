@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sosecure-v2'
+const CACHE_NAME = 'sosecure-v3'
 const STATIC_URLS = [
   '/',
   '/auth/login',
@@ -22,8 +22,12 @@ self.addEventListener('activate', (event) => {
 })
 
 self.addEventListener('fetch', (event) => {
-  // Network first for API calls
-  if (event.request.url.includes('/api/') || event.request.url.includes('supabase')) {
+  // Network first for API calls, Supabase, and Next.js compiled assets
+  if (
+    event.request.url.includes('/api/') ||
+    event.request.url.includes('supabase') ||
+    event.request.url.includes('/_next/')
+  ) {
     event.respondWith(
       fetch(event.request).catch(() =>
         new Response(JSON.stringify({ error: 'offline', message: 'No internet connection' }), {
@@ -35,7 +39,7 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // Cache first for static assets
+  // Cache first for other static assets (icons, manifest, etc.)
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached

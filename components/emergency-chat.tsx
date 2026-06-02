@@ -1,11 +1,11 @@
 /*
-  EmergencyChat — chat completamente integrado dentro de SafeWalk.
+  EmergencyChat — chat completamente integrado dentro de SOSecure.
   
   Flujo de identificación:
   - El usuario actual se identifica por su auth.uid() y su email.
   - Los contactos de emergencia se asocian por email (campo `email` en emergency_contacts).
   - Al enviar un mensaje, se busca el UUID del receptor usando la función RPC `get_user_id_by_email`.
-  - Si el contacto no tiene cuenta en SafeWalk → fallback a WhatsApp.
+  - Si el contacto no tiene cuenta en SOSecure → fallback a WhatsApp.
   - Si sí tiene cuenta → el mensaje se guarda en `chat_messages` y llega en tiempo real.
 */
 
@@ -53,7 +53,7 @@ function useAIChat(currentLocation: { latitude: number; longitude: number } | nu
   const [history, setHistory] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
   const [loading, setLoading] = useState(false)
 
-  const systemPrompt = `Eres SafeWalk AI, asistente de seguridad personal integrado en la app SafeWalk.
+  const systemPrompt = `Eres SOSecure AI, asistente de seguridad personal integrado en la app SOSecure.
 Ayudas a usuarios que pueden estar en situaciones de riesgo.
 ${currentLocation
     ? `Ubicación actual del usuario: lat ${currentLocation.latitude.toFixed(5)}, lon ${currentLocation.longitude.toFixed(5)}.`
@@ -239,8 +239,8 @@ export function EmergencyChat() {
         return [...prev, {
           id: 'ai-welcome',
           contactId: AI_ID,
-          contactName: 'SafeWalk AI',
-          text: '¡Hola! Soy SafeWalk AI, tu asistente de seguridad. ¿En qué puedo ayudarte hoy? 🛡️',
+          contactName: 'SOSecure AI',
+          text: '¡Hola! Soy SOSecure AI, tu asistente de seguridad. ¿En qué puedo ayudarte hoy? 🛡️',
           timestamp: Date.now(),
           isMe: false,
           type: 'ai',
@@ -288,7 +288,7 @@ export function EmergencyChat() {
       const loadingMsg: ChatMsg = {
         id: 'ai-loading',
         contactId: AI_ID,
-        contactName: 'SafeWalk AI',
+        contactName: 'SOSecure AI',
         text: '',
         timestamp: Date.now(),
         isMe: false,
@@ -303,7 +303,7 @@ export function EmergencyChat() {
         {
           id: `ai-${Date.now()}`,
           contactId: AI_ID,
-          contactName: 'SafeWalk AI',
+          contactName: 'SOSecure AI',
           text: reply,
           timestamp: Date.now(),
           isMe: false,
@@ -342,7 +342,7 @@ export function EmergencyChat() {
   const activeHasAccount = activeReceiverUUID != null
 
   const allItems = [
-    { id: AI_ID, name: 'SafeWalk AI', subtitle: 'Consejos de seguridad y emergencias', isAI: true },
+    { id: AI_ID, name: 'SOSecure AI', subtitle: 'Consejos de seguridad y emergencias', isAI: true },
     ...primaryContacts.map(c => {
       const email = (c as any).email as string | undefined
       const uuid = email ? resolvedIds[email] : undefined
@@ -395,14 +395,14 @@ export function EmergencyChat() {
               <MessageCircle className="w-5 h-5 text-primary flex-shrink-0" />
             )}
             <span className="font-semibold text-sm truncate">
-              {isAIActive ? 'SafeWalk AI' : activeContact ? activeContact.name : 'Chat'}
+              {isAIActive ? 'SOSecure AI' : activeContact ? activeContact.name : 'Chat'}
             </span>
             {isAIActive && <Badge variant="outline" className="text-xs border-primary/40 text-primary flex-shrink-0">IA</Badge>}
             {activeContact && !isAIActive && (
               activeHasAccount === false
                 ? <Badge variant="outline" className="text-xs text-muted-foreground flex-shrink-0"><WifiOff className="w-2.5 h-2.5 mr-1 inline" />Sin cuenta</Badge>
                 : activeHasAccount
-                  ? <Badge variant="outline" className="text-xs text-green-600 border-green-500/40 flex-shrink-0">En SafeWalk</Badge>
+                  ? <Badge variant="outline" className="text-xs text-green-600 border-green-500/40 flex-shrink-0">En SOSecure</Badge>
                   : <Badge variant="outline" className="text-xs flex-shrink-0">…</Badge>
             )}
             {sosActive && <Badge variant="destructive" className="text-xs animate-pulse flex-shrink-0">SOS</Badge>}
@@ -441,7 +441,7 @@ export function EmergencyChat() {
                       <p className="text-sm font-medium truncate">{item.name}</p>
                       {item.isAI && <Badge variant="outline" className="text-xs border-primary/40 text-primary">Asistente</Badge>}
                       {!item.isAI && (item as any).resolving && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
-                      {!item.isAI && (item as any).hasAccount && <Badge variant="outline" className="text-xs text-green-600 border-green-500/40">En SafeWalk</Badge>}
+                      {!item.isAI && (item as any).hasAccount && <Badge variant="outline" className="text-xs text-green-600 border-green-500/40">En SOSecure</Badge>}
                     </div>
                     <p className="text-xs text-muted-foreground truncate mt-0.5">
                       {lastMsg ? lastMsg.text.slice(0, 50) + (lastMsg.text.length > 50 ? '…' : '') : item.subtitle}
@@ -460,8 +460,8 @@ export function EmergencyChat() {
               {convoMessages.length === 0 && !isAIActive && (
                 <p className="text-xs text-muted-foreground text-center pt-4">
                   {activeHasAccount
-                    ? `Escribe para chatear con ${activeContact?.name ?? 'este contacto'} dentro de SafeWalk`
-                    : `${activeContact?.name ?? 'Este contacto'} no tiene cuenta en SafeWalk. Puedes compartir tu ubicación vía WhatsApp.`
+                    ? `Escribe para chatear con ${activeContact?.name ?? 'este contacto'} dentro de SOSecure`
+                    : `${activeContact?.name ?? 'Este contacto'} no tiene cuenta en SOSecure. Puedes compartir tu ubicación vía WhatsApp.`
                   }
                 </p>
               )}
@@ -536,8 +536,8 @@ export function EmergencyChat() {
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend('text') } }}
                 placeholder={
-                  isAIActive ? 'Pregunta algo a SafeWalk AI…'
-                  : activeHasAccount === false ? 'Este contacto no tiene cuenta en SafeWalk'
+                  isAIActive ? 'Pregunta algo a SOSecure AI…'
+                  : activeHasAccount === false ? 'Este contacto no tiene cuenta en SOSecure'
                   : 'Escribe un mensaje…'
                 }
                 disabled={sending || (isAIActive && aiLoading) || (!isAIActive && activeHasAccount === false)}

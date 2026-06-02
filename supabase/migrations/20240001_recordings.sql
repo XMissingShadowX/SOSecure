@@ -1,5 +1,5 @@
 -- ============================================================
--- SafeWalk — tabla recordings + bucket Storage
+-- SOSecure — tabla recordings + bucket Storage
 -- Ejecutar en: Supabase > SQL Editor
 -- ============================================================
 
