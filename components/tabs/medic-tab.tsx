@@ -80,6 +80,11 @@ export function MedicTab() {
   const [isLoading, setIsLoading] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  // Historial en el formato que espera la API (excluye el mensaje inicial del sistema)
+  const apiHistory = messages
+    .filter(m => m.id !== 'initial')
+    .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
+
   // Efecto para hacer scroll automático hacia el final del área de mensajes cada vez que se actualiza la lista de 
   // mensajes. Esto asegura que el usuario siempre vea el mensaje más reciente sin tener que desplazarse manualmente.
   useEffect(() => {
@@ -92,9 +97,7 @@ export function MedicTab() {
   // luego agrega el mensaje del usuario a la lista de mensajes, limpia la entrada y establece el estado de carga. 
   // Después de un breve retraso simulado, obtiene una respuesta predefinida basada en el contenido del mensaje del 
   // usuario y la agrega a la lista de mensajes, luego desactiva el estado de carga.
-  const sendMessage = (messageText: string) => {
-    // Si el mensaje está vacío o si ya se está cargando una respuesta, no se envía el mensaje. Esto evita que el 
-    // usuario envíe mensajes vacíos o múltiples mensajes mientras se espera una respuesta del asistente.
+  const sendMessage = async (messageText: string) => {
     if (!messageText.trim() || isLoading) return
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -106,21 +109,35 @@ export function MedicTab() {
     setInput('')
     setIsLoading(true)
 
-    // Simular un retraso para obtener la respuesta del asistente. Después de 600 milisegundos, se obtiene una respuesta
-    // predefinida basada en el contenido del mensaje del usuario utilizando la función `getOfflineResponse`. Si se 
-    // encuentra una respuesta predefinida, se utiliza esa respuesta; de lo contrario, se muestra un mensaje genérico 
-    // que valida los sentimientos del usuario y proporciona recursos de emergencia. Luego, se agrega la respuesta del 
-    // asistente a la lista de mensajes y se desactiva el estado de carga.
-    setTimeout(() => {
-      const offline = getOfflineResponse(messageText)
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [...apiHistory, { role: 'user', content: messageText }],
+        }),
+      })
+      const data = await res.json()
+      const content = res.ok
+        ? data.content
+        : (getOfflineResponse(messageText) ?? `💙 Recuerda que lo que sientes es válido.\n\nSi necesitas hablar con alguien:\n• **SAPTEL:** 55 5259-8121\n• **CONASAMA:** 800 290-0024`)
       setMessages((prev) => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: offline || `💙 Recuerda que lo que sientes es válido.\n\nSi necesitas hablar con alguien:\n• **SAPTEL:** 55 5259-8121\n• **CONASAMA:** 800 290-0024`,
+        content,
         timestamp: new Date(),
       }])
+    } catch {
+      const offline = getOfflineResponse(messageText) ?? `💙 Sin conexión. Si necesitas ayuda:\n• **SAPTEL:** 55 5259-8121`
+      setMessages((prev) => [...prev, {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: offline,
+        timestamp: new Date(),
+      }])
+    } finally {
       setIsLoading(false)
-    }, 600)
+    }
   }
 
   // Función para manejar el envío del formulario. Evita que el formulario se envíe de forma predeterminada, y en 

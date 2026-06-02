@@ -18,8 +18,6 @@ import { BottomNavigation } from './bottom-navigation'
 import { SOSButton } from './sos-button'
 import { EmergencyChat } from './emergency-chat'
 import { HomeTab } from './tabs/home-tab'
-import { MapTab } from './tabs/map-tab'
-import { RoutesTab } from './tabs/routes-tab'
 import { MedicTab } from './tabs/medic-tab'
 import { BeforeTab } from './tabs/before-tab'
 import { DuringTab } from './tabs/during-tab'
@@ -222,16 +220,10 @@ export function AppShell() {
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-lg mx-auto px-4 py-4">
             {activeTab === 'home' && <HomeTab />}
-            {activeTab === 'map' && (
-              <div className="relative z-0">
-                <MapTab />
-              </div>
-            )}
-            {activeTab === 'routes' && <RoutesTab />}
-            {activeTab === 'medic' && <MedicTab />}
             {activeTab === 'before' && <BeforeTab />}
             {activeTab === 'during' && <DuringTab />}
             {activeTab === 'after' && <AfterTab />}
+            {activeTab === 'medic' && <MedicTab />}
           </div>
         </main>
 

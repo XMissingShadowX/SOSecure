@@ -11,7 +11,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Polyline, Circle, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import type { Coordinates, Incident } from '@/lib/types'
 import 'leaflet/dist/leaflet.css'
@@ -21,6 +21,20 @@ L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+})
+
+const severityColors: Record<string, string> = {
+  high: '#ef4444',
+  medium: '#f59e0b',
+  low: '#3b82f6',
+}
+
+const createIncidentIcon = (color: string) => new L.DivIcon({
+  className: 'custom-marker',
+  html: `<div style="width:24px;height:24px;background:${color};border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.3)"></div>`,
+  iconSize: [24, 24],
+  iconAnchor: [12, 12],
+  popupAnchor: [0, -12],
 })
 
 const originIcon = new L.DivIcon({
@@ -151,6 +165,33 @@ export function RouteMap({ origin, destination, selectedRoute, incidents, onRout
             opacity: route.selected ? 1 : 0.4,
           }}
         />
+      ))}
+
+      {incidents.filter(inc => inc.severity === 'high').map(inc => (
+        <Circle
+          key={`zone-${inc.id}`}
+          center={[inc.latitude, inc.longitude]}
+          radius={200}
+          pathOptions={{ color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.2, weight: 1 }}
+        />
+      ))}
+
+      {incidents.map(inc => (
+        <Marker
+          key={inc.id}
+          position={[inc.latitude, inc.longitude]}
+          icon={createIncidentIcon(severityColors[inc.severity] || severityColors.low)}
+        >
+          <Popup>
+            <div className="p-2 min-w-[160px]">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: severityColors[inc.severity] }} />
+                <strong className="text-sm">{inc.title}</strong>
+              </div>
+              <p className="text-xs text-gray-500">{new Date(inc.reported_at).toLocaleString()}</p>
+            </div>
+          </Popup>
+        </Marker>
       ))}
 
       <Marker position={[origin.latitude, origin.longitude]} icon={originIcon} />

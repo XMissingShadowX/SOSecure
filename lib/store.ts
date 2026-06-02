@@ -11,7 +11,7 @@
 // persistirlo en el almacenamiento local del navegador. También se importan los tipos necesarios desde el módulo de tipos.
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { TabId, Coordinates, Incident, EmergencyContact, SOSAlert, FrequentPlace, LocationHistory } from './types'
+import type { TabId, Coordinates, Incident, EmergencyContact, SOSAlert, FrequentPlace, LocationHistory, RouteOption } from './types'
 
 // Definir la interfaz `AppState` que describe la estructura del estado global de la aplicación, incluyendo propiedades 
 // y funciones para manejar la navegación, la ubicación, los incidentes, los contactos, las alertas SOS, las rutas, 
@@ -54,6 +54,14 @@ interface AppState {
   routeDestination: Coordinates | null
   setRouteOrigin: (origin: Coordinates | null) => void
   setRouteDestination: (destination: Coordinates | null) => void
+  showRoutes: boolean
+  setShowRoutes: (v: boolean) => void
+  selectedRoute: string | null
+  setSelectedRoute: (v: string | null) => void
+  routeOptions: RouteOption[]
+  setRouteOptions: (options: RouteOption[]) => void
+  routeInfo: Record<string, { distance: string; duration: string }>
+  setRouteInfo: (info: Record<string, { distance: string; duration: string }>) => void
 
   // Lugares frecuentes
   frequentPlaces: FrequentPlace[]
@@ -125,6 +133,14 @@ export const useAppStore = create<AppState>()(
       routeDestination: null,
       setRouteOrigin: (origin) => set({ routeOrigin: origin }),
       setRouteDestination: (destination) => set({ routeDestination: destination }),
+      showRoutes: false,
+      setShowRoutes: (v) => set({ showRoutes: v }),
+      selectedRoute: null,
+      setSelectedRoute: (v) => set({ selectedRoute: v }),
+      routeOptions: [],
+      setRouteOptions: (options) => set({ routeOptions: options }),
+      routeInfo: {},
+      setRouteInfo: (info) => set({ routeInfo: info }),
 
       // Lugares frecuentes
       frequentPlaces: [],

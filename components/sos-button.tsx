@@ -162,7 +162,7 @@ export function SOSButton() {
         user_id: user.id,
         title: 'Alerta SOS',
         description: 'SOS de emergencia activado',
-        incident_type: 'other',
+        incident_type: 'SOS',
         severity: 'high',
         latitude: coords.latitude,
         longitude: coords.longitude,
@@ -451,7 +451,7 @@ export function SOSButton() {
                 )}
 
                 <button
-                  onClick={() => { setMinimized(true); setActiveTab('map') }}
+                  onClick={() => { setMinimized(true); setActiveTab('before') }}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-primary font-medium text-sm hover:bg-primary/90 transition-colors !text-black dark:!text-white"
                 >
                   Ver en Mapa

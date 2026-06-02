@@ -1,16 +1,10 @@
-/*
-  Pestaña "Antes" de la aplicación SOSecure, que se muestra antes de activar el modo de seguridad. Esta pestaña 
-  ayuda a los usuarios a prepararse antes de salir, con funciones como un temporizador de seguridad, información 
-  sobre zonas seguras cercanas, seguimiento de contactos que comparten su ubicación, y un resumen de los contactos 
-  listos para alertar en caso de emergencia. El código maneja la lógica del temporizador, la geolocalización para 
-  mostrar zonas seguras, y la integración con la tienda global para gestionar el estado de los contactos y el temporizador.
-*/
-
 'use client'
 
-// React y librerías
 import { useState, useEffect, useCallback } from 'react'
-import { ShieldCheck, Clock, MapPin, Users, Timer, AlertTriangle, Plus, Trash2, Eye } from 'lucide-react'
+import dynamic from 'next/dynamic'
+import { ShieldCheck, Clock, Users, Timer, AlertTriangle, Map, Navigation, ChevronDown, ChevronUp } from 'lucide-react'
+import { RoutesTab, calculateSafetyScore } from './routes-tab'
+import { MapTab } from './map-tab'
 import { useAppStore } from '@/lib/store'
 import { useGeolocation } from '@/hooks/use-geolocation'
 import { sendAlarmNotification, playAlarmSound } from '@/lib/notifications'
@@ -28,9 +22,24 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import type { RouteInfo } from '@/components/route-map'
 
-// Tipos de zonas seguras para mostrar en la sección de zonas seguras cercanas, con etiquetas y colores asociados 
-// para cada tipo
+const RouteMap = dynamic(
+  () => import('@/components/route-map').then(mod => mod.RouteMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-full w-full flex items-center justify-center bg-muted rounded-lg">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <span>Cargando mapa...</span>
+        </div>
+      </div>
+    ),
+  }
+)
+
+
 const SAFE_ZONE_TYPES = [
   { type: 'pharmacy', label: '💊 Farmacia', color: 'text-green-400' },
   { type: 'police', label: '👮 Policía', color: 'text-blue-400' },
@@ -38,9 +47,6 @@ const SAFE_ZONE_TYPES = [
   { type: 'store', label: '🏪 Tienda', color: 'text-yellow-400' },
 ]
 
-// Función para formatear el tiempo restante del temporizador de seguridad en formato "m:ss" para 
-// mostrarlo en la UI, redondeando hacia arriba para mostrar el minuto completo restante y asegurando que los segundos
-// siempre tengan dos dígitos
 function formatCountdown(ms: number) {
   const totalSec = Math.ceil(ms / 1000)
   const m = Math.floor(totalSec / 60)
@@ -48,78 +54,45 @@ function formatCountdown(ms: number) {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-// Componente principal para la pestaña "Antes" de la aplicación SOSecure, que incluye la lógica y la UI para el
-// temporizador de seguridad, zonas seguras cercanas, seguimiento de contactos, y resumen de contactos listos para alertar. 
-// Utiliza la tienda global para acceder a los contactos y el estado del temporizador, y maneja la geolocalización para 
-// mostrar zonas seguras cercanas. También incluye efectos para manejar el conteo regresivo del temporizador 
-// y acciones automáticas cuando el temporizador expira, como activar una alerta SOS y notificar a los contactos.
 export function BeforeTab() {
-  // Acceder a los contactos y el estado del temporizador de seguridad desde la tienda global de la aplicación, 
-  // así como funciones para actualizar el estado del temporizador y activar el modo SOS. También usar el hook de 
-  // geolocalización para obtener las coordenadas actuales del usuario, y manejar estados locales para el conteo 
-  // regresivo del temporizador, la configuración del tiempo del temporizador, y la visibilidad de los diálogos 
-  // de configuración y zonas seguras.
-  const { contacts, securityTimerActive, securityTimerEnd, setSecurityTimer, setSosActive } = useAppStore()
+  const {
+    contacts, securityTimerActive, securityTimerEnd, setSecurityTimer, setSosActive,
+    showRoutes, selectedRoute, routeOrigin, routeDestination, nearbyIncidents,
+    setRouteOptions, setRouteInfo,
+  } = useAppStore()
   const { coordinates } = useGeolocation({ watch: true })
+
   const [countdown, setCountdown] = useState<number | null>(null)
   const [timerMinutes, setTimerMinutes] = useState('30')
   const [showTimerDialog, setShowTimerDialog] = useState(false)
-  const [showSafeZones, setShowSafeZones] = useState(false)
-  const [trackedUsers] = useState<{ name: string; status: string }[]>([
-    // Placeholder — en una implementación real, esta información vendría de la base de datos o de la tienda global, 
-    // mostrando los contactos que actualmente comparten su ubicación contigo y su estado 
-    // (por ejemplo, "En camino", "Llegó a destino", etc.)
-  ])
-
-  // Efecto para manejar el conteo regresivo del temporizador de seguridad, actualizando el estado del conteo cada segundo,
-  // y tomando acciones automáticas cuando el temporizador expira, como activar una alerta SOS y notificar a los contactos.
+  const [trackedUsers] = useState<{ name: string; status: string }[]>([])
+  const [routesExpanded, setRoutesExpanded] = useState(true)
+  const [mapExpanded, setMapExpanded] = useState(true)
   useEffect(() => {
-    // Si el temporizador de seguridad no está activo o no tiene una hora de finalización establecida, limpiar el conteo 
-    // regresivo y salir del efecto
     if (!securityTimerActive || !securityTimerEnd) {
       setCountdown(null)
       return
     }
-
-    // Función para actualizar el conteo regresivo del temporizador cada segundo, calculando el tiempo restante y 
-    // actualizando
     const tick = () => {
-      // Calcular el tiempo restante restando la hora actual de la hora de finalización del temporizador
       const remaining = securityTimerEnd - Date.now()
-      // Si el tiempo restante es menor o igual a cero, significa que el temporizador ha expirado, por lo que 
-      // se actualiza el estado del conteo a cero, se reproduce un sonido de alarma, se envía una notificación 
-      // de alerta a los contactos, se activa el modo SOS, y se desactiva el temporizador de seguridad. Si el 
-      // tiempo restante es mayor a cero, se actualiza el estado del conteo con el tiempo restante, y si el tiempo 
-      // restante es menor a 5 minutos (pero mayor a 4.9 minutos para evitar múltiples notificaciones), se envía una 
-      // notificación de advertencia a los contactos indicando que quedan 5 minutos en el temporizador de seguridad.
       if (remaining <= 0) {
         setCountdown(0)
-        // Timer expired → trigger SOS automatically
         playAlarmSound()
         sendAlarmNotification('⏰ Temporizador de seguridad expirado', 'No se recibió confirmación de llegada — activando alerta', true)
         setSosActive(true)
         setSecurityTimer(false, null)
       } else {
         setCountdown(remaining)
-        // Warn at 5 min
         if (remaining < 5 * 60 * 1000 && remaining > 4.9 * 60 * 1000) {
           sendAlarmNotification('⏰ SOSecure', 'Quedan 5 minutos en tu temporizador de seguridad')
         }
       }
     }
-    // Iniciar el conteo regresivo llamando a la función
     tick()
-    // Configurar un intervalo para actualizar el conteo regresivo cada segundo, y limpiar el intervalo 
-    // cuando el componente se desmonte o cuando cambien las dependencias del efecto
     const id = setInterval(tick, 1000)
-    // Limpiar el intervalo cuando el componente se desmonte o cuando cambien las dependencias del efecto 
-    // para evitar fugas de memoria
     return () => clearInterval(id)
   }, [securityTimerActive, securityTimerEnd, setSosActive, setSecurityTimer])
 
-  // Función para iniciar el temporizador de seguridad, calculando la hora de finalización basada en los minutos configurados,
-  // actualizando el estado del temporizador en la tienda global, cerrando el diálogo de configuración, y enviando una 
-  // notificación a los contactos indicando que el temporizador ha sido iniciado con el tiempo configurado.
   const startTimer = useCallback(() => {
     const mins = parseInt(timerMinutes) || 30
     const endTime = Date.now() + mins * 60 * 1000
@@ -128,22 +101,14 @@ export function BeforeTab() {
     sendAlarmNotification('⏱️ Temporizador iniciado', `Tienes ${mins} minutos para llegar a tu destino`)
   }, [timerMinutes, setSecurityTimer])
 
-  // Función para cancelar el temporizador de seguridad, desactivando el temporizador en la tienda global, 
-  // limpiando el estado del conteo regresivo, y enviando una notificación a los contactos indicando que el 
-  // temporizador ha sido cancelado y que el usuario llegó con seguridad a su destino.
   const cancelTimer = useCallback(() => {
     setSecurityTimer(false, null)
     setCountdown(null)
     sendAlarmNotification('✅ Temporizador cancelado', 'Llegaste con seguridad')
   }, [setSecurityTimer])
 
-  // Renderizar la UI de la pestaña "Antes" con varias secciones, incluyendo una tarjeta informativa sobre el modo "Antes",
-  // una sección para el temporizador de seguridad que muestra el conteo regresivo y opciones para iniciar o cancelar el temporizador, 
-  // una sección para mostrar zonas seguras cercanas basada en la geolocalización, una sección para mostrar contactos que comparten su ubicación, 
-  // y una sección para mostrar un resumen de los contactos listos para alertar. La UI utiliza componentes de diseño como tarjetas, botones, diálogos, 
-  // y badges para organizar la información y las acciones disponibles para el usuario.
   return (
-    <div className="flex flex-col gap-6 pb-40">
+    <div className="flex flex-col gap-6 pb-60">
       <Card className="border-primary/30 bg-primary/5">
         <CardContent className="p-4 flex items-center gap-3">
           <ShieldCheck className="w-6 h-6 text-primary" />
@@ -154,7 +119,84 @@ export function BeforeTab() {
         </CardContent>
       </Card>
 
-      {/* Security Timer */}
+      {/* Mapa compartido — se muestra debajo de rutas si el mapa está colapsado, o en su propia sección si está expandido */}
+      {(() => {
+        const sharedMap = (
+          <MapTab
+            embedded
+            customMap={showRoutes && routeOrigin && routeDestination ? (
+              <RouteMap
+                origin={routeOrigin}
+                destination={routeDestination}
+                selectedRoute={selectedRoute}
+                incidents={nearbyIncidents}
+                onRoutesLoaded={(routes: RouteInfo[]) => {
+                  const info: Record<string, { distance: string; duration: string }> = {}
+                  routes.forEach(r => { info[r.id] = { distance: r.distance, duration: r.duration } })
+                  setRouteInfo(info)
+                  const safetyScore = calculateSafetyScore(routeDestination, nearbyIncidents)
+                  const names: Record<string, string> = {
+                    safest: 'Ruta más Segura',
+                    fastest: 'Ruta más Rápida',
+                    alternate: 'Ruta Alternativa',
+                  }
+                  setRouteOptions(routes.map((r, i) => ({
+                    id: r.id,
+                    name: names[r.id] || `Ruta ${i + 1}`,
+                    distance: r.distance,
+                    duration: r.duration,
+                    safetyScore: {
+                      score: Math.max(0, Math.min(100, safetyScore.score - i * 10)),
+                      incidents_nearby: Math.max(0, safetyScore.incidents_nearby - (routes.length - 1 - i)),
+                      risk_level: (safetyScore.score - i * 10) < 50 ? 'danger' : (safetyScore.score - i * 10) < 75 ? 'caution' : 'safe',
+                    },
+                    incidentsOnRoute: Math.max(0, safetyScore.incidents_nearby - (routes.length - 1 - i)),
+                  })))
+                }}
+              />
+            ) : undefined}
+          />
+        )
+        return (
+          <>
+            {/* Planificación de rutas */}
+            <div>
+              <button
+                onClick={() => setRoutesExpanded(v => !v)}
+                className="w-full flex items-center justify-between text-base font-semibold mb-3"
+              >
+                <span className="flex items-center gap-2">
+                  <Navigation className="w-5 h-5 text-primary" />
+                  Planear Ruta Segura
+                </span>
+                {routesExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+              </button>
+              {routesExpanded && <RoutesTab hideMap />}
+              {/* Mapa aquí solo cuando la sección de mapa está colapsada */}
+              {routesExpanded && !mapExpanded && (
+                <div className="mt-3">{sharedMap}</div>
+              )}
+            </div>
+
+            {/* Sección de mapa independiente */}
+            <div>
+              <button
+                onClick={() => setMapExpanded(v => !v)}
+                className="w-full flex items-center justify-between text-base font-semibold mb-2"
+              >
+                <span className="flex items-center gap-2">
+                  <Map className="w-5 h-5 text-primary" />
+                  {showRoutes && routeDestination ? 'Mapa de Ruta + Incidentes' : 'Mapa de Incidentes'}
+                </span>
+                {mapExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+              </button>
+              {mapExpanded && sharedMap}
+            </div>
+          </>
+        )
+      })()}
+
+      {/* Temporizador de Seguridad */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -231,7 +273,7 @@ export function BeforeTab() {
         </CardContent>
       </Card>
 
-      {/* Safe Zones */}
+      {/* Zonas Seguras */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -280,7 +322,7 @@ export function BeforeTab() {
         </CardContent>
       </Card>
 
-      {/* Tracking */}
+      {/* Seguimiento a Contactos */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -316,7 +358,7 @@ export function BeforeTab() {
         </CardContent>
       </Card>
 
-      {/* Contacts summary */}
+      {/* Contactos listos para alertar */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">

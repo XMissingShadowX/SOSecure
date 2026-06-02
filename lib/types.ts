@@ -6,7 +6,7 @@
 
 // Definir el tipo `TabId` que representa las diferentes pestañas de la aplicación, y la interfaz `Coordinates` 
 // que describe las coordenadas geográficas con latitud, longitud y precisión opcional.
-export type TabId = 'home' | 'map' | 'routes' | 'medic' | 'before' | 'during' | 'after'
+export type TabId = 'home' | 'before' | 'during' | 'after' | 'medic'
 
 // Definir los tipos de incidentes y su gravedad, así como la interfaz `Incident` que describe un incidente reportado por 
 // los usuarios, incluyendo su tipo, gravedad, ubicación, estado y otros detalles relevantes.
@@ -18,7 +18,7 @@ export interface Coordinates {
 
 // Definir los tipos de incidentes y su gravedad, así como la interfaz `Incident` que describe un incidente reportado por 
 // los usuarios, incluyendo su tipo, gravedad, ubicación, estado y otros detalles relevantes.
-export type IncidentType = 'theft' | 'assault' | 'harassment' | 'suspicious' | 'accident' | 'other'
+export type IncidentType = 'theft-assault' | 'harassment-suspicious' | 'accident' | 'SOS'
 export type IncidentSeverity = 'high' | 'medium' | 'low'
 
 // La interfaz `Incident` describe un incidente reportado por los usuarios, incluyendo su tipo, gravedad, ubicación, 
@@ -90,6 +90,15 @@ export interface SafetyScore {
   score: number
   incidents_nearby: number
   risk_level: 'safe' | 'caution' | 'danger'
+}
+
+export interface RouteOption {
+  id: string
+  name: string
+  distance: string
+  duration: string
+  safetyScore: SafetyScore
+  incidentsOnRoute: number
 }
 
 // Definir la interfaz `FrequentPlace` que describe un lugar frecuente guardado por el usuario, incluyendo su nombre, dirección,

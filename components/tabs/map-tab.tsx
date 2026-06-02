@@ -61,23 +61,19 @@ const IncidentMap = dynamic(
 // la lista de incidentes recientes.
 const incidentTypes: { value: IncidentType | 'all'; label: string }[] = [
   { value: 'all', label: 'Todos los tipos' },
-  { value: 'theft', label: 'Robo' },
-  { value: 'assault', label: 'Asalto' },
-  { value: 'harassment', label: 'Acoso' },
-  { value: 'suspicious', label: 'Actividad Sospechosa' },
+  { value: 'theft-assault', label: 'Robo/Asalto' },
+  { value: 'harassment-suspicious', label: 'Acoso/Actividad Sospechosa' },
   { value: 'accident', label: 'Accidente' },
-  { value: 'other', label: 'Otro' },
+  { value: 'SOS', label: 'Alerta SOS' },
 ]
 
 // Estos mismos tipos se definen nuevamente para el formulario de reporte, sin la opción "all", ya que no es 
 // relevante en ese contexto.
 const incidentTypesForm: { value: IncidentType; label: string }[] = [
-  { value: 'theft', label: 'Robo' },
-  { value: 'assault', label: 'Asalto' },
-  { value: 'harassment', label: 'Acoso' },
-  { value: 'suspicious', label: 'Actividad Sospechosa' },
+  { value: 'theft-assault', label: 'Robo/Asalto' },
+  { value: 'harassment-suspicious', label: 'Acoso/Actividad Sospechosa' },
   { value: 'accident', label: 'Accidente' },
-  { value: 'other', label: 'Otro' },
+  { value: 'SOS', label: 'Alerta SOS' },
 ]
 
 // Definición de los niveles de severidad para los incidentes, con etiquetas y clases de color asociadas para su 
@@ -91,7 +87,7 @@ const severityLevels: { value: IncidentSeverity; label: string; color: string }[
 // Componente principal para la pestaña de mapa, que maneja la visualización del mapa con los incidentes, el reporte 
 // de nuevos incidentes, la edición y eliminación de incidentes propios, la aplicación de filtros, y la sincronización 
 // de reportes cuando el usuario está offline.
-export function MapTab() {
+export function MapTab({ embedded = false, customMap }: { embedded?: boolean; customMap?: React.ReactNode }) {
   const { coordinates } = useGeolocation({ watch: true })
   const [mapTheme, setMapTheme] = useState(() => {
     if (typeof window === 'undefined') return 'dark'
@@ -118,7 +114,7 @@ export function MapTab() {
   const [refreshing, setRefreshing] = useState(false)
   const [filterSeverity, setFilterSeverity] = useState<IncidentSeverity | 'all'>('all')
   const [filterType, setFilterType] = useState<IncidentType | 'all'>('all')
-  const [filterTime, setFilterTime] = useState<'all' | '1d' | '7d' | '30d'>('all')
+  const [filterTime, setFilterTime] = useState<'all' | '1d' | '7d' | '30d'>('7d')
   const [isOnline, setIsOnline] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
@@ -127,7 +123,7 @@ export function MapTab() {
   const [newIncident, setNewIncident] = useState({
     title: '',
     description: '',
-    incident_type: 'suspicious' as IncidentType,
+    incident_type: 'SOS' as IncidentType,
     severity: 'medium' as IncidentSeverity,
   })
 
@@ -243,7 +239,7 @@ export function MapTab() {
         longitude: coordinates.longitude,
         is_verified: false,
       })
-      setNewIncident({ title: '', description: '', incident_type: 'suspicious', severity: 'medium' })
+      setNewIncident({ title: '', description: '', incident_type: 'harassment-suspicious', severity: 'medium' })
       setShowReportDialog(false)
       return
     }
@@ -273,7 +269,7 @@ export function MapTab() {
     // se invoca una función de Supabase para notificar a los usuarios cercanos sobre el nuevo incidente reportado, 
     // enviando el ID del incidente, las coordenadas, el título y la severidad como parte de la notificación.
     if (!error) {
-      setNewIncident({ title: '', description: '', incident_type: 'suspicious', severity: 'medium' })
+      setNewIncident({ title: '', description: '', incident_type: 'harassment-suspicious', severity: 'medium' })
       setShowReportDialog(false)
       loadIncidents()
     }
@@ -356,8 +352,7 @@ export function MapTab() {
   // para reportar nuevos incidentes y editar incidentes existentes, con formularios para ingresar los detalles del 
   // incidente a reportar o editar.
   return (
-    // flex-col que ocupa exactamente el viewport menos la nav, sin scroll externo
-    <div className="flex flex-col h-[calc(100vh-4rem)] pb-24 gap-2">
+    <div className={embedded ? "flex flex-col gap-2" : "flex flex-col h-[calc(100vh-4rem)] pb-24 gap-2"}>
 
       {/* Banner offline — solo aparece si no hay internet, altura fija */}
       {!isOnline && (
@@ -368,9 +363,9 @@ export function MapTab() {
         </div>
       )}
 
-      {/* ── MAPA ── flex-1 + min-h-0 es la clave: ocupa todo el espacio sobrante */}
-      <div className="relative flex-1 min-h-0 rounded-lg overflow-hidden">
-        {loading ? (
+      {/* ── MAPA ── */}
+      <div className={embedded ? "relative h-[350px] rounded-lg overflow-hidden z-0" : "relative flex-1 min-h-0 rounded-lg overflow-hidden"}>
+        {customMap ?? (loading ? (
           <div className="h-full w-full flex items-center justify-center bg-muted rounded-lg">
             <div className="flex items-center gap-2 text-muted-foreground">
               <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -387,7 +382,7 @@ export function MapTab() {
             onEdit={handleEdit}
             onDelete={handleDelete}
           />
-        )}
+        ))}
 
         {/* Refresh — flotante arriba derecha */}
         <div className="absolute top-3 right-3 z-[1000]">
@@ -435,10 +430,6 @@ export function MapTab() {
               </DialogHeader>
               <FieldGroup>
                 <Field>
-                  <FieldLabel>¿Qué pasó?</FieldLabel>
-                  <Input placeholder="Descripción breve" value={newIncident.title} onChange={(e) => setNewIncident({ ...newIncident, title: e.target.value })} />
-                </Field>
-                <Field>
                   <FieldLabel>Tipo de Incidente</FieldLabel>
                   <Select value={newIncident.incident_type} onValueChange={(v) => setNewIncident({ ...newIncident, incident_type: v as IncidentType })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -446,6 +437,10 @@ export function MapTab() {
                       {incidentTypesForm.map((type) => <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                </Field>
+                <Field>
+                  <FieldLabel>¿Qué pasó?</FieldLabel>
+                  <Input placeholder="Descripción breve" value={newIncident.title} onChange={(e) => setNewIncident({ ...newIncident, title: e.target.value })} />
                 </Field>
                 <Field>
                   <FieldLabel>Severidad</FieldLabel>
@@ -508,7 +503,7 @@ export function MapTab() {
           </SelectContent>
         </Select>
 
-        <Select value={filterTime} onValueChange={(v) => setFilterTime(v as 'all' | '1d' | '7d' | '30d')}>
+        <Select value={filterTime} onValueChange={(v) => setFilterTime(v as 'all' | '1d' | '7d' | '30d' | 'all')}>
           <SelectTrigger className="flex-1">
             <SelectValue placeholder="Tiempo" />
           </SelectTrigger>

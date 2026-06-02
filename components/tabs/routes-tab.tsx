@@ -43,24 +43,11 @@ const RouteMap = dynamic(
   }
 )
 
-// Definir la interfaz `RouteOption`, que representa una opción de ruta que se muestra al usuario. Cada opción de ruta
-// tiene un identificador único, un nombre descriptivo, información sobre la distancia y duración de la ruta, una 
-// puntuación de seguridad que incluye el puntaje numérico, el número de incidentes cercanos y el nivel de riesgo, 
-// y el número de incidentes que se encuentran directamente en la ruta.
-interface RouteOption {
-  id: string
-  name: string
-  distance: string
-  duration: string
-  safetyScore: SafetyScore
-  incidentsOnRoute: number
-}
-
 // Función para calcular la puntuación de seguridad de una ruta basada en la ubicación del destino y los incidentes reportados
 // cercanos. La función filtra los incidentes que están dentro de un rango de latitud y longitud del destino, y luego 
 // calcula una puntuación de seguridad basada en la cantidad y severidad de los incidentes cercanos. La puntuación se 
 // ajusta para estar entre 0 y 100, y se asigna un nivel de riesgo basado en la puntuación (seguro, precaución o peligro).
-function calculateSafetyScore(
+export function calculateSafetyScore(
   destination: Coordinates,
   incidents: { latitude: number; longitude: number; severity: string }[]
 ): SafetyScore {
@@ -98,20 +85,16 @@ function calculateSafetyScore(
 // la ubicación del usuario, el destino ingresado, las opciones de ruta disponibles, y la puntuación de seguridad. Proporciona 
 // funciones para buscar destinos utilizando la API de Photon, seleccionar rutas, y mostrar información relevante sobre la 
 // seguridad de cada ruta. También muestra consejos de seguridad para los usuarios al planear sus rutas.
-export function RoutesTab() {
-  // Utilizar el hook `useGeolocation` para obtener las coordenadas de la ubicación actual del usuario, y el hook `useAppStore`
-  // para acceder a los incidentes cercanos, el origen y destino de la ruta, la ubicación actual y los lugares frecuentes. 
-  // El componente también maneja varios estados locales para el input del destino, la visualización de las rutas, la ruta 
-  // seleccionada, las sugerencias de autocompletado, el estado de búsqueda, la información de las rutas y las opciones de ruta.
+export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
   const { coordinates } = useGeolocation({ watch: true })
-  const { nearbyIncidents, routeOrigin, routeDestination, setRouteOrigin, setRouteDestination, currentLocation, frequentPlaces } = useAppStore()
+  const {
+    nearbyIncidents, routeOrigin, routeDestination, setRouteOrigin, setRouteDestination, frequentPlaces,
+    showRoutes, setShowRoutes, selectedRoute, setSelectedRoute,
+    routeOptions, setRouteOptions, routeInfo, setRouteInfo,
+  } = useAppStore()
   const [destinationInput, setDestinationInput] = useState('')
-  const [showRoutes, setShowRoutes] = useState(false)
-  const [selectedRoute, setSelectedRoute] = useState<string | null>(null)
   const [suggestions, setSuggestions] = useState<{ display_name: string; lat: string; lon: string }[]>([])
   const [searching, setSearching] = useState(false)
-  const [routeInfo, setRouteInfo] = useState<Record<string, { distance: string; duration: string }>>({})
-  const [routeOptions, setRouteOptions] = useState<RouteOption[]>([])
 
   // Efecto para establecer el origen de la ruta como la ubicación actual del usuario tan pronto como se obtienen 
   // las coordenadas. Esto asegura que el punto de partida de la ruta sea siempre la ubicación actual, a menos 
@@ -214,7 +197,7 @@ export function RoutesTab() {
   // un mapa que muestra las rutas disponibles junto con su puntuación de seguridad. Si no se han mostrado las rutas, 
   // también se muestran consejos de seguridad para los usuarios.
   return (
-    <div className="flex flex-col gap-4 pb-40">
+    <div className="flex flex-col gap-4">
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -316,7 +299,7 @@ export function RoutesTab() {
         </CardContent>
       </Card>
 
-      {showRoutes && routeOrigin && routeDestination && (
+      {!hideMap && showRoutes && routeOrigin && routeDestination && (
         <div className="h-64 rounded-lg overflow-hidden relative z-0">
           <RouteMap
             origin={routeOrigin}

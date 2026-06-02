@@ -9,7 +9,7 @@
 
 'use client'
 
-import { Home, Map, Route, Brain, ShieldCheck, Radio, CheckCircle } from 'lucide-react'
+import { Home, Brain, ShieldCheck, Radio, CheckCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/lib/store'
 import type { TabId } from '@/lib/types'
@@ -17,10 +17,8 @@ import type { TabId } from '@/lib/types'
 const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: 'home', label: 'Inicio', icon: Home },
   { id: 'before', label: 'Antes', icon: ShieldCheck },
-  { id: 'map', label: 'Mapa', icon: Map },
   { id: 'during', label: 'Durante', icon: Radio },
   { id: 'after', label: 'Después', icon: CheckCircle },
-  { id: 'routes', label: 'Rutas', icon: Route },
   { id: 'medic', label: 'Apoyo', icon: Brain },
 ]
 
