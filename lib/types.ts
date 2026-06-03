@@ -18,7 +18,7 @@ export interface Coordinates {
 
 // Definir los tipos de incidentes y su gravedad, así como la interfaz `Incident` que describe un incidente reportado por 
 // los usuarios, incluyendo su tipo, gravedad, ubicación, estado y otros detalles relevantes.
-export type IncidentType = 'theft-assault' | 'harassment-suspicious' | 'accident' | 'SOS'
+export type IncidentType = 'theft-assault-violence' | 'harassment-suspicious' | 'accident' | 'SOS'
 export type IncidentSeverity = 'high' | 'medium' | 'low'
 
 // La interfaz `Incident` describe un incidente reportado por los usuarios, incluyendo su tipo, gravedad, ubicación, 
