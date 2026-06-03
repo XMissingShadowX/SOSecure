@@ -61,7 +61,7 @@ const IncidentMap = dynamic(
 // la lista de incidentes recientes.
 const incidentTypes: { value: IncidentType | 'all'; label: string }[] = [
   { value: 'all', label: 'Todos los tipos' },
-  { value: 'theft-assault', label: 'Robo/Asalto' },
+  { value: 'theft-assault-violence', label: 'Robo/Asalto/violencia' },
   { value: 'harassment-suspicious', label: 'Acoso/Actividad Sospechosa' },
   { value: 'accident', label: 'Accidente' },
   { value: 'SOS', label: 'Alerta SOS' },
@@ -70,19 +70,44 @@ const incidentTypes: { value: IncidentType | 'all'; label: string }[] = [
 // Estos mismos tipos se definen nuevamente para el formulario de reporte, sin la opción "all", ya que no es 
 // relevante en ese contexto.
 const incidentTypesForm: { value: IncidentType; label: string }[] = [
-  { value: 'theft-assault', label: 'Robo/Asalto' },
+  { value: 'theft-assault-violence', label: 'Robo/Asalto/violencia' },
   { value: 'harassment-suspicious', label: 'Acoso/Actividad Sospechosa' },
   { value: 'accident', label: 'Accidente' },
   { value: 'SOS', label: 'Alerta SOS' },
 ]
 
-// Definición de los niveles de severidad para los incidentes, con etiquetas y clases de color asociadas para su 
+// Definición de los niveles de severidad para los incidentes, con etiquetas y clases de color asociadas para su
 // visualización en el formulario de reporte y en la leyenda del mapa.
 const severityLevels: { value: IncidentSeverity; label: string; color: string }[] = [
   { value: 'high', label: 'Alto', color: 'bg-destructive text-destructive-foreground' },
   { value: 'medium', label: 'Medio', color: 'bg-warning text-warning-foreground' },
   { value: 'low', label: 'Bajo', color: 'bg-primary text-primary-foreground' },
 ]
+
+const incidentQuestions: Partial<Record<IncidentType, string[]>> = {
+  'theft-assault-violence': [
+    '¿Hubo uso de arma o amenaza con arma?',
+    '¿Hubo violencia física contra alguna persona?',
+    '¿La víctima resultó herida?',
+  ],
+  'harassment-suspicious': [
+    '¿La persona sospechosa está siguiendo o persiguiendo a alguien?',
+    '¿Hubo amenazas directas o comportamiento agresivo?',
+    '¿Existe riesgo inmediato para una persona vulnerable (menor, adulto mayor, etc.)?',
+  ],
+  'accident': [
+    '¿Hay personas lesionadas?',
+    '¿Hay riesgo de incendio, explosión o fuga de combustible?',
+    '¿El accidente bloquea completamente la circulación o pone en peligro a otros?',
+  ],
+}
+
+function calculateSeverity(answers: string[]): IncidentSeverity {
+  const score = answers.reduce((sum, a) => sum + (a === 'si' ? 1 : a === 'no_se' ? 0.5 : 0), 0)
+  if (score >= 3) return 'high'
+  if (score === 0) return 'low'
+  return 'medium'
+}
 
 // Componente principal para la pestaña de mapa, que maneja la visualización del mapa con los incidentes, el reporte 
 // de nuevos incidentes, la edición y eliminación de incidentes propios, la aplicación de filtros, y la sincronización 
@@ -118,14 +143,14 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
   const [isOnline, setIsOnline] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
-  // Estado local para manejar el formulario de reporte de nuevos incidentes, que incluye el título, descripción, 
-  // tipo y severidad del incidente a reportar.
   const [newIncident, setNewIncident] = useState({
     title: '',
     description: '',
-    incident_type: 'SOS' as IncidentType,
+    incident_type: 'theft-assault-violence' as IncidentType,
     severity: 'medium' as IncidentSeverity,
   })
+  const [questionAnswers, setQuestionAnswers] = useState<string[]>(['', '', ''])
+  const [reportError, setReportError] = useState<string | null>(null)
 
   // Efecto para obtener el ID del usuario actual desde Supabase Auth al montar el componente, lo que permite 
   // identificar qué incidentes fueron reportados por el usuario para permitir la edición y eliminación de esos incidentes.
@@ -221,25 +246,27 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
     // Verificar que se haya proporcionado un título para el incidente y que haya coordenadas disponibles 
     // antes de continuar con el reporte. Si falta alguno de estos datos, no se puede reportar el incidente, 
     // por lo que la función simplemente retorna sin hacer nada.
-    if (!newIncident.title || !coordinates) return
+    setReportError(null)
+    const questions = incidentQuestions[newIncident.incident_type] || []
+    const allAnswered = questions.length === 0 || questionAnswers.every(a => a !== '')
+    if (!coordinates || !allAnswered) return
 
-    // Si el usuario está offline, se agrega el nuevo incidente a la cola de reportes offline utilizando la 
-    // función 'addToOfflineQueue' del estado global. El incidente se guarda con los datos proporcionados en 
-    // el formulario, junto con las coordenadas actuales del usuario, y se marca como no verificado. Luego, se 
-    // limpia el formulario de nuevo incidente y se cierra el diálogo de reporte, ya que el reporte se ha 
-    // guardado localmente y se enviará al servidor cuando el usuario vuelva a estar online.
+    const autoTitle = incidentTypesForm.find(t => t.value === newIncident.incident_type)?.label || 'Incidente'
+    const autoSeverity: IncidentSeverity = questions.length > 0 ? calculateSeverity(questionAnswers) : 'medium'
+
     if (!isOnline) {
       addToOfflineQueue({
         user_id: null,
-        title: newIncident.title,
+        title: autoTitle,
         description: newIncident.description || null,
         incident_type: newIncident.incident_type,
-        severity: newIncident.severity,
+        severity: autoSeverity,
         latitude: coordinates.latitude,
         longitude: coordinates.longitude,
         is_verified: false,
       })
-      setNewIncident({ title: '', description: '', incident_type: 'harassment-suspicious', severity: 'medium' })
+      setNewIncident({ title: '', description: '', incident_type: 'theft-assault-violence', severity: 'medium' })
+      setQuestionAnswers(['', '', ''])
       setShowReportDialog(false)
       return
     }
@@ -255,21 +282,22 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
     // incidente, se cierra el diálogo de reporte, y se recarga la lista de incidentes para reflejar el nuevo reporte.
     const { data, error } = await supabase.from('incidents').insert({
       user_id: user?.id || null,
-      title: newIncident.title,
+      title: autoTitle,
       description: newIncident.description || null,
       incident_type: newIncident.incident_type,
-      severity: newIncident.severity,
+      severity: autoSeverity,
       latitude: coordinates.latitude,
       longitude: coordinates.longitude,
       is_verified: false,
     }).select().single()
 
-    // Si no hubo error al insertar el nuevo incidente, se limpia el formulario, se cierra el diálogo, y se recarga 
-    // la lista de incidentes. Además, si el incidente se insertó correctamente y se obtuvo el ID del nuevo incidente, 
-    // se invoca una función de Supabase para notificar a los usuarios cercanos sobre el nuevo incidente reportado, 
-    // enviando el ID del incidente, las coordenadas, el título y la severidad como parte de la notificación.
-    if (!error) {
-      setNewIncident({ title: '', description: '', incident_type: 'harassment-suspicious', severity: 'medium' })
+    if (error) {
+      console.error('Error al reportar incidente:', error)
+      setReportError(error.message || 'Error al enviar el reporte. Intenta de nuevo.')
+    } else {
+      setNewIncident({ title: '', description: '', incident_type: 'theft-assault-violence', severity: 'medium' })
+      setQuestionAnswers(['', '', ''])
+      setReportError(null)
       setShowReportDialog(false)
       loadIncidents()
     }
@@ -279,7 +307,7 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
     // incidente, las coordenadas, el título y la severidad como parte de la notificación.
     if (!error && data) {
       await supabase.functions.invoke('notify-nearby-users', {
-        body: { incident_id: data.id, incident_lat: coordinates.latitude, incident_lng: coordinates.longitude, title: newIncident.title, severity: newIncident.severity }
+        body: { incident_id: data.id, incident_lat: coordinates.latitude, incident_lng: coordinates.longitude, title: autoTitle, severity: autoSeverity }
       })
     }
   }
@@ -410,7 +438,14 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
 
         {/* Botón Reportar — flotante abajo derecha sobre el mapa */}
         <div className="absolute bottom-3 right-3 z-[1000]">
-          <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
+          <Dialog open={showReportDialog} onOpenChange={(open) => {
+            setShowReportDialog(open)
+            if (!open) {
+              setNewIncident({ title: '', description: '', incident_type: 'theft-assault-violence', severity: 'medium' })
+              setQuestionAnswers(['', '', ''])
+              setReportError(null)
+            }
+          }}>
             <DialogTrigger asChild>
               <Button size="sm" className="shadow-lg">
                 <Plus className="w-4 h-4 mr-1" />
@@ -431,30 +466,41 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
               <FieldGroup>
                 <Field>
                   <FieldLabel>Tipo de Incidente</FieldLabel>
-                  <Select value={newIncident.incident_type} onValueChange={(v) => setNewIncident({ ...newIncident, incident_type: v as IncidentType })}>
+                  <Select value={newIncident.incident_type} onValueChange={(v) => {
+                    setNewIncident({ ...newIncident, incident_type: v as IncidentType })
+                    setQuestionAnswers(['', '', ''])
+                  }}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {incidentTypesForm.map((type) => <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field>
-                  <FieldLabel>¿Qué pasó?</FieldLabel>
-                  <Input placeholder="Descripción breve" value={newIncident.title} onChange={(e) => setNewIncident({ ...newIncident, title: e.target.value })} />
-                </Field>
-                <Field>
-                  <FieldLabel>Severidad</FieldLabel>
-                  <div className="flex gap-2">
-                    {severityLevels.map((level) => (
-                      <button key={level.value} type="button"
-                        onClick={() => setNewIncident({ ...newIncident, severity: level.value })}
-                        className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
-                          newIncident.severity === level.value ? level.color : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                        }`}
-                      >{level.label}</button>
-                    ))}
-                  </div>
-                </Field>
+                {(incidentQuestions[newIncident.incident_type] || []).map((question, idx) => (
+                  <Field key={idx}>
+                    <FieldLabel>{question}</FieldLabel>
+                    <div className="flex gap-2">
+                      {(['si', 'no', 'no_se'] as const).map((opt) => (
+                        <button
+                          key={opt}
+                          type="button"
+                          onClick={() => {
+                            const next = [...questionAnswers]
+                            next[idx] = opt
+                            setQuestionAnswers(next)
+                          }}
+                          className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
+                            questionAnswers[idx] === opt
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                          }`}
+                        >
+                          {opt === 'si' ? 'Sí' : opt === 'no' ? 'No' : 'No sé'}
+                        </button>
+                      ))}
+                    </div>
+                  </Field>
+                ))}
                 <Field>
                   <FieldLabel>Detalles (Opcional)</FieldLabel>
                   <Textarea placeholder="Detalles adicionales..." rows={3} value={newIncident.description} onChange={(e) => setNewIncident({ ...newIncident, description: e.target.value })} />
@@ -466,9 +512,12 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
                   </div>
                 )}
               </FieldGroup>
+              {reportError && (
+                <p className="text-sm text-destructive px-1">{reportError}</p>
+              )}
               <DialogFooter>
                 <Button variant="outline" onClick={() => setShowReportDialog(false)}>Cancelar</Button>
-                <Button onClick={reportIncident} disabled={!newIncident.title || !coordinates}>
+                <Button onClick={reportIncident} disabled={!coordinates || ((incidentQuestions[newIncident.incident_type]?.length ?? 0) > 0 && questionAnswers.some(a => a === ''))}>
                   {isOnline ? 'Enviar Reporte' : 'Guardar Localmente'}
                 </Button>
               </DialogFooter>
