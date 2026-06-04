@@ -317,26 +317,28 @@ export function SOSButton() {
     } catch (err) { console.error('saveRecordingToCloud failed:', err) }
   }
 
-  const handleSaveAndClose = useCallback(async () => {
+  const handleSaveAndClose = useCallback(() => {
     setIsSaving(true)
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-      await new Promise<void>((resolve) => {
-        const orig = mediaRecorder.onstop
-        mediaRecorder.onstop = (e) => {
-          if (recordingChunksRef.current.length > 0) setDownloadReady(true)
-          if (orig) orig.call(mediaRecorder, e)
-          resolve()
-        }
-        mediaRecorder.stop()
-      })
+
+    const finalize = async () => {
+      if (recordingStream) recordingStream.getTracks().forEach(t => t.stop())
+      setRecordingStream(null)
+      setIsRecording(false)
+      if (recordingChunksRef.current.length > 0) {
+        setDownloadReady(true)
+        downloadRecording()
+      }
+      if (activeAlertId) await saveRecordingToCloud(activeAlertId)
+      setIsSaving(false)
+      setMinimized(true)
     }
-    if (recordingStream) recordingStream.getTracks().forEach(t => t.stop())
-    setRecordingStream(null)
-    setIsRecording(false)
-    downloadRecording()
-    if (activeAlertId) await saveRecordingToCloud(activeAlertId)
-    setIsSaving(false)
-    setMinimized(true)
+
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.onstop = () => { finalize() }
+      mediaRecorder.stop()
+    } else {
+      finalize()
+    }
   }, [mediaRecorder, recordingStream, activeAlertId])
 
   const cancelSOS = useCallback(async () => {

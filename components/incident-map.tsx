@@ -168,6 +168,11 @@ function HeatLayer({ incidents }: HeatLayerProps) {
       gradient: { 0.0: '#0000ff', 0.4: '#00ffff', 0.6: '#00ff00', 0.8: '#ffff00', 1.0: '#ff0000' },
     }).addTo(map)
 
+    // Garantizar fondo transparente en el canvas del heatmap
+    const overlayPane = map.getPanes().overlayPane
+    const canvas = overlayPane?.querySelector('canvas')
+    if (canvas) (canvas as HTMLCanvasElement).style.background = 'transparent'
+
     return () => { map.removeLayer(heat) }
   }, [map, incidents, zoom])
 
@@ -288,7 +293,7 @@ useEffect(() => {
     {/* Toggle compacto — muestra el modo activo, click cambia al otro */}
     <button
       onClick={() => setViewMode(v => v === 'markers' ? 'heatmap' : 'markers')}
-      className="absolute top-3 left-3 z-[1000] flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium shadow-md bg-background/90 border border-border hover:bg-muted transition-colors"
+      className="absolute top-3 left-3 z-[1000] flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium shadow-md bg-background/90 border border-border hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
     >
       {viewMode === 'markers' ? '📍' : '🔥'}
       <span>{viewMode === 'markers' ? 'Marcadores' : 'Calor'}</span>

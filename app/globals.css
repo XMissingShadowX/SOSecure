@@ -232,6 +232,14 @@ html.light .leaflet-tile {
   filter: none !important;
 }
 
+/* Canvas del heatmap siempre transparente (fondo negro en modo claro) */
+.leaflet-heatmap-layer {
+  background: transparent !important;
+}
+.leaflet-overlay-pane {
+  background: transparent !important;
+}
+
 .text-primary {
   color: var(--primary) !important;
 }
