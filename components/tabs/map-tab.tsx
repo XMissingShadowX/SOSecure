@@ -10,7 +10,7 @@
 // Importaciones de React, componentes dinámicos, iconos, hooks personalizados, cliente de Supabase, y componentes de UI.
 import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { Plus, RefreshCw, AlertTriangle, Filter, ShieldCheck, Pencil, Trash2 } from 'lucide-react'
+import { Plus, RefreshCw, AlertTriangle, Filter, ShieldCheck, Pencil, Trash2, LocateFixed } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { useGeolocation } from '@/hooks/use-geolocation'
 import { createClient } from '@/lib/supabase/client'
@@ -142,6 +142,7 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
   const [filterTime, setFilterTime] = useState<'all' | '1d' | '7d' | '30d'>('7d')
   const [isOnline, setIsOnline] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [locateTrigger, setLocateTrigger] = useState(0)
 
   const [newIncident, setNewIncident] = useState({
     title: '',
@@ -409,17 +410,29 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
             currentUserId={currentUserId}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            flyToUserTrigger={locateTrigger}
           />
         ))}
 
-        {/* Refresh — flotante arriba derecha */}
-        <div className="absolute top-3 right-3 z-[1000]">
+        {/* Refresh + Locate — flotantes arriba derecha */}
+        <div className="absolute top-3 right-3 z-[1000] flex gap-2">
+          <Button
+            size="icon"
+            variant="secondary"
+            className="shadow-lg bg-card text-foreground border border-border hover:bg-muted"
+            onClick={() => setLocateTrigger(t => t + 1)}
+            disabled={!coordinates}
+            title="Ir a mi ubicación"
+          >
+            <LocateFixed className="w-4 h-4" />
+          </Button>
           <Button
             size="icon"
             variant="secondary"
             className="shadow-lg bg-card text-foreground border border-border hover:bg-muted"
             onClick={handleRefresh}
             disabled={refreshing}
+            title="Recargar incidentes"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>

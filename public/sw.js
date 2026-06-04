@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sosecure-v3'
+const CACHE_NAME = 'sosecure-v4'
 const STATIC_URLS = [
   '/',
   '/auth/login',
@@ -22,6 +22,14 @@ self.addEventListener('activate', (event) => {
 })
 
 self.addEventListener('fetch', (event) => {
+  // Network first for HTML navigation — prevents stale chunk references after deploys
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match('/'))
+    )
+    return
+  }
+
   // Network first for API calls, Supabase, and Next.js compiled assets
   if (
     event.request.url.includes('/api/') ||

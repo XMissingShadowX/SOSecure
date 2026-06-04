@@ -9,9 +9,10 @@
 */
 'use client'
 
-import { useEffect, useMemo, useState, useCallback } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
+import 'leaflet.heat'
 import { useAppStore } from '@/lib/store'
 import { createClient } from '@/lib/supabase/client'
 import type { Incident, Coordinates } from '@/lib/types'
@@ -96,11 +97,80 @@ interface MapUpdaterProps {
   zoom: number
 }
 
+// Solo centra en el mount inicial, no en cada actualización de ubicación
 function MapUpdater({ center, zoom }: MapUpdaterProps) {
   const map = useMap()
   useEffect(() => {
     map.setView([center.latitude, center.longitude], zoom)
-  }, [map, center, zoom])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  return null
+}
+
+interface FlyToControllerProps {
+  trigger: number
+  userLocation: Coordinates | null
+}
+
+function FlyToController({ trigger, userLocation }: FlyToControllerProps) {
+  const map = useMap()
+  const prevTrigger = useRef(0)
+
+  useEffect(() => {
+    if (trigger > prevTrigger.current && userLocation) {
+      map.flyTo([userLocation.latitude, userLocation.longitude], 16, { duration: 1.2 })
+      prevTrigger.current = trigger
+    }
+  }, [trigger, userLocation, map])
+
+  return null
+}
+
+const severityIntensity: Record<string, number> = {
+  high: 1.0,
+  medium: 0.55,
+  low: 0.25,
+}
+
+interface HeatLayerProps {
+  incidents: Incident[]
+}
+
+function HeatLayer({ incidents }: HeatLayerProps) {
+  const map = useMap()
+  const [zoom, setZoom] = useState(() => map.getZoom())
+
+  useEffect(() => {
+    const onZoom = () => setZoom(map.getZoom())
+    map.on('zoomend', onZoom)
+    return () => { map.off('zoomend', onZoom) }
+  }, [map])
+
+  useEffect(() => {
+    if (!incidents.length) return
+
+    const points = incidents.map(inc => [
+      inc.latitude,
+      inc.longitude,
+      severityIntensity[inc.severity] ?? 0.3,
+    ] as [number, number, number])
+
+    // Radio escala con el zoom: pequeño al alejarse, grande al acercarse
+    const radius = Math.max(8, Math.min(35, (zoom - 8) * 4))
+    const blur = Math.round(radius * 0.55)
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const heat = (L as any).heatLayer(points, {
+      radius,
+      blur,
+      maxZoom: 18,
+      minOpacity: 0.65,
+      gradient: { 0.0: '#0000ff', 0.4: '#00ffff', 0.6: '#00ff00', 0.8: '#ffff00', 1.0: '#ff0000' },
+    }).addTo(map)
+
+    return () => { map.removeLayer(heat) }
+  }, [map, incidents, zoom])
+
   return null
 }
 
@@ -112,9 +182,10 @@ interface IncidentMapProps {
   currentUserId?: string | null
   onEdit?: (incident: Incident) => void
   onDelete?: (incidentId: string) => void
+  flyToUserTrigger?: number
 }
 
-export function IncidentMap({ incidents, userLocation, onMapClick, showHeatZones = true, currentUserId, onEdit, onDelete }: IncidentMapProps) {
+export function IncidentMap({ incidents, userLocation, onMapClick, showHeatZones = true, currentUserId, onEdit, onDelete, flyToUserTrigger = 0 }: IncidentMapProps) {
   const { mapCenter, mapZoom } = useAppStore()
 
   const [isDark, setIsDark] = useState(() => {
@@ -122,6 +193,7 @@ export function IncidentMap({ incidents, userLocation, onMapClick, showHeatZones
     return document.documentElement.className === 'dark'
   })
   const [tileKey, setTileKey] = useState(Date.now())
+  const [viewMode, setViewMode] = useState<'markers' | 'heatmap'>('markers')
 
   // Estado de votos en el mapa: { [incidentId]: { real, fake, voted } }
   const [mapVotes, setMapVotes] = useState<Record<string, { real: number; fake: number; voted: boolean }>>(() => {
@@ -204,23 +276,26 @@ useEffect(() => {
     return () => observer.disconnect()
   }, [])
 
-  const center = useMemo(() => {
+  // Solo para el centro inicial del mapa — no reacciona a updates de GPS
+  const initialCenter = useMemo(() => {
     if (userLocation) return userLocation
     return mapCenter
-  }, [userLocation, mapCenter])
-
-  const heatZones = useMemo(() => {
-    if (!showHeatZones) return []
-    return incidents.filter(i => i.severity === 'high').map(incident => ({
-      center: [incident.latitude, incident.longitude] as [number, number],
-      radius: 200,
-      color: '#ef4444',
-    }))
-  }, [incidents, showHeatZones])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
+    <div className="relative h-full w-full">
+    {/* Toggle compacto — muestra el modo activo, click cambia al otro */}
+    <button
+      onClick={() => setViewMode(v => v === 'markers' ? 'heatmap' : 'markers')}
+      className="absolute top-3 left-3 z-[1000] flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium shadow-md bg-background/90 border border-border hover:bg-muted transition-colors"
+    >
+      {viewMode === 'markers' ? '📍' : '🔥'}
+      <span>{viewMode === 'markers' ? 'Marcadores' : 'Calor'}</span>
+    </button>
+
     <MapContainer
-      center={[center.latitude, center.longitude]}
+      center={[initialCenter.latitude, initialCenter.longitude]}
       zoom={mapZoom}
       className="h-full w-full rounded-lg"
       zoomControl={false}
@@ -240,16 +315,12 @@ useEffect(() => {
         />
       )}
 
-      <MapUpdater center={center} zoom={mapZoom} />
+      <MapUpdater center={initialCenter} zoom={mapZoom} />
+      <FlyToController trigger={flyToUserTrigger} userLocation={userLocation} />
 
-      {heatZones.map((zone, index) => (
-        <Circle
-          key={`zone-${index}`}
-          center={zone.center}
-          radius={zone.radius}
-          pathOptions={{ color: zone.color, fillColor: zone.color, fillOpacity: 0.2, weight: 1 }}
-        />
-      ))}
+      {viewMode === 'heatmap' && showHeatZones && (
+        <HeatLayer incidents={incidents} />
+      )}
 
       {userLocation && (
         <Marker position={[userLocation.latitude, userLocation.longitude]} icon={userIcon}>
@@ -261,7 +332,7 @@ useEffect(() => {
         </Marker>
       )}
 
-      {incidents.map((incident) => {
+      {viewMode === 'markers' && incidents.map((incident) => {
         const isOwner = currentUserId && incident.user_id === currentUserId
         const votes = mapVotes[incident.id] ?? { real: incident.votes_real ?? 0, fake: incident.votes_fake ?? 0, voted: false }
         const totalVotes = votes.real + votes.fake
@@ -406,5 +477,6 @@ useEffect(() => {
         )
       })}
     </MapContainer>
+    </div>
   )
 }

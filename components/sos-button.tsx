@@ -6,11 +6,13 @@
 - Muestra una interfaz de grabación con opciones para cancelar, minimizar o finalizar la alerta
 - Al finalizar, permite descargar la grabación localmente o guardarla en la nube vinculada a la alerta
 - Si el usuario cancela la alerta, detiene la grabación, elimina la alerta de Supabase y restablece el estado
+- NUEVO: También se puede activar presionando el botón de volumen (subir o bajar) 5 veces en 3 segundos
 */
 
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { useVolumeSOS } from '@/hooks/use-volume-sos'
 import { AlertTriangle, X, Bell, Mic, Video, StopCircle, Minimize2, ChevronUp, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/lib/store'
@@ -363,6 +365,13 @@ export function SOSButton() {
   }, [setSosActive, setSosAlert, mediaRecorder, recordingStream])
 
   useEffect(() => () => clearTimers(), [clearTimers])
+
+  // ── Activación por botones de volumen ──────────────────────────────────
+  // 5 pulsaciones (subir o bajar) en menos de 3 segundos activan el SOS.
+  useVolumeSOS({
+    onActivate: activateSOS,
+    disabled: sosActive,
+  })
 
   if (sosActive) {
     return (

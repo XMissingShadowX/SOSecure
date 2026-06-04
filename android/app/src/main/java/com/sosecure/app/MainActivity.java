@@ -1,7 +1,6 @@
-package com.safewalk.app;
+package com.sosecure.app;
 
 import com.getcapacitor.BridgeActivity;
-import com.safewalk.app.VolumeButtonPlugin;
 
 public class MainActivity extends BridgeActivity {
 
