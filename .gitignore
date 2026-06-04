@@ -5,6 +5,7 @@ __v0_jsx-dev-runtime.ts
 
 # Dependencias
 node_modules/
+supabase/
 
 # Next.js
 .next/
@@ -44,6 +45,7 @@ desktop.ini
 *.swo
 
 # Android build artifacts
+android/
 android/.idea/
 android/app/build/
 android/.gradle/

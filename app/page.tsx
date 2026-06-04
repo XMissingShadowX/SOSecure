@@ -66,20 +66,20 @@ export default function HomePage() {
               <Shield className="w-12 h-12 text-primary" />
             </div>
             <h1 className="text-3xl font-bold">SOSecure</h1>
-            <p className="text-muted-foreground">Your personal safety companion</p>
+            <p className="text-muted-foreground">Tu compañero de seguridad personal</p>
           </div>
           <div className="flex flex-col gap-3">
             <Link
               href="/auth/login"
               className="flex items-center justify-center h-11 rounded-lg bg-primary text-primary-foreground font-semibold text-sm"
             >
-              Sign In
+              Iniciar Sesión
             </Link>
             <Link
               href="/auth/sign-up"
               className="flex items-center justify-center h-11 rounded-lg border border-border text-foreground font-semibold text-sm"
             >
-              Create Account
+              Crear Cuenta
             </Link>
           </div>
         </div>
