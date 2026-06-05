@@ -22,7 +22,7 @@ import { MedicTab } from './tabs/medic-tab'
 import { BeforeTab } from './tabs/before-tab'
 import { DuringTab } from './tabs/during-tab'
 import { AfterTab } from './tabs/after-tab'
-import { Shield, Settings, LogOut, BellRing, WifiOff, Sun, Moon } from 'lucide-react'
+import { Shield, Settings, LogOut, BellRing, WifiOff, Sun, Moon, UserCircle, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -31,6 +31,23 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import type { User } from '@supabase/supabase-js'
 
 export function AppShell() {
@@ -39,6 +56,9 @@ export function AppShell() {
   const [user, setUser] = useState<User | null>(null)
   const [isOnline, setIsOnline] = useState(true)
   const [isDark, setIsDark] = useState(true)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [deletingAccount, setDeletingAccount] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const applyTheme = (theme: string) => {
     const isDarkTheme = theme === 'dark'
@@ -160,6 +180,19 @@ export function AppShell() {
     window.location.href = '/auth/login'
   }
 
+  const handleDeleteAccount = async () => {
+    setDeletingAccount(true)
+    setDeleteError(null)
+    const res = await fetch('/api/delete-account', { method: 'POST' })
+    if (res.ok) {
+      window.location.href = '/auth/login'
+    } else {
+      const body = await res.json().catch(() => ({}))
+      setDeleteError(body.error ?? 'Error al eliminar la cuenta')
+      setDeletingAccount(false)
+    }
+  }
+
   return (
     <PermissionGate>
       <div className="min-h-screen bg-background flex flex-col">
@@ -183,30 +216,26 @@ export function AppShell() {
             </div>
 
             <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleTheme}
-                aria-label="Cambiar tema"
-              >
-                {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-              </Button>
-
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon">
-                    <Settings className="w-5 h-5" />
+                    <UserCircle className="w-5 h-5" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="z-[9999] bg-popover text-popover-foreground">
                   {user && (
                     <>
-                      <DropdownMenuItem className="text-xs text-muted-foreground">
+                      <DropdownMenuItem className="text-xs text-muted-foreground cursor-default select-none">
                         {user.email}
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                     </>
                   )}
+                  <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
+                    <Settings className="w-4 h-4 mr-2" />
+                    Ajustes
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleSignOut}>
                     <LogOut className="w-4 h-4 mr-2" />
                     Cerrar sesión
@@ -214,6 +243,70 @@ export function AppShell() {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+
+            {/* Dialog de Ajustes */}
+            <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+              <DialogContent className="max-w-sm">
+                <DialogHeader>
+                  <DialogTitle>Ajustes</DialogTitle>
+                </DialogHeader>
+
+                <div className="space-y-6 pt-2">
+                  {/* Tema */}
+                  <div>
+                    <p className="text-sm font-medium mb-3">Apariencia</p>
+                    <div className="flex items-center justify-between p-3 rounded-lg border border-border">
+                      <div className="flex items-center gap-2">
+                        {isDark ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                        <span className="text-sm">{isDark ? 'Tema oscuro' : 'Tema claro'}</span>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={toggleTheme}>
+                        {isDark ? <Sun className="w-4 h-4 mr-1" /> : <Moon className="w-4 h-4 mr-1" />}
+                        {isDark ? 'Cambiar a claro' : 'Cambiar a oscuro'}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Cuenta */}
+                  <div>
+                    <p className="text-sm font-medium mb-3">Cuenta</p>
+                    <div className="p-3 rounded-lg border border-destructive/40 space-y-2">
+                      {deleteError && (
+                        <p className="text-xs text-destructive">{deleteError}</p>
+                      )}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="destructive" size="sm" className="w-full" disabled={deletingAccount}>
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            {deletingAccount ? 'Eliminando...' : 'Eliminar cuenta'}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>¿Eliminar tu cuenta?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta acción es permanente. Se borrarán todos tus datos y no podrás recuperarlos.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              onClick={handleDeleteAccount}
+                            >
+                              Sí, eliminar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                      <p className="text-xs text-muted-foreground">
+                        Si no inicias sesión en 30 días, tu cuenta será eliminada permanentemente.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </header>
 

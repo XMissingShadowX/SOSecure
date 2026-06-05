@@ -17,7 +17,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Shield, Mail, Lock, Eye, EyeOff, User, AlertCircle } from 'lucide-react'
+import { Shield, Mail, Lock, Eye, EyeOff, User, Phone, AlertCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -31,6 +31,7 @@ export default function SignUpPage() {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [phone, setPhone] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -53,6 +54,7 @@ export default function SignUpPage() {
         emailRedirectTo: undefined,
         data: {
           full_name: fullName,
+          phone,
         },
       },
     })
@@ -109,6 +111,22 @@ export default function SignUpPage() {
                       placeholder="Tu nombre"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
+                      required
+                    />
+                  </InputGroup>
+                </Field>
+
+                <Field>
+                  <FieldLabel>Número de teléfono</FieldLabel>
+                  <InputGroup>
+                    <InputGroupAddon>
+                      <Phone className="w-4 h-4" />
+                    </InputGroupAddon>
+                    <InputGroupInput
+                      type="tel"
+                      placeholder="+52 000 000 0000"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
                       required
                     />
                   </InputGroup>

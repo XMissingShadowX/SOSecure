@@ -142,6 +142,7 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
   const [filterTime, setFilterTime] = useState<'all' | '1d' | '7d' | '30d'>('7d')
   const [isOnline, setIsOnline] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [locateTrigger, setLocateTrigger] = useState(0)
 
   const [newIncident, setNewIncident] = useState({
@@ -159,6 +160,7 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
     const supabase = createClient()
     supabase.auth.getUser().then(({ data: { user } }) => {
       setCurrentUserId(user?.id || null)
+      setIsAdmin(user?.app_metadata?.role === 'admin')
     })
   }, [])
 
@@ -408,6 +410,7 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
             userLocation={currentLocation || coordinates || null}
             showHeatZones={true}
             currentUserId={currentUserId}
+            isAdmin={isAdmin}
             onEdit={handleEdit}
             onDelete={handleDelete}
             flyToUserTrigger={locateTrigger}
@@ -600,7 +603,7 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
                 </div>
                 <div className="flex items-center gap-1">
                   {incident.is_verified && <Badge variant="outline" className="text-xs text-safe border-safe">✓</Badge>}
-                  {incident.user_id === currentUserId && (
+                  {(isAdmin || incident.user_id === currentUserId) && (
                     <>
                       <button onClick={() => handleEdit(incident)} className="p-1 hover:text-primary transition-colors">
                         <Pencil className="w-3 h-3" />

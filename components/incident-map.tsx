@@ -185,12 +185,13 @@ interface IncidentMapProps {
   onMapClick?: (coords: Coordinates) => void
   showHeatZones?: boolean
   currentUserId?: string | null
+  isAdmin?: boolean
   onEdit?: (incident: Incident) => void
   onDelete?: (incidentId: string) => void
   flyToUserTrigger?: number
 }
 
-export function IncidentMap({ incidents, userLocation, onMapClick, showHeatZones = true, currentUserId, onEdit, onDelete, flyToUserTrigger = 0 }: IncidentMapProps) {
+export function IncidentMap({ incidents, userLocation, onMapClick, showHeatZones = true, currentUserId, isAdmin = false, onEdit, onDelete, flyToUserTrigger = 0 }: IncidentMapProps) {
   const { mapCenter, mapZoom } = useAppStore()
 
   const [isDark, setIsDark] = useState(() => {
@@ -338,7 +339,7 @@ useEffect(() => {
       )}
 
       {viewMode === 'markers' && incidents.map((incident) => {
-        const isOwner = currentUserId && incident.user_id === currentUserId
+        const isOwner = isAdmin || (currentUserId && incident.user_id === currentUserId)
         const votes = mapVotes[incident.id] ?? { real: incident.votes_real ?? 0, fake: incident.votes_fake ?? 0, voted: false }
         const totalVotes = votes.real + votes.fake
 
