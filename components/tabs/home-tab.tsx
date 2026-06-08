@@ -156,6 +156,7 @@ export function HomeTab() {
           user_id:      user.id,
           name:         newContact.name,
           phone:        newContact.phone,
+          email:        newContact.email || null,
           relationship: newContact.relationship || null,
           priority:     contacts.length + 1,
           importance:   newContact.importance,
@@ -196,6 +197,7 @@ export function HomeTab() {
       .update({
         name:         editContact.name,
         phone:        editContact.phone,
+        email:        editContact.email || null,
         relationship: editContact.relationship || null,
         importance:   editContact.importance,
       })

@@ -244,68 +244,69 @@ html.light .leaflet-tile {
   color: var(--primary) !important;
 }
 
-/* Arreglar estilos de dropdowns */
-[role="listbox"],
-[role="option"],
-[role="combobox"] {
-  color: oklch(0.15 0.01 260) !important;
-  background-color: oklch(1 0 0) !important;
-}
-
-/* Estilos para modo oscuro */
-html.dark [role="listbox"],
-html.dark [role="option"],
-html.dark [role="combobox"] {
-  color: oklch(0.95 0.01 260) !important;
-  background-color: oklch(0.17 0.01 260) !important;
-}
-
-/* Estilos para opciones resaltadas en dropdowns */
-[role="option"][data-highlighted] {
-  background-color: oklch(0.90 0.01 260) !important;
-}
-
-/* Estilos para opciones resaltadas en dropdowns en modo oscuro */
-html.dark [role="option"][data-highlighted] {
-  background-color: oklch(0.25 0.02 260) !important;
-}
-
-/* Estilos para contenido de dropdowns */
-[data-radix-dropdown-menu-content] {
-  background-color: var(--popover) !important;
-  color: var(--popover-foreground) !important;
+/* ── Radix popper wrapper ── */
+[data-radix-popper-content-wrapper] {
   z-index: 9999 !important;
 }
 
-/* Estilos para items de dropdowns */
-[data-radix-dropdown-menu-item] {
+/* ── Select / listbox ── */
+[role="listbox"],
+[role="combobox"] {
+  background-color: var(--popover) !important;
   color: var(--popover-foreground) !important;
 }
 
-/* Estilos para items de dropdowns resaltados */
-[data-radix-dropdown-menu-item]:hover,
-[data-radix-dropdown-menu-item][data-highlighted] {
+[role="option"] {
+  color: var(--popover-foreground) !important;
+  background-color: transparent !important;
+}
+
+[role="option"][data-highlighted],
+[role="option"]:hover {
   background-color: var(--accent) !important;
   color: var(--accent-foreground) !important;
 }
 
-/* Estilos para items de dropdowns en modo oscuro */
-[role="menuitem"] {
-  color: var(--popover-foreground) !important;
-}
-
-/* Estilos para items de dropdowns resaltados en modo oscuro */
+/* ── Dropdown menu ── */
 [role="menu"] {
   background-color: var(--popover) !important;
   color: var(--popover-foreground) !important;
 }
 
-/* Estilos para selects */
-[data-radix-select-content] {
-  z-index: 9999 !important;
+[role="menuitem"],
+[role="menuitemcheckbox"],
+[role="menuitemradio"] {
+  color: var(--popover-foreground) !important;
+  background-color: transparent !important;
 }
 
-/* Estilos para poppers */
-[data-radix-popper-content-wrapper] {
-  z-index: 9999 !important;
+[role="menuitem"][data-highlighted],
+[role="menuitemcheckbox"][data-highlighted],
+[role="menuitemradio"][data-highlighted],
+[role="menuitem"]:hover,
+[role="menuitemcheckbox"]:hover,
+[role="menuitemradio"]:hover {
+  background-color: var(--accent) !important;
+  color: var(--accent-foreground) !important;
+}
+
+/* Reset inline overrides that applyTheme may have set on popover content */
+[data-radix-popper-content-wrapper] *[style] {
+  background-color: revert !important;
+  color: revert !important;
+}
+[data-radix-popper-content-wrapper] [role="menu"],
+[data-radix-popper-content-wrapper] [role="listbox"] {
+  background-color: var(--popover) !important;
+  color: var(--popover-foreground) !important;
+}
+[data-radix-popper-content-wrapper] [role="menuitem"],
+[data-radix-popper-content-wrapper] [role="option"] {
+  color: var(--popover-foreground) !important;
+  background-color: transparent !important;
+}
+[data-radix-popper-content-wrapper] [role="menuitem"][data-highlighted],
+[data-radix-popper-content-wrapper] [role="option"][data-highlighted] {
+  background-color: var(--accent) !important;
+  color: var(--accent-foreground) !important;
 }

@@ -74,6 +74,10 @@ interface AppState {
   securityTimerEnd: number | null
   setSecurityTimer: (active: boolean, endTime: number | null) => void
 
+  // Compartir ubicación en vivo (persiste entre pestañas)
+  isLiveSharing: boolean
+  setIsLiveSharing: (v: boolean) => void
+
   // Cola sin conexión (incidentes para enviar cuando se vuelva en línea)
   offlineQueue: Incident[]
   addToOfflineQueue: (incident: Omit<Incident, 'id' | 'reported_at' | 'is_active' | 'resolved_at'>) => void
@@ -153,6 +157,10 @@ export const useAppStore = create<AppState>()(
       securityTimerEnd: null,
       setSecurityTimer: (active, endTime) => set({ securityTimerActive: active, securityTimerEnd: endTime }),
 
+      // Compartir ubicación en vivo
+      isLiveSharing: false,
+      setIsLiveSharing: (v) => set({ isLiveSharing: v }),
+
       // Cola sin conexión
       offlineQueue: [],
       addToOfflineQueue: (incident) => {
@@ -176,6 +184,7 @@ export const useAppStore = create<AppState>()(
         frequentPlaces: state.frequentPlaces,
         locationHistory: state.locationHistory,
         offlineQueue: state.offlineQueue,
+        isLiveSharing: state.isLiveSharing,
       }),
     }
   )

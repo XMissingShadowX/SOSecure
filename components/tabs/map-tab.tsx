@@ -395,7 +395,7 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
       )}
 
       {/* ── MAPA ── */}
-      <div className={embedded ? "relative h-[350px] rounded-lg overflow-hidden z-0" : "relative flex-1 min-h-0 rounded-lg overflow-hidden"}>
+      <div className={embedded ? "relative h-[350px] rounded-lg overflow-hidden z-0" : "relative flex-1 min-h-0 rounded-lg overflow-hidden"} style={{ isolation: 'isolate' }}>
         {customMap ?? (loading ? (
           <div className="h-full w-full flex items-center justify-center bg-muted rounded-lg">
             <div className="flex items-center gap-2 text-muted-foreground">

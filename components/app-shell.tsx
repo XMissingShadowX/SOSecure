@@ -9,7 +9,7 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useAppStore } from '@/lib/store'
 import { useGeolocation } from '@/hooks/use-geolocation'
 import { createClient } from '@/lib/supabase/client'
@@ -51,9 +51,10 @@ import {
 import type { User } from '@supabase/supabase-js'
 
 export function AppShell() {
-  const { activeTab, setCurrentLocation, setNearbyIncidents, offlineQueue } = useAppStore()
+  const { activeTab, setCurrentLocation, setNearbyIncidents, offlineQueue, isLiveSharing } = useAppStore()
   const { coordinates } = useGeolocation({ watch: true })
   const [user, setUser] = useState<User | null>(null)
+  const liveBroadcastRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [isOnline, setIsOnline] = useState(true)
   const [isDark, setIsDark] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -69,20 +70,26 @@ export function AppShell() {
     const muted = isDarkTheme ? 'oklch(0.22 0.02 260)' : 'oklch(0.95 0.01 260)'
     const primary = isDarkTheme ? 'oklch(0.75 0.15 180)' : 'oklch(0.55 0.15 180)'
 
+    // Helper: skip elements inside Radix portals (dropdowns, selects, dialogs)
+    const inPortal = (el: HTMLElement) => !!el.closest('[data-radix-popper-content-wrapper],[data-radix-portal]')
+
     document.body.style.backgroundColor = bg
     document.body.style.color = fg
 
     document.querySelectorAll<HTMLElement>('.bg-background, .min-h-screen, header, nav').forEach(el => {
+      if (inPortal(el)) return
       el.style.backgroundColor = bg
       el.style.color = fg
     })
 
     document.querySelectorAll<HTMLElement>('.text-muted-foreground').forEach(el => {
+      if (inPortal(el)) return
       el.style.color = isDarkTheme ? 'oklch(0.65 0.02 260)' : 'oklch(0.45 0.02 260)'
     })
 
     document.querySelectorAll<HTMLElement>('.bg-card, [class*="card"]').forEach(el => {
       if (el.tagName === 'BUTTON') return
+      if (inPortal(el)) return
       if (el.classList.contains('leaflet-container') || el.closest('.leaflet-container')) return
       el.style.backgroundColor = card
       el.style.color = fg
@@ -91,6 +98,7 @@ export function AppShell() {
 
     document.querySelectorAll<HTMLElement>('.bg-muted, [class*="muted"]').forEach(el => {
       if (el.tagName === 'BUTTON' || el.closest('nav')) return
+      if (inPortal(el)) return
       el.style.backgroundColor = muted
     })
 
@@ -101,7 +109,7 @@ export function AppShell() {
     // Limpiar estilos inline de botones del nav y dejar que React maneje sus colores
     document.querySelectorAll<HTMLElement>('nav button').forEach(el => {
       el.style.backgroundColor = 'transparent'
-      el.style.color = ''  // quita el color inline para que React tome control
+      el.style.color = ''
     })
   }
 
@@ -173,6 +181,33 @@ export function AppShell() {
       supabase.removeChannel(channel)
     }
   }, [setNearbyIncidents])
+
+  // Broadcasting de ubicación en vivo — persiste en todas las pestañas
+  useEffect(() => {
+    if (!user || !isLiveSharing) {
+      if (liveBroadcastRef.current) { clearInterval(liveBroadcastRef.current); liveBroadcastRef.current = null }
+      return
+    }
+
+    const broadcast = () => {
+      if (!navigator.geolocation) return
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const supabase = createClient()
+        await supabase.from('user_locations').upsert({
+          user_id: user.id,
+          display_name: user.user_metadata?.full_name || user.email || 'Usuario',
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          updated_at: new Date().toISOString(),
+          is_sharing: true,
+        }, { onConflict: 'user_id' })
+      }, undefined, { enableHighAccuracy: true, timeout: 10000 })
+    }
+
+    broadcast()
+    liveBroadcastRef.current = setInterval(broadcast, 30_000)
+    return () => { if (liveBroadcastRef.current) { clearInterval(liveBroadcastRef.current); liveBroadcastRef.current = null } }
+  }, [user, isLiveSharing])
 
   const handleSignOut = async () => {
     const supabase = createClient()

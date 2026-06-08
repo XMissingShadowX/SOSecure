@@ -134,3 +134,25 @@ export interface LocationHistory {
   coordinates: Coordinates
   timestamp: number
 }
+
+export interface TrackingSession {
+  id: string
+  initiator_user_id: string
+  initiator_name: string
+  status: 'active' | 'stopped'
+  created_at: string
+  security_timer_end: number | null
+}
+
+export interface TrackingMember {
+  id: string
+  session_id: string
+  display_name: string
+  is_initiator: boolean
+  external_token: string
+  user_id: string | null
+  latitude: number | null
+  longitude: number | null
+  updated_at: string | null
+  is_sharing: boolean
+}

@@ -1,13 +1,18 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import dynamic from 'next/dynamic'
-import { ShieldCheck, Clock, Users, Timer, AlertTriangle, Map, Navigation, ChevronDown, ChevronUp } from 'lucide-react'
+import { ShieldCheck, Clock, Users, Timer, AlertTriangle, Map, Navigation, ChevronDown, ChevronUp, Radio, UserCheck, UserX, RefreshCw } from 'lucide-react'
 import { RoutesTab, calculateSafetyScore } from './routes-tab'
 import { MapTab } from './map-tab'
 import { useAppStore } from '@/lib/store'
 import { useGeolocation } from '@/hooks/use-geolocation'
+import { useTracking } from '@/hooks/use-tracking'
+import { useIncomingTracking } from '@/hooks/use-incoming-tracking'
+import { useLiveLocation } from '@/hooks/use-live-location'
+import { useContactUserIds } from '@/hooks/use-contact-user-ids'
 import { sendAlarmNotification, playAlarmSound } from '@/lib/notifications'
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -23,6 +28,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import type { RouteInfo } from '@/components/route-map'
+import type { TrackingMember } from '@/lib/types'
 
 const RouteMap = dynamic(
   () => import('@/components/route-map').then(mod => mod.RouteMap),
@@ -54,6 +60,128 @@ function formatCountdown(ms: number) {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
+function formatRelativeTime(isoString: string | null): string {
+  if (!isoString) return 'Sin actualizar'
+  const diffMs = Date.now() - new Date(isoString).getTime()
+  const diffSec = Math.floor(diffMs / 1000)
+  if (diffSec < 15) return 'Ahora mismo'
+  if (diffSec < 60) return `Hace ${diffSec}s`
+  const diffMin = Math.floor(diffSec / 60)
+  if (diffMin < 60) return `Hace ${diffMin} min`
+  return `Hace ${Math.floor(diffMin / 60)}h`
+}
+
+function memberStatus(m: TrackingMember): 'active' | 'stale' | 'stopped' {
+  if (!m.is_sharing) return 'stopped'
+  if (!m.updated_at) return 'stale'
+  const diffMin = (Date.now() - new Date(m.updated_at).getTime()) / 60000
+  return diffMin > 2 ? 'stale' : 'active'
+}
+
+function TrackingMap({ members }: { members: TrackingMember[] }) {
+  const mapRef = useRef<HTMLDivElement>(null)
+  const mapInstanceRef = useRef<any>(null)
+  const markersRef = useRef<Record<string, any>>({})
+  const LRef = useRef<any>(null)
+  const initialFitDoneRef = useRef(false)
+  const [reloadKey, setReloadKey] = useState(0)
+
+  const fitAll = useCallback(() => {
+    if (!mapInstanceRef.current || !LRef.current) return
+    const withLocation = members.filter(m => m.latitude && m.longitude)
+    if (!withLocation.length) return
+    const bounds = LRef.current.latLngBounds(withLocation.map(m => [m.latitude!, m.longitude!] as [number, number]))
+    mapInstanceRef.current.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 })
+  }, [members])
+
+  const centerOnMe = useCallback(() => {
+    if (!mapInstanceRef.current) return
+    const me = members.find(m => m.is_initiator && m.latitude && m.longitude)
+    if (!me) return
+    mapInstanceRef.current.setView([me.latitude!, me.longitude!], 16, { animate: true })
+  }, [members])
+
+  // Reload button resets the initial-fit flag so next render re-fits
+  const handleReload = useCallback(() => {
+    initialFitDoneRef.current = false
+    setReloadKey(k => k + 1)
+  }, [])
+
+  useEffect(() => {
+    const withLocation = members.filter(m => m.latitude && m.longitude)
+    if (!withLocation.length || !mapRef.current || typeof window === 'undefined') return
+
+    const init = async () => {
+      const L = (await import('leaflet')).default
+      // @ts-ignore
+      await import('leaflet/dist/leaflet.css')
+      LRef.current = L
+
+      if (!mapInstanceRef.current) {
+        mapInstanceRef.current = L.map(mapRef.current!)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(mapInstanceRef.current)
+      }
+
+      withLocation.forEach(m => {
+        const color = m.is_initiator ? '#f97316' : '#3b82f6'
+        const html = `<div style="width:20px;height:20px;background:${color};border:3px solid white;border-radius:50%;box-shadow:0 0 0 3px ${color}44,0 2px 6px rgba(0,0,0,0.2)"></div>`
+        const icon = L.divIcon({ className: '', html, iconSize: [20, 20], iconAnchor: [10, 10] })
+        if (markersRef.current[m.id]) {
+          markersRef.current[m.id].setLatLng([m.latitude!, m.longitude!])
+        } else {
+          markersRef.current[m.id] = L.marker([m.latitude!, m.longitude!], { icon })
+            .bindTooltip(m.display_name, { permanent: false, direction: 'top' })
+            .addTo(mapInstanceRef.current)
+        }
+      })
+
+      // Only fit bounds on first load or when reload button is pressed
+      if (!initialFitDoneRef.current) {
+        const bounds = L.latLngBounds(withLocation.map(m => [m.latitude!, m.longitude!] as [number, number]))
+        mapInstanceRef.current.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 })
+        initialFitDoneRef.current = true
+      }
+    }
+
+    init()
+  }, [members, reloadKey])
+
+  const hasLocation = members.some(m => m.latitude && m.longitude)
+  const hasMe = members.some(m => m.is_initiator && m.latitude && m.longitude)
+
+  return (
+    <div className="rounded-lg overflow-hidden border border-border mt-3" style={{ isolation: 'isolate' }}>
+      {hasLocation ? (
+        <div className="relative">
+          <div ref={mapRef} style={{ height: '320px', width: '100%' }} />
+          <div className="absolute bottom-3 right-3 flex flex-col gap-1.5 z-[999]">
+            <button
+              onClick={handleReload}
+              className="w-9 h-9 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-gray-100 transition-colors"
+              title="Recargar mapa"
+            >
+              <RefreshCw className="w-4 h-4 text-gray-700" />
+            </button>
+            {hasMe && (
+              <button
+                onClick={centerOnMe}
+                className="w-9 h-9 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-gray-100 transition-colors"
+                title="Centrar en mi ubicación"
+              >
+                <Navigation className="w-4 h-4 text-gray-700" />
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="h-36 flex items-center justify-center text-muted-foreground bg-muted/50">
+          <p className="text-xs">Esperando ubicaciones…</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function BeforeTab() {
   const {
     contacts, securityTimerActive, securityTimerEnd, setSecurityTimer, setSosActive,
@@ -61,13 +189,42 @@ export function BeforeTab() {
     setRouteOptions, setRouteInfo,
   } = useAppStore()
   const { coordinates } = useGeolocation({ watch: true })
+  const { session, members, loading: trackingLoading, error: trackingError, startTracking, stopTracking, syncTimer } = useTracking()
 
   const [countdown, setCountdown] = useState<number | null>(null)
   const [timerMinutes, setTimerMinutes] = useState('30')
   const [showTimerDialog, setShowTimerDialog] = useState(false)
-  const [trackedUsers] = useState<{ name: string; status: string }[]>([])
   const [routesExpanded, setRoutesExpanded] = useState(false)
   const [mapExpanded, setMapExpanded] = useState(false)
+  const [currentUser, setCurrentUser] = useState<{ id: string; name: string } | null>(null)
+
+  const { incoming, shareLocation, stopShare } = useIncomingTracking(currentUser?.id ?? null)
+  const { contactUserIds, nameFor } = useContactUserIds(contacts)
+  const { isSharingMyLocation, toggleSharing, contacts: liveContacts, myLocation } = useLiveLocation({
+    currentUserId: currentUser?.id ?? null,
+    currentUserName: currentUser?.name ?? null,
+    contactUserIds,
+  })
+
+  // Cargar usuario actual
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        setCurrentUser({
+          id: user.id,
+          name: user.user_metadata?.full_name || user.email || 'Usuario',
+        })
+      }
+    })
+  }, [])
+
+  // Sincronizar el temporizador activo con la sesión de tracking
+  useEffect(() => {
+    if (!session) return
+    syncTimer(securityTimerActive ? (securityTimerEnd ?? null) : null)
+  }, [securityTimerActive, securityTimerEnd, session, syncTimer])
+  
   useEffect(() => {
     if (!securityTimerActive || !securityTimerEnd) {
       setCountdown(null)
@@ -322,39 +479,121 @@ export function BeforeTab() {
         </CardContent>
       </Card>
 
-      {/* Seguimiento a Contactos */}
+      {/* Seguimiento en Vivo — modelo Life360 */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <Users className="w-5 h-5 text-primary" />
-            Seguimiento a Contactos
+            Ubicaciones en Vivo
+            {isSharingMyLocation && (
+              <span className="ml-auto flex items-center gap-1 text-xs font-normal text-green-600">
+                <Radio className="w-3 h-3 animate-pulse" />
+                Compartiendo
+              </span>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {trackedUsers.length === 0 ? (
+          {contacts.length === 0 ? (
             <div className="text-center py-4">
               <Users className="w-10 h-10 mx-auto text-muted-foreground/40 mb-2" />
-              <p className="text-sm text-muted-foreground">No hay usuarios compartiéndote su ubicación</p>
-              <p className="text-xs text-muted-foreground mt-1">Pídeles a tus contactos que habiliten el seguimiento</p>
+              <p className="text-sm text-muted-foreground">Agrega contactos con cuenta SOSecure para ver sus ubicaciones</p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {trackedUsers.map((u, i) => (
-                <div key={i} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                  <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                    <Users className="w-4 h-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm">{u.name}</p>
-                    <p className="text-xs text-muted-foreground">{u.status}</p>
-                  </div>
+            <>
+              {/* Toggle de sharing propio */}
+              <button
+                onClick={toggleSharing}
+                className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-colors
+                  ${isSharingMyLocation
+                    ? 'border-green-300 bg-green-50 dark:bg-green-950/30'
+                    : 'border-border bg-muted/30 hover:bg-muted/60'}`}
+              >
+                {isSharingMyLocation
+                  ? <UserCheck className="w-5 h-5 text-green-600 flex-shrink-0" />
+                  : <UserX className="w-5 h-5 text-muted-foreground flex-shrink-0" />}
+                <div className="text-left flex-1">
+                  <p className={`text-sm font-medium ${isSharingMyLocation ? 'text-green-700 dark:text-green-400' : ''}`}>
+                    {isSharingMyLocation ? 'Compartiendo mi ubicación' : 'Compartir mi ubicación'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {isSharingMyLocation ? 'Tus contactos SOSecure pueden verte · Toca para detener' : 'Tus contactos no pueden verte ahora'}
+                  </p>
                 </div>
-              ))}
-            </div>
+                <div className={`w-10 h-6 rounded-full transition-colors flex items-center px-0.5
+                  ${isSharingMyLocation ? 'bg-green-500 justify-end' : 'bg-muted-foreground/30 justify-start'}`}>
+                  <div className="w-5 h-5 rounded-full bg-white shadow-sm" />
+                </div>
+              </button>
+
+              {/* Lista de contactos con su estado */}
+              <div className="space-y-2">
+                {contactUserIds.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-1">
+                    Ningún contacto tiene cuenta SOSecure aún
+                  </p>
+                ) : (
+                  contactUserIds.map(uid => {
+                    const live = liveContacts.find(c => c.user_id === uid)
+                    const name = nameFor(uid)
+                    const diffMin = live ? (Date.now() - new Date(live.updated_at).getTime()) / 60000 : Infinity
+                    const status = live ? (diffMin > 3 ? 'stale' : 'active') : 'offline'
+                    return (
+                      <div key={uid} className="flex items-center gap-3 p-2.5 bg-muted/50 rounded-lg">
+                        <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">
+                          {name[0].toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {live ? formatRelativeTime(live.updated_at) : 'No está compartiendo'}
+                          </p>
+                        </div>
+                        <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+                          status === 'active' ? 'bg-green-400' :
+                          status === 'stale' ? 'bg-yellow-400' : 'bg-gray-300'}`} />
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+
+              {/* Mapa unificado */}
+              {(isSharingMyLocation || liveContacts.length > 0) && (() => {
+                const mapMembers = [
+                  ...(myLocation && isSharingMyLocation ? [{
+                    id: currentUser?.id ?? 'me',
+                    session_id: '',
+                    display_name: currentUser?.name ?? 'Tú',
+                    is_initiator: true,
+                    external_token: '',
+                    user_id: currentUser?.id ?? null,
+                    latitude: myLocation.latitude,
+                    longitude: myLocation.longitude,
+                    updated_at: new Date().toISOString(),
+                    is_sharing: true,
+                  }] : []),
+                  ...liveContacts.map(c => ({
+                    id: c.user_id,
+                    session_id: '',
+                    display_name: nameFor(c.user_id),
+                    is_initiator: false,
+                    external_token: '',
+                    user_id: c.user_id,
+                    latitude: c.latitude,
+                    longitude: c.longitude,
+                    updated_at: c.updated_at,
+                    is_sharing: true,
+                  })),
+                ]
+                return <TrackingMap members={mapMembers} />
+              })()}
+
+              <p className="text-xs text-muted-foreground text-center">
+                Solo contactos con cuenta SOSecure · Actualiza cada 30s
+              </p>
+            </>
           )}
-          <p className="text-xs text-muted-foreground text-center">
-            El seguimiento requiere que el contacto acepte compartir su ubicación
-          </p>
         </CardContent>
       </Card>
 
