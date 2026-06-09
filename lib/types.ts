@@ -34,12 +34,9 @@ export interface Incident {
   latitude: number
   longitude: number
   is_active: boolean
-  is_verified: boolean        // ← también agrega este si te faltaba
   reported_at: string
   resolved_at: string | null
   false_alarm_count?: number
-  votes_real?: number         // ← nuevo
-  votes_fake?: number         // ← nuevo
 }
 
 // Definir la interfaz `EmergencyContact` que describe un contacto de emergencia guardado por el usuario, incluyendo su nombre,

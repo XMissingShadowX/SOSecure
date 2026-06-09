@@ -78,6 +78,10 @@ interface AppState {
   isLiveSharing: boolean
   setIsLiveSharing: (v: boolean) => void
 
+  // Palabra clave de voz para activar SOS
+  voiceKeyword: string
+  setVoiceKeyword: (keyword: string) => void
+
   // Cola sin conexión (incidentes para enviar cuando se vuelva en línea)
   offlineQueue: Incident[]
   addToOfflineQueue: (incident: Omit<Incident, 'id' | 'reported_at' | 'is_active' | 'resolved_at'>) => void
@@ -161,6 +165,10 @@ export const useAppStore = create<AppState>()(
       isLiveSharing: false,
       setIsLiveSharing: (v) => set({ isLiveSharing: v }),
 
+      // Palabra clave de voz
+      voiceKeyword: 'socorro',
+      setVoiceKeyword: (keyword) => set({ voiceKeyword: keyword }),
+
       // Cola sin conexión
       offlineQueue: [],
       addToOfflineQueue: (incident) => {
@@ -185,6 +193,7 @@ export const useAppStore = create<AppState>()(
         locationHistory: state.locationHistory,
         offlineQueue: state.offlineQueue,
         isLiveSharing: state.isLiveSharing,
+        voiceKeyword: state.voiceKeyword,
       }),
     }
   )

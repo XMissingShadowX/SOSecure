@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils'
 import { useAppStore } from '@/lib/store'
 import { useGeolocation } from '@/hooks/use-geolocation'
 import { createClient } from '@/lib/supabase/client'
+import { createLiveBroadcaster, type LiveBroadcaster } from '@/lib/live-stream'
 import { sendAlarmNotification, playAlarmSound } from '@/lib/notifications'
 import { Button } from '@/components/ui/button'
 import {
@@ -60,6 +61,15 @@ export function SOSButton() {
   const tapTimesRef = useRef<number[]>([])
   const voiceListeningRef = useRef(false)
   const videoPreviewRef = useRef<HTMLVideoElement>(null)
+  const liveBroadcasterRef = useRef<LiveBroadcaster | null>(null)
+
+  // Detiene la transmisión de video en vivo (si está activa) sin afectar la grabación.
+  const stopLive = useCallback(() => {
+    if (liveBroadcasterRef.current) {
+      try { liveBroadcasterRef.current.stop() } catch { /* noop */ }
+      liveBroadcasterRef.current = null
+    }
+  }, [])
 
   const clearTimers = useCallback(() => {
     if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null }
@@ -77,6 +87,7 @@ export function SOSButton() {
     playAlarmSound()
     sendAlarmNotification('🚨 SOSecure SOS Activado', 'Alerta de emergencia enviada a tus contactos', true)
 
+    let activeStream: MediaStream | null = null
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
@@ -86,6 +97,7 @@ export function SOSButton() {
       ).catch(
         () => navigator.mediaDevices.getUserMedia({ audio: true })
       )
+      activeStream = stream
       setRecordingStream(stream)
 
       const mimeType = (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus'))
@@ -126,6 +138,16 @@ export function SOSButton() {
       if (alert) {
         setSosAlert(alert)
         setActiveAlertId(alert.id)
+
+        // ── Transmisión de VIDEO EN VIVO ──────────────────────────────
+        // Empezamos a enviar fotogramas en tiempo real al canal de la alerta
+        // para que los contactos los vean al instante en /emergency/[alertId].
+        // No afecta la grabación local ni la subida final.
+        if (activeStream && activeStream.getVideoTracks().length) {
+          const broadcaster = createLiveBroadcaster(alert.id)
+          liveBroadcasterRef.current = broadcaster
+          broadcaster.start(activeStream).catch(() => { /* sin conexión Realtime */ })
+        }
 
         await supabase.from('sos_locations').insert({
           alert_id: alert.id,
@@ -321,6 +343,7 @@ export function SOSButton() {
     setIsSaving(true)
 
     const finalize = async () => {
+      stopLive()
       if (recordingStream) recordingStream.getTracks().forEach(t => t.stop())
       setRecordingStream(null)
       setIsRecording(false)
@@ -342,6 +365,7 @@ export function SOSButton() {
   }, [mediaRecorder, recordingStream, activeAlertId])
 
   const cancelSOS = useCallback(async () => {
+    stopLive()
     if (mediaRecorder) { try { mediaRecorder.stop() } catch { /* ignore */ } }
     if (recordingStream) { recordingStream.getTracks().forEach(t => t.stop()) }
     setMediaRecorder(null)
@@ -366,7 +390,7 @@ export function SOSButton() {
     recordingChunksRef.current = []
   }, [setSosActive, setSosAlert, mediaRecorder, recordingStream])
 
-  useEffect(() => () => clearTimers(), [clearTimers])
+  useEffect(() => () => { clearTimers(); stopLive() }, [clearTimers, stopLive])
 
   // ── Activación por botones de volumen ──────────────────────────────────
   // 5 pulsaciones (subir o bajar) en menos de 3 segundos activan el SOS.
@@ -489,6 +513,7 @@ export function SOSButton() {
                 {recordingStream ? (
                   <button
                     onClick={() => {
+                      stopLive()
                       if (mediaRecorder) { try { mediaRecorder.stop() } catch { /**/ } }
                       recordingStream.getTracks().forEach(t => t.stop())
                       setRecordingStream(null)
@@ -516,6 +541,13 @@ export function SOSButton() {
                         recorder.start()
                         setMediaRecorder(recorder)
                         setIsRecording(true)
+                        // Reanudar también la transmisión en vivo para los contactos.
+                        if (activeAlertId && stream.getVideoTracks().length) {
+                          stopLive()
+                          const broadcaster = createLiveBroadcaster(activeAlertId)
+                          liveBroadcasterRef.current = broadcaster
+                          broadcaster.start(stream).catch(() => { /* sin Realtime */ })
+                        }
                       } catch { /* sin permisos */ }
                     }}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border bg-card text-foreground text-sm hover:bg-muted transition-colors"
@@ -607,9 +639,12 @@ export function SOSButton() {
         </div>
       </button>
 
-      {isHolding && (
-        <p className="whitespace-nowrap text-sm text-muted-foreground">Mantén presionado...</p>
-      )}
+      <p
+        className="whitespace-nowrap text-sm font-medium px-3 py-1 rounded-full -mt-1"
+        style={{ backgroundColor: 'rgba(220, 38, 38, 0.2)', color: '#991b1b' }}
+      >
+        {isHolding ? 'Mantén presionado...' : 'Presiona'}
+      </p>
     </div>
   )
 }

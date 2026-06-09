@@ -67,8 +67,8 @@ export default function SignUpPage() {
       // Session exists → auto-logged in, go directly to app
       router.push('/')
     } else {
-      // Supabase still requires confirmation (project setting), go to login
-      router.push('/auth/login?registered=1')
+      // Email confirmation required — show "check your inbox" page
+      router.push(`/auth/sign-up-success?email=${encodeURIComponent(email)}`)
     }
   }
 

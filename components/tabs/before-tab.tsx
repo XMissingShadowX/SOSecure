@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import dynamic from 'next/dynamic'
-import { ShieldCheck, Clock, Users, Timer, AlertTriangle, Map, Navigation, ChevronDown, ChevronUp, Radio, UserCheck, UserX, RefreshCw } from 'lucide-react'
+import { ShieldCheck, Clock, Users, Timer, AlertTriangle, Map, Navigation, ChevronDown, ChevronUp, Radio, UserCheck, UserX, RefreshCw, Mic } from 'lucide-react'
 import { RoutesTab, calculateSafetyScore } from './routes-tab'
 import { MapTab } from './map-tab'
 import { useAppStore } from '@/lib/store'
@@ -78,21 +78,15 @@ function memberStatus(m: TrackingMember): 'active' | 'stale' | 'stopped' {
   return diffMin > 2 ? 'stale' : 'active'
 }
 
-function TrackingMap({ members }: { members: TrackingMember[] }) {
+function TrackingMap({ members, focusUserId }: { members: TrackingMember[], focusUserId?: string | null }) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
   const markersRef = useRef<Record<string, any>>({})
   const LRef = useRef<any>(null)
   const initialFitDoneRef = useRef(false)
+  // Cache of last known positions so we can pan even after a contact stops sharing
+  const lastKnownRef = useRef<Record<string, [number, number]>>({})
   const [reloadKey, setReloadKey] = useState(0)
-
-  const fitAll = useCallback(() => {
-    if (!mapInstanceRef.current || !LRef.current) return
-    const withLocation = members.filter(m => m.latitude && m.longitude)
-    if (!withLocation.length) return
-    const bounds = LRef.current.latLngBounds(withLocation.map(m => [m.latitude!, m.longitude!] as [number, number]))
-    mapInstanceRef.current.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 })
-  }, [members])
 
   const centerOnMe = useCallback(() => {
     if (!mapInstanceRef.current) return
@@ -123,6 +117,9 @@ function TrackingMap({ members }: { members: TrackingMember[] }) {
       }
 
       withLocation.forEach(m => {
+        // Update last known position cache
+        lastKnownRef.current[m.user_id ?? m.id] = [m.latitude!, m.longitude!]
+
         const color = m.is_initiator ? '#f97316' : '#3b82f6'
         const html = `<div style="width:20px;height:20px;background:${color};border:3px solid white;border-radius:50%;box-shadow:0 0 0 3px ${color}44,0 2px 6px rgba(0,0,0,0.2)"></div>`
         const icon = L.divIcon({ className: '', html, iconSize: [20, 20], iconAnchor: [10, 10] })
@@ -145,6 +142,15 @@ function TrackingMap({ members }: { members: TrackingMember[] }) {
 
     init()
   }, [members, reloadKey])
+
+  // Pan to focused contact when focusUserId changes
+  useEffect(() => {
+    if (!focusUserId || !mapInstanceRef.current) return
+    const pos = lastKnownRef.current[focusUserId]
+    if (pos) {
+      mapInstanceRef.current.setView(pos, 16, { animate: true })
+    }
+  }, [focusUserId])
 
   const hasLocation = members.some(m => m.latitude && m.longitude)
   const hasMe = members.some(m => m.is_initiator && m.latitude && m.longitude)
@@ -187,6 +193,7 @@ export function BeforeTab() {
     contacts, securityTimerActive, securityTimerEnd, setSecurityTimer, setSosActive,
     showRoutes, selectedRoute, routeOrigin, routeDestination, nearbyIncidents,
     setRouteOptions, setRouteInfo,
+    sosActive, voiceKeyword, setVoiceKeyword,
   } = useAppStore()
   const { coordinates } = useGeolocation({ watch: true })
   const { session, members, loading: trackingLoading, error: trackingError, startTracking, stopTracking, syncTimer } = useTracking()
@@ -197,6 +204,9 @@ export function BeforeTab() {
   const [routesExpanded, setRoutesExpanded] = useState(false)
   const [mapExpanded, setMapExpanded] = useState(false)
   const [currentUser, setCurrentUser] = useState<{ id: string; name: string } | null>(null)
+  const [focusUserId, setFocusUserId] = useState<string | null>(null)
+  const [showKeywordDialog, setShowKeywordDialog] = useState(false)
+  const [keywordDraft, setKeywordDraft] = useState('')
 
   const { incoming, shareLocation, stopShare } = useIncomingTracking(currentUser?.id ?? null)
   const { contactUserIds, nameFor } = useContactUserIds(contacts)
@@ -538,9 +548,15 @@ export function BeforeTab() {
                     const name = nameFor(uid)
                     const diffMin = live ? (Date.now() - new Date(live.updated_at).getTime()) / 60000 : Infinity
                     const status = live ? (diffMin > 3 ? 'stale' : 'active') : 'offline'
+                    const isFocused = focusUserId === uid
                     return (
-                      <div key={uid} className="flex items-center gap-3 p-2.5 bg-muted/50 rounded-lg">
-                        <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">
+                      <button
+                        key={uid}
+                        onClick={() => setFocusUserId(isFocused ? null : uid)}
+                        className={`w-full flex items-center gap-3 p-2.5 rounded-lg transition-colors text-left
+                          ${isFocused ? 'bg-primary/15 ring-1 ring-primary/40' : 'bg-muted/50 hover:bg-muted/80'}`}
+                      >
+                        <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
                           {name[0].toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -552,7 +568,7 @@ export function BeforeTab() {
                         <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
                           status === 'active' ? 'bg-green-400' :
                           status === 'stale' ? 'bg-yellow-400' : 'bg-gray-300'}`} />
-                      </div>
+                      </button>
                     )
                   })
                 )}
@@ -586,7 +602,7 @@ export function BeforeTab() {
                     is_sharing: true,
                   })),
                 ]
-                return <TrackingMap members={mapMembers} />
+                return <TrackingMap members={mapMembers} focusUserId={focusUserId} />
               })()}
 
               <p className="text-xs text-muted-foreground text-center">
@@ -594,6 +610,77 @@ export function BeforeTab() {
               </p>
             </>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Palabra Clave de Voz */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Mic className="w-5 h-5 text-primary" />
+            Palabra Clave de Voz
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Di esta palabra en voz alta para activar el SOS automáticamente (solo funciona cuando el SOS no está activo).
+          </p>
+          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+            <div>
+              <p className="text-xs text-muted-foreground mb-0.5">Palabra actual</p>
+              <p className="font-semibold text-sm">{voiceKeyword || 'No configurada'}</p>
+            </div>
+            {sosActive ? (
+              <span className="text-xs text-muted-foreground">SOS activo</span>
+            ) : (
+              <span className="flex items-center gap-1 text-xs text-green-600">
+                <Mic className="w-3 h-3 animate-pulse" />
+                Escuchando
+              </span>
+            )}
+          </div>
+          <Dialog open={showKeywordDialog} onOpenChange={(open) => {
+            setShowKeywordDialog(open)
+            if (open) setKeywordDraft(voiceKeyword)
+          }}>
+            <Button className="w-full" variant="outline" onClick={() => {
+              setKeywordDraft(voiceKeyword)
+              setShowKeywordDialog(true)
+            }}>
+              Cambiar palabra clave
+            </Button>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Configurar Palabra Clave de Voz</DialogTitle>
+                <DialogDescription>
+                  Elige una palabra única que activa el SOS cuando la dices en voz alta.
+                </DialogDescription>
+              </DialogHeader>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel>Palabra clave</FieldLabel>
+                  <Input
+                    value={keywordDraft}
+                    onChange={(e) => setKeywordDraft(e.target.value)}
+                    placeholder="ej. socorro"
+                    autoFocus
+                  />
+                </Field>
+              </FieldGroup>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowKeywordDialog(false)}>Cancelar</Button>
+                <Button
+                  disabled={!keywordDraft.trim()}
+                  onClick={() => {
+                    setVoiceKeyword(keywordDraft.trim().toLowerCase())
+                    setShowKeywordDialog(false)
+                  }}
+                >
+                  Guardar
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </CardContent>
       </Card>
 

@@ -96,6 +96,13 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
   const [suggestions, setSuggestions] = useState<{ display_name: string; lat: string; lon: string }[]>([])
   const [searching, setSearching] = useState(false)
 
+  // Custom origin state
+  const [originInput, setOriginInput] = useState('')
+  const [originSuggestions, setOriginSuggestions] = useState<{ display_name: string; lat: string; lon: string }[]>([])
+  const [searchingOrigin, setSearchingOrigin] = useState(false)
+  const [isEditingOrigin, setIsEditingOrigin] = useState(false)
+  const [customOriginLabel, setCustomOriginLabel] = useState<string | null>(null)
+
   // Efecto para establecer el origen de la ruta como la ubicación actual del usuario tan pronto como se obtienen 
   // las coordenadas. Esto asegura que el punto de partida de la ruta sea siempre la ubicación actual, a menos 
   // que el usuario decida cambiarlo manualmente. El efecto depende de las coordenadas, el origen de la ruta y 
@@ -113,7 +120,7 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
   // coordenadas del resultado y muestra las opciones de ruta. Si no se encuentra el destino o si ocurre un error durante 
   // la búsqueda, se muestra una alerta al usuario.
   const handleSearch = async () => {
-    if (!destinationInput || !coordinates) return
+    if (!destinationInput || !routeOrigin) return
     // Realizar una solicitud a la API de Photon para buscar el destino ingresado por el usuario. La función codifica el
     // input del destino para asegurarse de que sea seguro para usar en una URL, y limita los resultados a 1 para obtener la 
     // coincidencia más relevante. Si se encuentra una coincidencia, se extraen las coordenadas del resultado y se establece 
@@ -162,6 +169,50 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
     setSelectedRoute(null)
     setRouteInfo({})
     setSuggestions([])
+    // Reset origin back to GPS
+    if (coordinates) setRouteOrigin(coordinates)
+    setCustomOriginLabel(null)
+    setOriginInput('')
+    setIsEditingOrigin(false)
+    setOriginSuggestions([])
+  }
+
+  const handleOriginInputChange = async (value: string) => {
+    setOriginInput(value)
+    if (value.length < 3) { setOriginSuggestions([]); return }
+    clearTimeout((window as any)._photonOriginTimeout)
+    ;(window as any)._photonOriginTimeout = setTimeout(async () => {
+      setSearchingOrigin(true)
+      try {
+        const res = await fetch(
+          `https://photon.komoot.io/api/?q=${encodeURIComponent(value)}&limit=5`,
+          { headers: { 'Accept': 'application/json' } }
+        )
+        const data = await res.json()
+        setOriginSuggestions(data.features.map((f: any) => ({
+          display_name: [f.properties.name, f.properties.street, f.properties.city, f.properties.country].filter(Boolean).join(', '),
+          lat: f.geometry.coordinates[1].toString(),
+          lon: f.geometry.coordinates[0].toString(),
+        })))
+      } catch {}
+      setSearchingOrigin(false)
+    }, 500)
+  }
+
+  const selectOriginSuggestion = (s: { display_name: string; lat: string; lon: string }) => {
+    setRouteOrigin({ latitude: parseFloat(s.lat), longitude: parseFloat(s.lon) })
+    setCustomOriginLabel(s.display_name)
+    setOriginInput(s.display_name)
+    setIsEditingOrigin(false)
+    setOriginSuggestions([])
+  }
+
+  const resetOriginToGps = () => {
+    if (coordinates) setRouteOrigin(coordinates)
+    setCustomOriginLabel(null)
+    setOriginInput('')
+    setIsEditingOrigin(false)
+    setOriginSuggestions([])
   }
 
   // Función para obtener la clase de color de texto basada en el nivel de riesgo. Esta función se utiliza para asignar un color
@@ -206,13 +257,62 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* ── Origen ── */}
           <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-            <div className="w-3 h-3 rounded-full bg-safe" />
-            <div className="flex-1">
-              <p className="text-xs text-muted-foreground">Desde</p>
-              <p className="text-sm font-medium">
-                {coordinates ? 'Ubicación actual' : 'Esperando ubicación...'}
-              </p>
+            <div className="w-3 h-3 rounded-full bg-safe flex-shrink-0" />
+            <div className="flex-1 relative min-w-0">
+              {isEditingOrigin ? (
+                <>
+                  <p className="text-xs text-muted-foreground mb-1">Punto de inicio</p>
+                  <input
+                    autoFocus
+                    type="text"
+                    value={originInput}
+                    onChange={e => handleOriginInputChange(e.target.value)}
+                    onKeyDown={e => e.key === 'Escape' && setIsEditingOrigin(false)}
+                    placeholder="Escribe la dirección de inicio..."
+                    className="w-full text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground"
+                  />
+                  {originSuggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
+                      {searchingOrigin && <p className="text-xs text-muted-foreground p-2">Buscando...</p>}
+                      {originSuggestions.map((s, i) => (
+                        <button
+                          key={i}
+                          className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted border-b border-border last:border-0"
+                          onClick={() => selectOriginSuggestion(s)}
+                        >
+                          {s.display_name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-muted-foreground">Desde</p>
+                  <p className="text-sm font-medium truncate">
+                    {customOriginLabel ?? (coordinates ? 'Ubicación actual' : 'Esperando ubicación...')}
+                  </p>
+                </>
+              )}
+            </div>
+            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+              {!isEditingOrigin ? (
+                <button
+                  onClick={() => setIsEditingOrigin(true)}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Cambiar
+                </button>
+              ) : (
+                <button
+                  onClick={resetOriginToGps}
+                  className="text-xs text-muted-foreground hover:text-foreground whitespace-nowrap"
+                >
+                  Mi ubicación
+                </button>
+              )}
             </div>
           </div>
 
@@ -291,7 +391,7 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
                 Reiniciar
               </Button>
             ) : (
-              <Button onClick={handleSearch} className="flex-1" disabled={!destinationInput || !coordinates}>
+              <Button onClick={handleSearch} className="flex-1" disabled={!destinationInput || !routeOrigin}>
                 Planear Ruta Segura
               </Button>
             )}

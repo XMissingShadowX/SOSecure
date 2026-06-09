@@ -1,20 +1,10 @@
-/*
-  IncidentMap es el componente encargado de renderizar el mapa interactivo con los incidentes reportados.
-- Utiliza React Leaflet para mostrar un mapa con marcadores personalizados según la gravedad del incidente
-- Permite a los usuarios verificar la autenticidad de los incidentes votando si son reales o falsos
-- Muestra un círculo de calor para incidentes de alta gravedad, ayudando a identificar zonas peligrosas
-- Sincroniza los votos en tiempo real con Supabase, pero también mantiene un estado local para una experiencia fluida
-- Permite a los usuarios propietarios de incidentes editarlos o eliminarlos directamente desde el popup del marcador
-- Se adapta automáticamente al tema claro u oscuro cambiando las capas de tiles del mapa
-*/
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet.heat'
 import { useAppStore } from '@/lib/store'
-import { createClient } from '@/lib/supabase/client'
 import type { Incident, Coordinates } from '@/lib/types'
 import 'leaflet/dist/leaflet.css'
 
@@ -66,30 +56,10 @@ const severityColors: Record<string, string> = {
 }
 
 const incidentTypeLabels: Record<string, string> = {
-  theft: 'Robo',
-  assault: 'Asalto',
-  harassment: 'Acoso',
-  suspicious: 'Actividad sospechosa',
+  'theft-assault-violence': 'Robo / Asalto / Violencia',
+  'harassment-suspicious': 'Acoso / Sospechoso',
   accident: 'Accidente',
-  other: 'Otro',
-}
-
-// Key de sessionStorage para votos en el mapa (compartida con after-tab)
-const SESSION_VOTED_KEY = 'safewalk_voted_incidents'
-
-function getMapVotedIds(): Set<string> {
-  try {
-    const raw = sessionStorage.getItem(SESSION_VOTED_KEY)
-    return new Set(raw ? (JSON.parse(raw) as string[]) : [])
-  } catch {
-    return new Set()
-  }
-}
-
-function markMapVoted(id: string): void {
-  const ids = getMapVotedIds()
-  ids.add(id)
-  sessionStorage.setItem(SESSION_VOTED_KEY, JSON.stringify([...ids]))
+  SOS: 'SOS',
 }
 
 interface MapUpdaterProps {
@@ -97,7 +67,6 @@ interface MapUpdaterProps {
   zoom: number
 }
 
-// Solo centra en el mount inicial, no en cada actualización de ubicación
 function MapUpdater({ center, zoom }: MapUpdaterProps) {
   const map = useMap()
   useEffect(() => {
@@ -155,7 +124,6 @@ function HeatLayer({ incidents }: HeatLayerProps) {
       severityIntensity[inc.severity] ?? 0.3,
     ] as [number, number, number])
 
-    // Radio escala con el zoom: pequeño al alejarse, grande al acercarse
     const radius = Math.max(8, Math.min(35, (zoom - 8) * 4))
     const blur = Math.round(radius * 0.55)
 
@@ -168,7 +136,6 @@ function HeatLayer({ incidents }: HeatLayerProps) {
       gradient: { 0.0: '#0000ff', 0.4: '#00ffff', 0.6: '#00ff00', 0.8: '#ffff00', 1.0: '#ff0000' },
     }).addTo(map)
 
-    // Garantizar fondo transparente en el canvas del heatmap
     const overlayPane = map.getPanes().overlayPane
     const canvas = overlayPane?.querySelector('canvas')
     if (canvas) (canvas as HTMLCanvasElement).style.background = 'transparent'
@@ -198,83 +165,11 @@ export function IncidentMap({ incidents, userLocation, onMapClick, showHeatZones
     if (typeof window === 'undefined') return true
     return document.documentElement.className === 'dark'
   })
-  const [tileKey, setTileKey] = useState(Date.now())
   const [viewMode, setViewMode] = useState<'markers' | 'heatmap'>('markers')
-
-  // Estado de votos en el mapa: { [incidentId]: { real, fake, voted } }
-  const [mapVotes, setMapVotes] = useState<Record<string, { real: number; fake: number; voted: boolean }>>(() => {
-    const voted = getMapVotedIds()
-    const initial: Record<string, { real: number; fake: number; voted: boolean }> = {}
-    for (const inc of incidents) {
-      initial[inc.id] = {
-        real: inc.votes_real ?? 0,
-        fake: inc.votes_fake ?? 0,
-        voted: voted.has(inc.id),
-      }
-    }
-    return initial
-  })
-
-  // Sincronizar mapVotes cuando cambian los incidents (ej: nueva carga)
-  // DESPUÉS — siempre sincroniza conteos de la DB, respeta voted local
-useEffect(() => {
-  const voted = getMapVotedIds()
-  setMapVotes(prev => {
-    const next = { ...prev }
-    for (const inc of incidents) {
-      next[inc.id] = {
-        real: inc.votes_real ?? 0,
-        fake: inc.votes_fake ?? 0,
-        // si ya votó localmente, respetar ese estado
-        voted: voted.has(inc.id) || prev[inc.id]?.voted === true,
-      }
-    }
-    return next
-  })
-}, [incidents])
-
-  const handleMapVerify = useCallback(async (incident: Incident, verified: boolean) => {
-    if (mapVotes[incident.id]?.voted) return
-
-    // Optimistic update
-    setMapVotes(prev => ({
-      ...prev,
-      [incident.id]: {
-        real: (prev[incident.id]?.real ?? 0) + (verified ? 1 : 0),
-        fake: (prev[incident.id]?.fake ?? 0) + (verified ? 0 : 1),
-        voted: true,
-      },
-    }))
-    markMapVoted(incident.id)
-
-    const supabase = createClient()
-
-    if (verified) {
-      const { error } = await supabase.rpc('increment_votes', {
-        incident_id: incident.id,
-        vote_column: 'votes_real',
-      })
-      if (error) console.error('Error votando real:', error)
-    } else {
-      const { error } = await supabase.rpc('increment_votes', {
-        incident_id: incident.id,
-        vote_column: 'votes_fake',
-      })
-      if (error) console.error('Error votando falso:', error)
-
-      // Desactivar aparte
-      await supabase
-        .from('incidents')
-        .update({ is_active: false, resolved_at: new Date().toISOString() })
-        .eq('id', incident.id)
-    }
-  }, [mapVotes])
 
   useEffect(() => {
     const updateTheme = () => {
-      const dark = document.documentElement.className === 'dark'
-      setIsDark(dark)
-      setTileKey(Date.now())
+      setIsDark(document.documentElement.className === 'dark')
     }
     updateTheme()
     const observer = new MutationObserver(updateTheme)
@@ -282,7 +177,6 @@ useEffect(() => {
     return () => observer.disconnect()
   }, [])
 
-  // Solo para el centro inicial del mapa — no reacciona a updates de GPS
   const initialCenter = useMemo(() => {
     if (userLocation) return userLocation
     return mapCenter
@@ -291,198 +185,93 @@ useEffect(() => {
 
   return (
     <div className="relative h-full w-full">
-    {/* Toggle compacto — muestra el modo activo, click cambia al otro */}
-    <button
-      onClick={() => setViewMode(v => v === 'markers' ? 'heatmap' : 'markers')}
-      className="absolute top-3 left-3 z-[1000] flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium shadow-md bg-background/90 border border-border hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-    >
-      {viewMode === 'markers' ? '📍' : '🔥'}
-      <span>{viewMode === 'markers' ? 'Marcadores' : 'Calor'}</span>
-    </button>
+      <button
+        onClick={() => setViewMode(v => v === 'markers' ? 'heatmap' : 'markers')}
+        className="absolute top-3 left-3 z-[1000] flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium shadow-md bg-background/90 border border-border hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+      >
+        {viewMode === 'markers' ? '📍' : '🔥'}
+        <span>{viewMode === 'markers' ? 'Marcadores' : 'Calor'}</span>
+      </button>
 
-    <MapContainer
-      center={[initialCenter.latitude, initialCenter.longitude]}
-      zoom={mapZoom}
-      className="h-full w-full rounded-lg"
-      zoomControl={false}
-      attributionControl={false}
-    >
-      {isDark ? (
-        <TileLayer
-          key="dark-tiles"
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-          attribution='&copy; OpenStreetMap'
-        />
-      ) : (
-        <TileLayer
-          key="light-tiles"
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-          attribution='&copy; OpenStreetMap'
-        />
-      )}
+      <MapContainer
+        center={[initialCenter.latitude, initialCenter.longitude]}
+        zoom={mapZoom}
+        className="h-full w-full rounded-lg"
+        zoomControl={false}
+        attributionControl={false}
+      >
+        {isDark ? (
+          <TileLayer
+            key="dark-tiles"
+            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            attribution='&copy; OpenStreetMap'
+          />
+        ) : (
+          <TileLayer
+            key="light-tiles"
+            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+            attribution='&copy; OpenStreetMap'
+          />
+        )}
 
-      <MapUpdater center={initialCenter} zoom={mapZoom} />
-      <FlyToController trigger={flyToUserTrigger} userLocation={userLocation} />
+        <MapUpdater center={initialCenter} zoom={mapZoom} />
+        <FlyToController trigger={flyToUserTrigger} userLocation={userLocation} />
 
-      {viewMode === 'heatmap' && showHeatZones && (
-        <HeatLayer incidents={incidents} />
-      )}
+        {viewMode === 'heatmap' && showHeatZones && (
+          <HeatLayer incidents={incidents} />
+        )}
 
-      {userLocation && (
-        <Marker position={[userLocation.latitude, userLocation.longitude]} icon={userIcon}>
-          <Popup>
-            <div className="text-center p-1">
-              <strong>Estás aquí</strong>
-            </div>
-          </Popup>
-        </Marker>
-      )}
-
-      {viewMode === 'markers' && incidents.map((incident) => {
-        const isOwner = isAdmin || (currentUserId && incident.user_id === currentUserId)
-        const votes = mapVotes[incident.id] ?? { real: incident.votes_real ?? 0, fake: incident.votes_fake ?? 0, voted: false }
-        const totalVotes = votes.real + votes.fake
-
-        return (
-          <Marker
-            key={incident.id}
-            position={[incident.latitude, incident.longitude]}
-            icon={createIcon(severityColors[incident.severity] || severityColors.low)}
-          >
+        {userLocation && (
+          <Marker position={[userLocation.latitude, userLocation.longitude]} icon={userIcon}>
             <Popup>
-              <div className="p-2 min-w-[210px]">
-                {/* Header */}
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: severityColors[incident.severity] }} />
-                  <strong className="text-sm">{incident.title}</strong>
-                </div>
-                <p className="text-xs text-gray-600 mb-1">{incidentTypeLabels[incident.incident_type]}</p>
-                {incident.description && <p className="text-xs text-gray-500 mb-2">{incident.description}</p>}
-                <p className="text-xs text-gray-400 mb-3">{new Date(incident.reported_at).toLocaleString()}</p>
-
-                {/* Conteo de votos */}
-                <div className="flex items-center gap-2 mb-3 pb-2 border-t border-gray-100 pt-2">
-                  <span className="text-xs text-gray-400">{totalVotes} {totalVotes === 1 ? 'voto' : 'votos'}:</span>
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '3px',
-                      fontSize: '11px',
-                      padding: '2px 7px',
-                      borderRadius: '9999px',
-                      border: '1px solid #22c55e66',
-                      color: '#16a34a',
-                      fontWeight: 500,
-                    }}
-                  >
-                    👍 {votes.real}
-                  </span>
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '3px',
-                      fontSize: '11px',
-                      padding: '2px 7px',
-                      borderRadius: '9999px',
-                      border: '1px solid #ef444466',
-                      color: '#dc2626',
-                      fontWeight: 500,
-                    }}
-                  >
-                    👎 {votes.fake}
-                  </span>
-                </div>
-
-                {/* Acciones */}
-                {isOwner ? (
-                  /* Dueño: editar / eliminar */
-                  <div className="flex gap-2 pt-1 border-t border-gray-200">
-                    <button
-                      onClick={() => onEdit?.(incident)}
-                      className="flex-1 text-xs py-1 px-2 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-                    >
-                      ✏️ Editar
-                    </button>
-                    <button
-                      onClick={() => onDelete?.(incident.id)}
-                      className="flex-1 text-xs py-1 px-2 rounded bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
-                    >
-                      🗑️ Eliminar
-                    </button>
-                  </div>
-                ) : (
-                  /* Otros usuarios: verificar */
-                  !incident.is_verified && (
-                    <div className="pt-1 border-t border-gray-200">
-                      {votes.voted ? (
-                        <p
-                          style={{
-                            fontSize: '11px',
-                            textAlign: 'center',
-                            color: '#9ca3af',
-                            padding: '4px 0',
-                          }}
-                        >
-                          ✅ Ya votaste en este incidente
-                        </p>
-                      ) : (
-                        <>
-                          <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '6px', textAlign: 'center' }}>
-                            ¿Es real este incidente?
-                          </p>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleMapVerify(incident, true)}
-                              style={{
-                                flex: 1,
-                                fontSize: '12px',
-                                padding: '5px 8px',
-                                borderRadius: '6px',
-                                background: '#f0fdf4',
-                                color: '#16a34a',
-                                border: '1px solid #86efac',
-                                cursor: 'pointer',
-                                transition: 'background 0.15s',
-                                fontWeight: 500,
-                              }}
-                              onMouseOver={e => (e.currentTarget.style.background = '#dcfce7')}
-                              onMouseOut={e => (e.currentTarget.style.background = '#f0fdf4')}
-                            >
-                              👍 Real
-                            </button>
-                            <button
-                              onClick={() => handleMapVerify(incident, false)}
-                              style={{
-                                flex: 1,
-                                fontSize: '12px',
-                                padding: '5px 8px',
-                                borderRadius: '6px',
-                                background: '#fff1f2',
-                                color: '#dc2626',
-                                border: '1px solid #fca5a5',
-                                cursor: 'pointer',
-                                transition: 'background 0.15s',
-                                fontWeight: 500,
-                              }}
-                              onMouseOver={e => (e.currentTarget.style.background = '#fee2e2')}
-                              onMouseOut={e => (e.currentTarget.style.background = '#fff1f2')}
-                            >
-                              👎 Falso
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )
-                )}
+              <div className="text-center p-1">
+                <strong>Estás aquí</strong>
               </div>
             </Popup>
           </Marker>
-        )
-      })}
-    </MapContainer>
+        )}
+
+        {viewMode === 'markers' && incidents.map((incident) => {
+          const isOwner = isAdmin || (currentUserId && incident.user_id === currentUserId)
+
+          return (
+            <Marker
+              key={incident.id}
+              position={[incident.latitude, incident.longitude]}
+              icon={createIcon(severityColors[incident.severity] || severityColors.low)}
+            >
+              <Popup>
+                <div className="p-2 min-w-[200px]">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: severityColors[incident.severity] }} />
+                    <strong className="text-sm">{incident.title}</strong>
+                  </div>
+                  <p className="text-xs text-gray-600 mb-1">{incidentTypeLabels[incident.incident_type] ?? incident.incident_type}</p>
+                  {incident.description && <p className="text-xs text-gray-500 mb-2">{incident.description}</p>}
+                  <p className="text-xs text-gray-400 mb-3">{new Date(incident.reported_at).toLocaleString()}</p>
+
+                  {isOwner && (
+                    <div className="flex gap-2 pt-1 border-t border-gray-200">
+                      <button
+                        onClick={() => onEdit?.(incident)}
+                        className="flex-1 text-xs py-1 px-2 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                      >
+                        ✏️ Editar
+                      </button>
+                      <button
+                        onClick={() => onDelete?.(incident.id)}
+                        className="flex-1 text-xs py-1 px-2 rounded bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                      >
+                        🗑️ Eliminar
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </Popup>
+            </Marker>
+          )
+        })}
+      </MapContainer>
     </div>
   )
 }

@@ -266,8 +266,7 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
         severity: autoSeverity,
         latitude: coordinates.latitude,
         longitude: coordinates.longitude,
-        is_verified: false,
-      })
+        })
       setNewIncident({ title: '', description: '', incident_type: 'theft-assault-violence', severity: 'medium' })
       setQuestionAnswers(['', '', ''])
       setShowReportDialog(false)
@@ -291,7 +290,6 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
       severity: autoSeverity,
       latitude: coordinates.latitude,
       longitude: coordinates.longitude,
-      is_verified: false,
     }).select().single()
 
     if (error) {
@@ -602,7 +600,6 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
                   <p className="text-xs text-muted-foreground">{new Date(incident.reported_at).toLocaleString()}</p>
                 </div>
                 <div className="flex items-center gap-1">
-                  {incident.is_verified && <Badge variant="outline" className="text-xs text-safe border-safe">✓</Badge>}
                   {(isAdmin || incident.user_id === currentUserId) && (
                     <>
                       <button onClick={() => handleEdit(incident)} className="p-1 hover:text-primary transition-colors">

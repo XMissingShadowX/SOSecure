@@ -51,10 +51,11 @@ import {
 import type { User } from '@supabase/supabase-js'
 
 export function AppShell() {
-  const { activeTab, setCurrentLocation, setNearbyIncidents, offlineQueue, isLiveSharing } = useAppStore()
+  const { activeTab, setCurrentLocation, setNearbyIncidents, offlineQueue, isLiveSharing, voiceKeyword, sosActive } = useAppStore()
   const { coordinates } = useGeolocation({ watch: true })
   const [user, setUser] = useState<User | null>(null)
   const liveBroadcastRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const voiceRecognitionRef = useRef<any>(null)
   const [isOnline, setIsOnline] = useState(true)
   const [isDark, setIsDark] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -208,6 +209,50 @@ export function AppShell() {
     liveBroadcastRef.current = setInterval(broadcast, 30_000)
     return () => { if (liveBroadcastRef.current) { clearInterval(liveBroadcastRef.current); liveBroadcastRef.current = null } }
   }, [user, isLiveSharing])
+
+  // Reconocimiento de voz global — activo en todas las pestañas mientras haya palabra clave configurada
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) return
+
+    // Detener instancia anterior si existe
+    if (voiceRecognitionRef.current) {
+      try { voiceRecognitionRef.current.stop() } catch { /* ignore */ }
+      voiceRecognitionRef.current = null
+    }
+
+    if (!voiceKeyword || sosActive) return
+
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    const recognition = new SR()
+    recognition.continuous = true
+    recognition.lang = 'es-MX'
+    recognition.interimResults = false
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase()
+      if (transcript.includes(voiceKeyword)) {
+        window.dispatchEvent(new Event('sosecure:activate'))
+      }
+    }
+
+    recognition.onend = () => {
+      // Reiniciar automáticamente para mantenerlo activo
+      if (voiceRecognitionRef.current === recognition && !sosActive) {
+        try { recognition.start() } catch { /* ignore */ }
+      }
+    }
+
+    try {
+      recognition.start()
+      voiceRecognitionRef.current = recognition
+    } catch { /* ignore */ }
+
+    return () => {
+      try { recognition.stop() } catch { /* ignore */ }
+      voiceRecognitionRef.current = null
+    }
+  }, [voiceKeyword, sosActive])
 
   const handleSignOut = async () => {
     const supabase = createClient()

@@ -76,14 +76,6 @@ export default function AdminPage() {
     setIncidents(prev => prev.filter(i => i.id !== id))
   }
 
-  // Función para verificar un incidente
-  const verify = async (id: string) => {
-    // Crear una instancia de Supabase para interactuar con la base de datos
-    const supabase = createClient()
-    // Actualizar el incidente para marcarlo como verificado en la base de datos
-    await supabase.from('incidents').update({ is_verified: true }).eq('id', id)
-  }
-
   // Si el usuario no es administrador, mostrar un mensaje de acceso restringido
   if (!isAdmin) return <p className="p-8 text-center">Acceso restringido</p>
 
@@ -101,7 +93,6 @@ export default function AdminPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => verify(inc.id)} className="text-xs px-2 py-1 bg-green-600 text-white rounded">✓ Verificar</button>
             <button onClick={() => deactivate(inc.id)} className="text-xs px-2 py-1 bg-red-600 text-white rounded">✕ Eliminar</button>
           </div>
         </div>

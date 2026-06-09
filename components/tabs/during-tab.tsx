@@ -12,13 +12,14 @@
 // para manejar la lógica de grabación, geolocalización, notificaciones, y la interfaz de usuario.
 'use client'
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Mic, MicOff, Video, VideoOff, AlertTriangle, WifiOff, Wifi, Radio, Save, Send, Upload, CheckCircle } from 'lucide-react'
+import { Mic, MicOff, Video, VideoOff, AlertTriangle, WifiOff, Wifi, Radio, Save, Send, Upload, CheckCircle, MessageCircle } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { useGeolocation } from '@/hooks/use-geolocation'
 import { sendAlarmNotification, playAlarmSound } from '@/lib/notifications'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { createClient } from '@/lib/supabase/client'
 import {
   saveRecordingLocally,
   sendRecordingToContacts,
@@ -115,7 +116,7 @@ function useStreetNames(locationHistory: { coordinates: { latitude: number; long
 // para el modo de emergencia activo, la grabación de audio y video, la conexión a internet, y la interacción 
 // con los contactos de emergencia.
 export function DuringTab() {
-  const { sosActive, setSosActive, contacts, locationHistory } = useAppStore()
+  const { sosActive, setSosActive, contacts, locationHistory, voiceKeyword } = useAppStore()
   const { coordinates } = useGeolocation({ watch: true })
     const [isOnline, setIsOnline] = useState(true)
   const [isRecordingAudio, setIsRecordingAudio] = useState(false)
@@ -135,7 +136,6 @@ export function DuringTab() {
   const tapCountRef = useRef(0)
   const tapTimerRef = useRef<NodeJS.Timeout | null>(null)
   const [tapCountDisplay, setTapCountDisplay] = useState(0)
-
   // Efecto para manejar los eventos de conexión y desconexión a internet, actualizando el estado de conexión en consecuencia.
   useEffect(() => {
     const update = () => setIsOnline(navigator.onLine)
@@ -271,6 +271,57 @@ export function DuringTab() {
     } else {
       setStatusMsg('⚠️ No se pudo enviar. Guarda localmente.')
     }
+    setRecordingStatus('done')
+  }, [lastRecording, contacts])
+
+  // Enviar grabación por chat interno
+  const handleSendViaChat = useCallback(async () => {
+    if (!lastRecording) return
+    setRecordingStatus('sending')
+    setStatusMsg('Subiendo y enviando por chat...')
+
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      setStatusMsg('⚠️ Inicia sesión para usar el chat')
+      setRecordingStatus('idle')
+      return
+    }
+
+    const ext = lastRecording.mimeType.includes('mp4') ? 'mp4' : 'webm'
+    const path = `${user.id}/${lastRecording.id}.${ext}`
+    const { error: upErr } = await supabase.storage
+      .from('recordings')
+      .upload(path, lastRecording.blob, { contentType: lastRecording.mimeType, upsert: false })
+    if (upErr) {
+      setStatusMsg('⚠️ Error al subir el archivo')
+      setRecordingStatus('idle')
+      return
+    }
+
+    const { data: { publicUrl } } = supabase.storage.from('recordings').getPublicUrl(path)
+    const prefix = lastRecording.type === 'audio' ? '🎵 Audio de emergencia' : '🎥 Video de emergencia'
+    const content = `${prefix}:\n${publicUrl}`
+
+    let sent = 0
+    const primaryContacts = contacts.filter(c => c.importance === 'primary' || c.importance === 'secondary')
+    for (const c of primaryContacts) {
+      const email = (c as any).email as string | undefined
+      if (email) {
+        const { data: receiverId } = await supabase.rpc('get_user_id_by_email', { p_email: email })
+        if (receiverId && receiverId !== user.id) {
+          await supabase.from('chat_messages').insert({
+            sender_id: user.id,
+            receiver_id: receiverId,
+            content,
+            type: 'media',
+          })
+          sent++
+        }
+      }
+    }
+
+    setStatusMsg(sent > 0 ? `✅ Enviado a ${sent} contacto(s) por chat` : '⚠️ Ningún contacto tiene cuenta SOSecure')
     setRecordingStatus('done')
   }, [lastRecording, contacts])
 
@@ -419,10 +470,24 @@ export function DuringTab() {
             </div>
             <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
               <span className="text-2xl">🎙️</span>
-              <div>
+              <div className="flex-1">
                 <p className="text-sm font-medium">Activación por voz</p>
-                <p className="text-xs text-muted-foreground">Di &quot;auxilio&quot;, &quot;ayuda&quot; o &quot;emergencia&quot;</p>
+                {voiceKeyword ? (
+                  <p className="text-xs text-muted-foreground">
+                    Di <span className="font-semibold text-foreground">&quot;{voiceKeyword}&quot;</span> para activar SOS
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Sin palabra clave — configúrala en la pestaña <span className="font-medium">Antes</span>
+                  </p>
+                )}
               </div>
+              {voiceKeyword && !sosActive && (
+                <span className="flex items-center gap-1 text-[10px] text-green-600 font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                  Escuchando
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
               <span className="text-2xl">⏱️</span>
@@ -526,6 +591,15 @@ export function DuringTab() {
                     <Send className="w-4 h-4 mr-2" />
                     Enviar a contactos de emergencia
                     {contacts.length === 0 && <span className="ml-1 text-xs text-muted-foreground">(sin contactos)</span>}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleSendViaChat}
+                    disabled={recordingStatus !== 'idle'}
+                  >
+                    <MessageCircle className="w-4 h-4 mr-2" />
+                    Enviar por Chat de Emergencia
                   </Button>
                   <Button
                     variant="outline"

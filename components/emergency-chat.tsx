@@ -13,7 +13,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   MessageCircle, X, Send, MapPin, AlertTriangle, Phone,
-  Bot, Loader2, Shield, ChevronLeft, Sparkles, UserCircle2, WifiOff
+  Bot, Loader2, Shield, ChevronLeft, Sparkles, UserCircle2, WifiOff, FileVideo, FileAudio
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { Button } from '@/components/ui/button'
@@ -27,7 +27,7 @@ interface DBMessage {
   sender_id: string
   receiver_id: string
   content: string
-  type: 'text' | 'location' | 'sos'
+  type: 'text' | 'location' | 'sos' | 'media'
   is_read: boolean
   created_at: string
 }
@@ -39,13 +39,44 @@ interface ChatMsg {
   text: string
   timestamp: number
   isMe: boolean
-  type: 'text' | 'location' | 'sos' | 'ai'
+  type: 'text' | 'location' | 'sos' | 'ai' | 'media'
   loading?: boolean
 }
 
 // ─── ID especial para el asistente IA ────────────────────────────────────────
 
 const AI_ID = '__safewalk_ai__'
+
+// ─── Renderizador de mensajes multimedia ──────────────────────────────────────
+
+function MediaMessage({ text, isMe, timestamp }: { text: string; isMe: boolean; timestamp: number }) {
+  const lines = text.split('\n')
+  const label = lines[0] ?? ''
+  const url = lines[1] ?? ''
+  const isAudio = label.includes('Audio') || label.includes('audio')
+  const isVideo = label.includes('Video') || label.includes('video')
+
+  return (
+    <div className="space-y-2 min-w-[200px]">
+      <div className="flex items-center gap-1.5 text-xs font-medium">
+        {isAudio ? <FileAudio className="w-3.5 h-3.5" /> : <FileVideo className="w-3.5 h-3.5" />}
+        {label}
+      </div>
+      {url && isAudio && (
+        <audio controls src={url} className="w-full h-8" style={{ minWidth: 180 }} />
+      )}
+      {url && isVideo && (
+        <video controls src={url} className="w-full rounded-lg max-h-40 object-cover" />
+      )}
+      {url && !isAudio && !isVideo && (
+        <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs underline break-all">{url}</a>
+      )}
+      <p className={`text-xs ${isMe ? 'text-primary-foreground/60' : 'text-muted-foreground'}`}>
+        {new Date(timestamp).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+      </p>
+    </div>
+  )
+}
 
 // ─── Hook: Asistente IA ───────────────────────────────────────────────────────
 
@@ -476,6 +507,7 @@ export function EmergencyChat() {
                     msg.loading ? 'bg-muted text-muted-foreground'
                     : msg.type === 'sos' ? 'bg-destructive text-white'
                     : msg.type === 'location' ? 'bg-primary/20 text-foreground'
+                    : msg.type === 'media' ? (msg.isMe ? 'bg-primary/20 text-foreground' : 'bg-muted text-foreground')
                     : (msg.type === 'ai' && !msg.isMe) ? 'bg-muted text-foreground'
                     : msg.isMe ? 'bg-primary text-primary-foreground'
                     : 'bg-muted text-foreground'
@@ -485,6 +517,8 @@ export function EmergencyChat() {
                         <Loader2 className="w-3 h-3 animate-spin" />
                         <span className="text-xs">Escribiendo…</span>
                       </div>
+                    ) : msg.type === 'media' ? (
+                      <MediaMessage text={msg.text} isMe={msg.isMe} timestamp={msg.timestamp} />
                     ) : (
                       <>
                         {msg.type === 'sos' && <AlertTriangle className="w-3 h-3 inline mr-1" />}

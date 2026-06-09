@@ -11,6 +11,7 @@
 // Importar hooks de React, la función para crear un cliente de Supabase y componentes de UI
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { liveChannelName, type LiveFramePayload, type LiveStatusPayload } from '@/lib/live-stream'
 import { Shield, MapPin, Clock, AlertTriangle } from 'lucide-react'
 import { use } from 'react'
 
@@ -26,6 +27,10 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [loading, setLoading] = useState(true)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
+  // ── Video EN VIVO ────────────────────────────────────────────────
+  const [liveFrame, setLiveFrame] = useState<string | null>(null)
+  const [liveLastTs, setLiveLastTs] = useState<number | null>(null)
+  const [tick, setTick] = useState(0) // fuerza re-render para recalcular "frescura" del feed
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
   const markerRef = useRef<any>(null)
@@ -103,6 +108,39 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
     // la base de datos cuando el usuario navegue fuera de esta página
     return () => { clearInterval(interval); clearInterval(refreshVideo) }
   }, [alertId])
+
+  // Suscribirse al canal de Realtime para recibir los fotogramas EN VIVO que envía
+  // la persona en peligro desde su teléfono. Cada fotograma es una imagen JPEG (data URL).
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel(liveChannelName(alertId), { config: { broadcast: { self: false } } })
+      .on('broadcast', { event: 'frame' }, ({ payload }) => {
+        const p = payload as LiveFramePayload
+        if (p?.img) {
+          setLiveFrame(p.img)
+          setLiveLastTs(p.ts ?? Date.now())
+        }
+      })
+      .on('broadcast', { event: 'status' }, ({ payload }) => {
+        const p = payload as LiveStatusPayload
+        if (p && p.live === false) setLiveLastTs(0) // transmisión terminada
+      })
+      .subscribe()
+
+    // Recalcular cada 2s si el feed sigue "fresco" (llegó un fotograma reciente).
+    const freshness = setInterval(() => setTick((t) => t + 1), 2000)
+
+    return () => {
+      clearInterval(freshness)
+      try { supabase.removeChannel(channel) } catch { /* noop */ }
+    }
+  }, [alertId])
+
+  // El feed se considera EN VIVO si llegó un fotograma en los últimos 8 segundos.
+  const liveIsFresh = !!liveFrame && !!liveLastTs && Date.now() - liveLastTs < 8000
+  const liveSecondsAgo = liveLastTs ? Math.max(0, Math.floor((Date.now() - liveLastTs) / 1000)) : null
+  void tick // tick solo dispara el re-render para recomputar liveIsFresh
 
   // Configurar el mapa para mostrar la ubicación en tiempo real de la alerta, actualizando el marcador y 
   // la vista del mapa cada vez que se actualiza la ubicación
@@ -258,6 +296,45 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
             </div>
           )}
         </div>
+
+        {alert.status === 'active' && (
+          <div className="bg-white rounded-xl border-2 border-red-300 overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+              <span className="relative flex h-3 w-3">
+                {liveIsFresh && (
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />
+                )}
+                <span className={`relative inline-flex rounded-full h-3 w-3 ${liveIsFresh ? 'bg-red-600' : 'bg-gray-300'}`} />
+              </span>
+              <p className="font-medium text-gray-800">
+                {liveIsFresh ? '🔴 Video EN VIVO' : 'Video en vivo'}
+              </p>
+              {liveIsFresh && liveSecondsAgo !== null && (
+                <span className="ml-auto text-xs text-gray-400">
+                  {liveSecondsAgo <= 1 ? 'ahora mismo' : `hace ${liveSecondsAgo}s`}
+                </span>
+              )}
+            </div>
+            <div className="bg-black">
+              {liveIsFresh && liveFrame ? (
+                <img
+                  src={liveFrame}
+                  alt="Transmisión en vivo de la emergencia"
+                  className="w-full object-contain"
+                  style={{ maxHeight: '360px' }}
+                />
+              ) : (
+                <div className="h-56 flex flex-col items-center justify-center gap-3 text-gray-300">
+                  <div className="w-6 h-6 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                  <p className="text-sm">Conectando con la cámara en vivo…</p>
+                  <p className="text-xs text-gray-500 px-6 text-center">
+                    Verás la imagen en cuanto la persona active su cámara.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {videoUrl && (
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
