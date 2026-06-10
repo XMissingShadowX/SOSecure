@@ -1,16 +1,34 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect } from 'react'
-import { CheckCircle, MapPin, AlertTriangle } from 'lucide-react'
+import { CheckCircle, MapPin, AlertTriangle, Home, Mic, Video, Download, Trash2, Loader2 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { sendAlarmNotification } from '@/lib/notifications'
+import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+
+interface StoredRecording {
+  id: string
+  recording_type: 'audio' | 'video'
+  public_url: string
+  duration_ms: number
+  created_at: string
+  latitude: number | null
+  longitude: number | null
+}
 
 export function AfterTab() {
-  const { nearbyIncidents } = useAppStore()
+  const { nearbyIncidents, contacts } = useAppStore()
   const [dangerZones, setDangerZones] = useState<{ lat: number; lng: number; count: number }[]>([])
   const [notifiedZoneCount, setNotifiedZoneCount] = useState(-1)
+  const [arrivedSent, setArrivedSent] = useState(false)
+  const [sendingArrived, setSendingArrived] = useState(false)
+  const [arrivedResult, setArrivedResult] = useState<{ internal: number; whatsapp: number } | null>(null)
+  const [recordings, setRecordings] = useState<StoredRecording[]>([])
+  const [loadingRecordings, setLoadingRecordings] = useState(true)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   useEffect(() => {
     const high = nearbyIncidents.filter(i => i.severity === 'high')
@@ -27,21 +45,230 @@ export function AfterTab() {
     }
   }, [nearbyIncidents])
 
+  useEffect(() => {
+    async function fetchRecordings() {
+      setLoadingRecordings(true)
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setLoadingRecordings(false); return }
+      const { data } = await supabase
+        .from('recordings')
+        .select('id, recording_type, public_url, duration_ms, created_at, latitude, longitude')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(20)
+      setRecordings(data ?? [])
+      setLoadingRecordings(false)
+    }
+    fetchRecordings()
+  }, [])
+
+  async function handleArrivedWell() {
+    if (!contacts.length || sendingArrived) return
+    setSendingArrived(true)
+
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const content = `✅ Llegué bien a mi destino — ${new Date().toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })}`
+
+    let internalCount = 0
+    let whatsappCount = 0
+
+    for (const contact of contacts) {
+      const email = (contact as any).email as string | undefined
+
+      // 1. Intentar por mensajería interna si el contacto tiene email registrado
+      if (user && email) {
+        const { data: receiverId } = await supabase.rpc('get_user_id_by_email', { p_email: email })
+        if (receiverId && receiverId !== user.id) {
+          const { error } = await supabase
+            .from('chat_messages')
+            .insert({ sender_id: user.id, receiver_id: receiverId, content, type: 'text' })
+          if (!error) {
+            await supabase
+              .from('chat_conversations')
+              .upsert(
+                { user_a: [user.id, receiverId].sort()[0], user_b: [user.id, receiverId].sort()[1], last_message: content, last_message_at: new Date().toISOString() },
+                { onConflict: 'user_a,user_b' }
+              )
+            internalCount++
+            continue
+          }
+        }
+      }
+
+      // 2. Fallback: WhatsApp si el contacto no está en SOSecure o falla el interno
+      const phone = contact.phone.replace(/\D/g, '')
+      if (phone) {
+        const waMsg = `${content}\n\nMensaje enviado automáticamente desde la app SOSecure.`
+        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(waMsg)}`, '_blank', 'noopener')
+        whatsappCount++
+        if (contacts.indexOf(contact) < contacts.length - 1) {
+          await new Promise(r => setTimeout(r, 600))
+        }
+      }
+    }
+
+    await sendAlarmNotification(
+      '✅ Llegaste bien',
+      internalCount > 0
+        ? `${internalCount} contacto${internalCount > 1 ? 's' : ''} notificado${internalCount > 1 ? 's' : ''} por SOSecure`
+        : `Abriendo WhatsApp para ${whatsappCount} contacto${whatsappCount > 1 ? 's' : ''}`
+    )
+
+    setSendingArrived(false)
+    setArrivedSent(true)
+    setArrivedResult({ internal: internalCount, whatsapp: whatsappCount })
+  }
+
+  async function handleDeleteRecording(rec: StoredRecording) {
+    setDeletingId(rec.id)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const ext = rec.public_url?.split('.').pop() ?? 'webm'
+      await supabase.storage.from('recordings').remove([`${user.id}/${rec.id}.${ext}`])
+      await supabase.from('recordings').delete().eq('id', rec.id)
+      setRecordings(prev => prev.filter(r => r.id !== rec.id))
+    }
+    setDeletingId(null)
+  }
+
+  function formatDuration(ms: number) {
+    const s = Math.floor(ms / 1000)
+    const m = Math.floor(s / 60)
+    return m > 0 ? `${m}m ${s % 60}s` : `${s}s`
+  }
+
   return (
     <div className="flex flex-col gap-6 pb-40">
       <Card className="border-safe/50 bg-safe/5">
-        <CardContent className="p-4 flex items-center gap-3">
-          <CheckCircle className="w-6 h-6 text-safe" />
-          <div>
-            <p className="font-semibold text-sm">Modo DESPUÉS</p>
-            <p className="text-xs text-muted-foreground">Seguimiento y protección post-incidente</p>
+        <CardContent className="flex items-center justify-center gap-3 py-2 px-3">
+          <CheckCircle className="w-5 h-5 shrink-0 text-safe" />
+          <div className="text-center">
+            <p className="font-semibold text-base">Modo DESPUÉS</p>
+            <p className="text-sm text-muted-foreground">Seguimiento y protección post-incidente</p>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Llegué bien */}
+      <Card>
+        <CardHeader className="pb-0">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Home className="w-5 h-5 text-safe" />
+            Notificar llegada
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Avisa a tus contactos que llegaste bien. Si tienen SOSecure, recibirán el mensaje en la app; de lo contrario se enviará por WhatsApp.
+          </p>
+          {arrivedSent && arrivedResult ? (
+            <div className="space-y-2">
+              {arrivedResult.internal > 0 && (
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-safe/10 text-safe text-sm font-medium">
+                  <CheckCircle className="w-4 h-4 shrink-0" />
+                  {arrivedResult.internal} contacto{arrivedResult.internal > 1 ? 's' : ''} notificado{arrivedResult.internal > 1 ? 's' : ''} por SOSecure
+                </div>
+              )}
+              {arrivedResult.whatsapp > 0 && (
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-muted text-muted-foreground text-sm">
+                  <CheckCircle className="w-4 h-4 shrink-0 text-safe" />
+                  {arrivedResult.whatsapp} contacto{arrivedResult.whatsapp > 1 ? 's' : ''} notificado{arrivedResult.whatsapp > 1 ? 's' : ''} por WhatsApp
+                </div>
+              )}
+            </div>
+          ) : (
+            <Button
+              className="w-full bg-safe hover:bg-safe/90 text-white"
+              disabled={sendingArrived || contacts.length === 0}
+              onClick={handleArrivedWell}
+            >
+              {sendingArrived ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Enviando...</>
+              ) : (
+                <>✅ Llegué bien</>
+              )}
+            </Button>
+          )}
+          {contacts.length === 0 && (
+            <p className="text-xs text-destructive">Agrega contactos de emergencia en la pestaña Inicio.</p>
+          )}
+          {arrivedSent && (
+            <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setArrivedSent(false)}>
+              Enviar de nuevo
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Grabaciones */}
+      <Card>
+        <CardHeader className="pb-0">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Video className="w-5 h-5 text-primary" />
+            Mis grabaciones
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loadingRecordings ? (
+            <div className="flex justify-center py-6">
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : recordings.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-4">
+              No tienes grabaciones almacenadas.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {recordings.map(rec => (
+                <div key={rec.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/40">
+                  {rec.recording_type === 'video'
+                    ? <Video className="w-4 h-4 text-primary shrink-0" />
+                    : <Mic className="w-4 h-4 text-primary shrink-0" />
+                  }
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium capitalize">{rec.recording_type}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(rec.created_at).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })}
+                      {rec.duration_ms > 0 && ` · ${formatDuration(rec.duration_ms)}`}
+                    </p>
+                    {rec.latitude && rec.longitude && (
+                      <p className="text-xs text-muted-foreground font-mono">
+                        {rec.latitude.toFixed(4)}, {rec.longitude.toFixed(4)}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <a href={rec.public_url} target="_blank" rel="noopener noreferrer" download>
+                      <Button variant="ghost" size="icon" className="h-7 w-7">
+                        <Download className="w-3.5 h-3.5" />
+                      </Button>
+                    </a>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive hover:text-destructive"
+                      disabled={deletingId === rec.id}
+                      onClick={() => handleDeleteRecording(rec)}
+                    >
+                      {deletingId === rec.id
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        : <Trash2 className="w-3.5 h-3.5" />
+                      }
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {dangerZones.length > 0 && (
         <Card className="border-warning bg-warning/10">
-          <CardHeader className="pb-3">
+          <CardHeader className="pb-0">
             <CardTitle className="flex items-center gap-2 text-base text-warning">
               <AlertTriangle className="w-5 h-5" />
               Alertas de Zona Peligrosa

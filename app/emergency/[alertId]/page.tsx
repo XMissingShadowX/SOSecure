@@ -11,7 +11,7 @@
 // Importar hooks de React, la función para crear un cliente de Supabase y componentes de UI
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { liveChannelName, type LiveFramePayload, type LiveStatusPayload } from '@/lib/live-stream'
+import { liveChannelName, type LiveFramePayload, type LiveStatusPayload, type VideoChunkPayload } from '@/lib/live-stream'
 import { Shield, MapPin, Clock, AlertTriangle } from 'lucide-react'
 import { use } from 'react'
 
@@ -30,7 +30,14 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
   // ── Video EN VIVO ────────────────────────────────────────────────
   const [liveFrame, setLiveFrame] = useState<string | null>(null)
   const [liveLastTs, setLiveLastTs] = useState<number | null>(null)
-  const [tick, setTick] = useState(0) // fuerza re-render para recalcular "frescura" del feed
+  const [liveMode, setLiveMode] = useState<'video' | 'jpeg' | null>(null)
+  const [tick, setTick] = useState(0)
+  const liveVideoRef  = useRef<HTMLVideoElement>(null)
+  const liveMsRef     = useRef<MediaSource | null>(null)
+  const liveSbRef     = useRef<SourceBuffer | null>(null)
+  const liveQueueRef  = useRef<ArrayBuffer[]>([])
+  const liveMimeRef   = useRef<string | null>(null)
+  const liveObjUrlRef = useRef<string | null>(null)
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
   const markerRef = useRef<any>(null)
@@ -109,38 +116,130 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
     return () => { clearInterval(interval); clearInterval(refreshVideo) }
   }, [alertId])
 
-  // Suscribirse al canal de Realtime para recibir los fotogramas EN VIVO que envía
-  // la persona en peligro desde su teléfono. Cada fotograma es una imagen JPEG (data URL).
+  // Suscribirse al canal Realtime para recibir video en vivo (MediaSource) o frames JPEG (fallback).
   useEffect(() => {
     const supabase = createClient()
+    let destroyed  = false
+
+    const snapToLiveEdge = () => {
+      const video = liveVideoRef.current
+      const sb    = liveSbRef.current
+      if (!video || !sb || sb.buffered.length === 0) return
+      const edge = sb.buffered.end(0)
+      const lag  = edge - video.currentTime
+      if (lag > 0.5) { video.currentTime = edge - 0.1; video.playbackRate = 1 }
+      else if (lag > 0.2) { video.playbackRate = 1.05 }
+      else { video.playbackRate = 1 }
+    }
+
+    const flushQueue = () => {
+      const sb = liveSbRef.current
+      if (!sb || sb.updating || liveQueueRef.current.length === 0) return
+      while (liveQueueRef.current.length > 3) liveQueueRef.current.shift()
+      try { sb.appendBuffer(liveQueueRef.current.shift()!) } catch { /* noop */ }
+    }
+
+    const onUpdateEnd = () => {
+      const sb = liveSbRef.current
+      if (!sb) return
+      if (sb.buffered.length > 0) {
+        const end = sb.buffered.end(0), start = sb.buffered.start(0)
+        if (end - start > 3) { try { sb.remove(start, end - 3) } catch { /* noop */ } }
+      }
+      snapToLiveEdge()
+      flushQueue()
+    }
+
+    const initMs = (mimeType: string) => {
+      const video = liveVideoRef.current
+      if (!video || !('MediaSource' in window)) return false
+      try {
+        if (!MediaSource.isTypeSupported(mimeType)) return false
+        const ms = new MediaSource()
+        liveMsRef.current = ms
+        const url = URL.createObjectURL(ms)
+        liveObjUrlRef.current = url
+        video.src = url
+        ms.addEventListener('sourceopen', () => {
+          if (destroyed) return
+          try {
+            const sb = ms.addSourceBuffer(mimeType)
+            sb.mode = 'segments'
+            liveSbRef.current = sb
+            sb.addEventListener('updateend', onUpdateEnd)
+            flushQueue()
+          } catch { /* noop */ }
+        })
+        return true
+      } catch { return false }
+    }
+
+    const appendChunk = (b64: string) => {
+      try {
+        const binary = atob(b64)
+        const bytes = new Uint8Array(binary.length)
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+        liveQueueRef.current.push(bytes.buffer)
+        flushQueue()
+        const video = liveVideoRef.current
+        if (video && video.paused) video.play().catch(() => {})
+      } catch { /* noop */ }
+    }
+
     const channel = supabase
       .channel(liveChannelName(alertId), { config: { broadcast: { self: false } } })
+      .on('broadcast', { event: 'status' }, ({ payload }) => {
+        const p = payload as LiveStatusPayload
+        if (!p) return
+        if (p.live === false) { setLiveLastTs(0); return }
+        setLiveLastTs(Date.now())
+        setLiveMode(p.mode)
+        if (p.mode === 'video' && p.mimeType && !liveMimeRef.current) {
+          liveMimeRef.current = p.mimeType
+          initMs(p.mimeType)
+        }
+      })
+      .on('broadcast', { event: 'video_chunk' }, ({ payload }) => {
+        const p = payload as VideoChunkPayload
+        setLiveLastTs(Date.now())
+        setLiveMode('video')
+        if (!liveMimeRef.current) return
+        if (p.seq === 0 && !liveSbRef.current) {
+          initMs(liveMimeRef.current)
+          setTimeout(() => appendChunk(p.chunk), 30)
+        } else {
+          appendChunk(p.chunk)
+        }
+      })
       .on('broadcast', { event: 'frame' }, ({ payload }) => {
         const p = payload as LiveFramePayload
         if (p?.img) {
           setLiveFrame(p.img)
           setLiveLastTs(p.ts ?? Date.now())
+          setLiveMode('jpeg')
         }
-      })
-      .on('broadcast', { event: 'status' }, ({ payload }) => {
-        const p = payload as LiveStatusPayload
-        if (p && p.live === false) setLiveLastTs(0) // transmisión terminada
       })
       .subscribe()
 
-    // Recalcular cada 2s si el feed sigue "fresco" (llegó un fotograma reciente).
     const freshness = setInterval(() => setTick((t) => t + 1), 2000)
 
     return () => {
+      destroyed = true
       clearInterval(freshness)
       try { supabase.removeChannel(channel) } catch { /* noop */ }
+      const ms = liveMsRef.current
+      if (ms && ms.readyState === 'open') { try { ms.endOfStream() } catch { /* noop */ } }
+      if (liveObjUrlRef.current) { URL.revokeObjectURL(liveObjUrlRef.current); liveObjUrlRef.current = null }
+      const video = liveVideoRef.current
+      if (video) { video.pause(); video.src = '' }
+      liveMsRef.current = null; liveSbRef.current = null; liveQueueRef.current = []; liveMimeRef.current = null
     }
   }, [alertId])
 
-  // El feed se considera EN VIVO si llegó un fotograma en los últimos 8 segundos.
-  const liveIsFresh = !!liveFrame && !!liveLastTs && Date.now() - liveLastTs < 8000
+  // El feed se considera EN VIVO si llegó datos en los últimos 8 segundos.
+  const liveIsFresh = !!liveLastTs && liveLastTs > 0 && Date.now() - liveLastTs < 8000
   const liveSecondsAgo = liveLastTs ? Math.max(0, Math.floor((Date.now() - liveLastTs) / 1000)) : null
-  void tick // tick solo dispara el re-render para recomputar liveIsFresh
+  void tick
 
   // Configurar el mapa para mostrar la ubicación en tiempo real de la alerta, actualizando el marcador y 
   // la vista del mapa cada vez que se actualiza la ubicación
@@ -316,22 +415,33 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
               )}
             </div>
             <div className="bg-black">
-              {liveIsFresh && liveFrame ? (
+              {/* Video real via MediaSource */}
+              <video
+                ref={liveVideoRef}
+                autoPlay
+                muted
+                playsInline
+                className={`w-full object-contain ${liveMode === 'video' && liveIsFresh ? 'block' : 'hidden'}`}
+                style={{ maxHeight: '360px' }}
+              />
+              {/* Fallback JPEG */}
+              {liveMode === 'jpeg' && liveIsFresh && liveFrame ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={liveFrame}
                   alt="Transmisión en vivo de la emergencia"
                   className="w-full object-contain"
                   style={{ maxHeight: '360px' }}
                 />
-              ) : (
+              ) : liveMode !== 'video' || !liveIsFresh ? (
                 <div className="h-56 flex flex-col items-center justify-center gap-3 text-gray-300">
                   <div className="w-6 h-6 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
                   <p className="text-sm">Conectando con la cámara en vivo…</p>
                   <p className="text-xs text-gray-500 px-6 text-center">
-                    Verás la imagen en cuanto la persona active su cámara.
+                    Verás el video en cuanto la persona active su cámara.
                   </p>
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
         )}

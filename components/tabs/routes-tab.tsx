@@ -1,4 +1,4 @@
-/*
+﻿/*
   Este código define el componente `RoutesTab`, que es una interfaz para planear rutas seguras utilizando la ubicación 
   actual del usuario y un destino ingresado. El componente utiliza la geolocalización para obtener la ubicación del 
   usuario, permite buscar destinos utilizando la API de Photon, muestra sugerencias de autocompletado, y luego muestra 
@@ -250,7 +250,7 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
   return (
     <div className="flex flex-col gap-4">
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <Navigation className="w-5 h-5 text-primary" />
             Planear Ruta Segura

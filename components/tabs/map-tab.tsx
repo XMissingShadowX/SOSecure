@@ -1,4 +1,4 @@
-/*
+﻿/*
   Componente principal para la pestaña de mapa, que muestra un mapa interactivo con los incidentes reportados 
   cerca del usuario, permite reportar nuevos incidentes, editar o eliminar los propios, y aplicar filtros para 
   visualizar solo ciertos tipos o severidades de incidentes. 
@@ -585,7 +585,7 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
 
       {/* ── Incidentes recientes — flex-none, scroll interno ── */}
       <Card className="flex-none">
-        <CardHeader className="py-3">
+        <CardHeader className="pb-0">
           <CardTitle className="text-sm flex items-center justify-between">
             Incidentes Recientes
             <Badge variant="secondary" className="!text-black dark:!text-white">{filteredIncidents.length}</Badge>

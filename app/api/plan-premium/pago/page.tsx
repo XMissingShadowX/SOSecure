@@ -1,15 +1,15 @@
 /*
-  Página WEB de pago del Plan Familiar — /plan-familiar/pago
+  Página WEB de pago del Plan Premium — /plan-premium/pago
   Es la "ventana de método de pago" en formato web. Funciona dentro de la
   misma app (la sesión de Supabase se comparte) y también abierta directo
   en un navegador.
 
   Flujo:
-   1) Muestra el resumen del plan y los 5 cupos de la familia.
-   2) "Pagar" -> /api/family/checkout (create-session):
+   1) Muestra el resumen del plan premium y sus funciones.
+   2) "Pagar" -> /api/premium/checkout (create-session):
         - Si hay Mercado Pago / Stripe configurado -> redirige a su checkout.
         - Si no hay pasarela -> abre el formulario DEMO (para la presentación).
-   3) Al volver del proveedor (?status=success) confirma que el plan quedó activo.
+   3) Al volver del proveedor (?status=success) confirma que quedó activo.
 
   Estilos autocontenidos (prefijo .pf-) para no depender del tema de la app.
 */
@@ -18,15 +18,13 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { FAMILY_PLAN, formatAmount } from '@/lib/plan-config'
-import { ensureOwnedGroup, getOwnedGroup, listMembers, type FamilyMember } from '@/lib/family'
-import { Shield } from 'lucide-react'
+import { PREMIUM_PLAN, formatAmount } from '@/lib/plan-config'
+import { getSubscription, ensureSubscription } from '@/lib/premium'
 
 type View = 'loading' | 'auth' | 'checkout' | 'success'
 
-export default function PagoPlanFamiliarPage() {
+export default function PagoPlanPremiumPage() {
   const [view, setView] = useState<View>('loading')
-  const [members, setMembers] = useState<FamilyMember[]>([])
   const [demoOpen, setDemoOpen] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -45,22 +43,21 @@ export default function PagoPlanFamiliarPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setView('auth'); return }
 
-      const group = await ensureOwnedGroup()
-      if (group) setMembers(await listMembers(group.id))
+      const sub = await ensureSubscription()
 
       // ¿Regresó del proveedor? Verificar si ya quedó activo.
       if (statusParam === 'success') {
-        let active = group?.status === 'active'
+        let active = sub?.status === 'active'
         for (let i = 0; i < 5 && !active; i++) {
           await new Promise(r => setTimeout(r, 1500))
-          const g = await getOwnedGroup()
-          active = g?.status === 'active'
-          if (active) setPeriodEnd(g?.current_period_end ?? null)
+          const s = await getSubscription()
+          active = s?.status === 'active'
+          if (active) setPeriodEnd(s?.current_period_end ?? null)
         }
         if (active) { setView('success'); return }
       }
-      if (group?.status === 'active') {
-        setPeriodEnd(group.current_period_end)
+      if (sub?.status === 'active') {
+        setPeriodEnd(sub.current_period_end)
         setView('success'); return
       }
 
@@ -70,13 +67,10 @@ export default function PagoPlanFamiliarPage() {
     init().catch(() => { setError('No se pudo cargar el plan'); setView('checkout') })
   }, [])
 
-  const usedSlots = members.length
-  const freeSlots = Math.max(0, FAMILY_PLAN.maxMembers - usedSlots)
-
   const payWithProvider = async () => {
     setProcessing(true); setError(null)
     try {
-      const res = await fetch('/api/family/checkout', {
+      const res = await fetch('/api/premium/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'create-session' }),
@@ -101,7 +95,7 @@ export default function PagoPlanFamiliarPage() {
     }
     setProcessing(true); setError(null)
     try {
-      const res = await fetch('/api/family/checkout', {
+      const res = await fetch('/api/premium/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'activate' }),
@@ -125,7 +119,7 @@ export default function PagoPlanFamiliarPage() {
 
       <header className="pf-top">
         <div className="pf-brand">
-          <Shield className="w-6 h-6 text-primary" />
+          <span className="pf-shield" aria-hidden>🛡️</span>
           <span className="pf-brand-name">SOSecure</span>
         </div>
         <span className="pf-secure">🔒 Pago cifrado</span>
@@ -139,7 +133,7 @@ export default function PagoPlanFamiliarPage() {
         <main className="pf-main pf-center">
           <div className="pf-card pf-narrow">
             <h1 className="pf-h1">Inicia sesión para continuar</h1>
-            <p className="pf-sub">Necesitas tu cuenta de SOSecure para contratar el plan familiar.</p>
+            <p className="pf-sub">Necesitas tu cuenta de SOSecure para activar el plan premium.</p>
             <a className="pf-btn pf-btn-primary" href="/auth/login/">Iniciar sesión</a>
             <a className="pf-btn pf-btn-ghost" href="/auth/sign-up/">Crear cuenta</a>
           </div>
@@ -150,41 +144,26 @@ export default function PagoPlanFamiliarPage() {
         <main className="pf-main pf-grid">
           {/* Resumen del plan */}
           <section className="pf-card">
-            <span className="pf-eyebrow">Suscripción anual</span>
-            <h1 className="pf-h1">{FAMILY_PLAN.name}</h1>
-            <p className="pf-tagline">{FAMILY_PLAN.tagline}</p>
+            <span className="pf-eyebrow">★ Premium · Individual</span>
+            <h1 className="pf-h1">{PREMIUM_PLAN.name}</h1>
+            <p className="pf-tagline">{PREMIUM_PLAN.tagline}</p>
 
             <div className="pf-price">
-              <span className="pf-amount">{formatAmount(FAMILY_PLAN.amountCents)}</span>
-              <span className="pf-per">/ {FAMILY_PLAN.period}</span>
+              <span className="pf-amount">{formatAmount(PREMIUM_PLAN.amountCents)}</span>
+              <span className="pf-per">/ {PREMIUM_PLAN.period}</span>
             </div>
 
             <ul className="pf-benefits">
-              {FAMILY_PLAN.benefits.map((b, i) => (
+              {PREMIUM_PLAN.benefits.map((b, i) => (
                 <li key={i}><span className="pf-check">✓</span>{b}</li>
               ))}
             </ul>
 
-            {/* Firma visual: los 5 cupos de la familia */}
-            <div className="pf-slots-label">Tu familia protegida ({usedSlots}/{FAMILY_PLAN.maxMembers})</div>
-            <div className="pf-slots">
-              {Array.from({ length: FAMILY_PLAN.maxMembers }).map((_, i) => {
-                const m = members[i]
-                return (
-                  <div key={i} className={`pf-slot ${m ? 'pf-slot-filled' : ''}`}>
-                    {m
-                      ? <span className="pf-slot-initial">{(m.name || m.email || '?').charAt(0).toUpperCase()}</span>
-                      : <span className="pf-slot-plus">+</span>}
-                    <span className="pf-slot-tag">
-                      {m ? (m.role === 'owner' ? 'Titular' : (m.name || 'Miembro')) : 'Cupo libre'}
-                    </span>
-                  </div>
-                )
-              })}
+            <div className="pf-badge-row">
+              <span className="pf-badge">★ Asistente</span>
+              <span className="pf-badge">◐ Modo discreto</span>
+              <span className="pf-badge">👥 10 contactos</span>
             </div>
-            {freeSlots > 0 && (
-              <p className="pf-hint">Podrás invitar a {freeSlots} {freeSlots === 1 ? 'persona más' : 'personas más'} desde Ajustes.</p>
-            )}
           </section>
 
           {/* Método de pago */}
@@ -194,7 +173,7 @@ export default function PagoPlanFamiliarPage() {
             {!demoOpen && (
               <>
                 <button className="pf-btn pf-btn-primary" onClick={payWithProvider} disabled={processing}>
-                  {processing ? 'Redirigiendo…' : `Pagar ${formatAmount(FAMILY_PLAN.amountCents)}`}
+                  {processing ? 'Redirigiendo…' : `Pagar ${formatAmount(PREMIUM_PLAN.amountCents)}`}
                 </button>
                 <p className="pf-methods">Tarjeta · OXXO · SPEI · transferencia</p>
                 <p className="pf-redirect-note">
@@ -236,7 +215,7 @@ export default function PagoPlanFamiliarPage() {
                 </div>
 
                 <button className="pf-btn pf-btn-primary" onClick={payDemo} disabled={processing}>
-                  {processing ? 'Procesando…' : `Pagar ${formatAmount(FAMILY_PLAN.amountCents)}`}
+                  {processing ? 'Procesando…' : `Pagar ${formatAmount(PREMIUM_PLAN.amountCents)}`}
                 </button>
                 <button className="pf-link" onClick={() => setDemoOpen(false)}>Volver</button>
               </div>
@@ -252,12 +231,11 @@ export default function PagoPlanFamiliarPage() {
         <main className="pf-main pf-center">
           <div className="pf-card pf-narrow pf-success">
             <div className="pf-success-icon">✓</div>
-            <h1 className="pf-h1">¡Plan familiar activado!</h1>
+            <h1 className="pf-h1">¡Premium activado!</h1>
             <p className="pf-sub">
-              Ya puedes proteger hasta {FAMILY_PLAN.maxMembers} personas.
+              Ya tienes el asistente con IA, el modo discreto y hasta {PREMIUM_PLAN.features.maxContacts} contactos de emergencia.
               {periodEnd && <> Tu plan es válido hasta el <strong>{formatDate(periodEnd)}</strong>.</>}
             </p>
-            <p className="pf-sub">Invita a tu familia desde <strong>Ajustes → Plan Familiar</strong>.</p>
             <a className="pf-btn pf-btn-primary" href="/">Volver a SOSecure</a>
           </div>
         </main>
@@ -300,14 +278,8 @@ const CSS = `
 .pf-benefits{list-style:none;padding:0;margin:0 0 22px;display:grid;gap:11px;}
 .pf-benefits li{display:flex;gap:10px;font-size:14.5px;line-height:1.45;color:#d3eae6;}
 .pf-check{color:#0b1110;background:#2dd4bf;min-width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;margin-top:1px;}
-.pf-slots-label{font-size:12.5px;color:#9fc6c0;font-weight:600;margin-bottom:10px;}
-.pf-slots{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
-.pf-slot{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px;border-radius:12px;border:1px dashed rgba(159,198,192,.3);}
-.pf-slot-filled{border-style:solid;border-color:rgba(45,212,191,.5);background:rgba(45,212,191,.08);}
-.pf-slot-initial{width:34px;height:34px;border-radius:50%;background:#2dd4bf;color:#06201c;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;}
-.pf-slot-plus{width:34px;height:34px;border-radius:50%;border:1px dashed rgba(159,198,192,.5);display:flex;align-items:center;justify-content:center;font-size:18px;color:#9fc6c0;}
-.pf-slot-tag{font-size:10px;color:#9fc6c0;text-align:center;line-height:1.1;}
-.pf-hint{font-size:12.5px;color:#9fc6c0;margin:14px 0 0;}
+.pf-badge-row{display:flex;flex-wrap:wrap;gap:8px;}
+.pf-badge{font-size:12px;font-weight:600;color:#5eead4;background:rgba(45,212,191,.1);border:1px solid rgba(94,234,212,.25);padding:6px 11px;border-radius:999px;}
 .pf-btn{display:block;width:100%;text-align:center;padding:14px 18px;border-radius:12px;font-size:15.5px;font-weight:700;cursor:pointer;border:none;text-decoration:none;margin-top:6px;transition:transform .06s,opacity .2s;}
 .pf-btn:active{transform:scale(.99);}
 .pf-btn:disabled{opacity:.6;cursor:default;}

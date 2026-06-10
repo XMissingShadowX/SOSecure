@@ -153,13 +153,15 @@ export function MedicTab() {
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] pb-24">
       <Card className="mb-4 border-primary/30 bg-primary/5">
-        <CardContent className="p-3 flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 text-primary flex-shrink-0" />
-          <p className="text-sm">
-            <strong>¿Crisis emocional?</strong>{' '}
-            <a href="tel:5552598121" className="text-primary underline font-bold">SAPTEL: 55 5259-8121</a>{' '}
-            (24 horas, gratis)
-          </p>
+        <CardContent className="flex items-center justify-center gap-3 py-2 px-3">
+          <AlertCircle className="w-5 h-5 text-primary shrink-0" />
+          <div className="text-center">
+            <p className="text-base font-semibold">¿Crisis emocional?</p>
+            <p className="text-sm text-muted-foreground">
+              <a href="tel:5552598121" className="text-primary underline font-bold">SAPTEL: 55 5259-8121</a>
+              {' · '}24 horas · gratis
+            </p>
+          </div>
         </CardContent>
       </Card>
 

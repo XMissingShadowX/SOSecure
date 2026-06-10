@@ -13,12 +13,14 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   MessageCircle, X, Send, MapPin, AlertTriangle, Phone,
-  Bot, Loader2, Shield, ChevronLeft, Sparkles, UserCircle2, WifiOff, FileVideo, FileAudio, Video
+  Bot, Loader2, Shield, ChevronLeft, Sparkles, UserCircle2, WifiOff, FileVideo, FileAudio, Video, Radio, Camera
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/lib/supabase/client'
+import { liveChannelName } from '@/lib/live-stream'
+import type { LiveFramePayload, LiveStatusPayload, VideoChunkPayload } from '@/lib/live-stream'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -43,9 +45,10 @@ interface ChatMsg {
   loading?: boolean
 }
 
-// ─── ID especial para el asistente IA ────────────────────────────────────────
+// ─── IDs especiales ───────────────────────────────────────────────────────────
 
 const AI_ID = '__safewalk_ai__'
+const LIVE_ID = '__live_sos__'
 
 // ─── Renderizador de mensajes multimedia ──────────────────────────────────────
 
@@ -74,6 +77,225 @@ function MediaMessage({ text, isMe, timestamp }: { text: string; isMe: boolean; 
       <p className={`text-xs ${isMe ? 'text-primary-foreground/60' : 'text-muted-foreground'}`}>
         {new Date(timestamp).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
       </p>
+    </div>
+  )
+}
+
+// ─── Visualizador de transmisión en vivo ──────────────────────────────────────
+
+/*
+  Estrategia de máxima fluidez en el receptor:
+  - "Live-edge seeking": tras cada appendBuffer, si el video está > 0.5 s atrás
+    del borde del buffer, salta instantáneamente al frente.
+  - playbackRate = 1.05 cuando el retraso es 0.2-0.5 s (alcanza el borde sin salto brusco).
+  - Buffer recortado a los últimos 3 s para evitar acumulación de memoria.
+  - Cola de chunks: si se acumulan > 3 sin procesar (red lenta), descarta los viejos.
+*/
+
+const LIVE_EDGE_JUMP    = 0.5   // segundos de retraso antes de saltar al frente
+const LIVE_EDGE_CATCHUP = 0.2   // segundos de retraso antes de acelerar playbackRate
+const BUFFER_KEEP_S     = 3     // segundos de buffer a conservar
+
+function LiveStreamViewer({ alertId }: { alertId: string }) {
+  const videoRef     = useRef<HTMLVideoElement>(null)
+  const msRef        = useRef<MediaSource | null>(null)
+  const sbRef        = useRef<SourceBuffer | null>(null)
+  const queueRef     = useRef<ArrayBuffer[]>([])
+  const mimeRef      = useRef<string | null>(null)
+  const objectUrlRef = useRef<string | null>(null)
+
+  const [isLive,   setIsLive]   = useState(false)
+  const [mode,     setMode]     = useState<'video' | 'jpeg' | null>(null)
+  const [jpgFrame, setJpgFrame] = useState<string | null>(null)
+  const [waiting,  setWaiting]  = useState(true)
+
+  useEffect(() => {
+    const supabase = createClient()
+    let destroyed  = false
+
+    // ── live-edge seeking ────────────────────────────────────────────────────
+    const snapToLiveEdge = () => {
+      const video = videoRef.current
+      const sb    = sbRef.current
+      if (!video || !sb || sb.buffered.length === 0) return
+      const edge = sb.buffered.end(0)
+      const lag  = edge - video.currentTime
+      if (lag > LIVE_EDGE_JUMP) {
+        video.currentTime = edge - 0.1
+        video.playbackRate = 1
+      } else if (lag > LIVE_EDGE_CATCHUP) {
+        video.playbackRate = 1.05
+      } else {
+        video.playbackRate = 1
+      }
+    }
+
+    // ── flush de la cola de chunks ───────────────────────────────────────────
+    const flushQueue = () => {
+      const sb = sbRef.current
+      if (!sb || sb.updating || queueRef.current.length === 0) return
+
+      // Si la cola crece demasiado (red lenta), descartar chunks viejos.
+      while (queueRef.current.length > 3) queueRef.current.shift()
+
+      try {
+        sb.appendBuffer(queueRef.current.shift()!)
+      } catch { /* noop */ }
+    }
+
+    // ── después de cada append: recortar buffer + snap al borde ─────────────
+    const onUpdateEnd = () => {
+      const sb = sbRef.current
+      if (!sb) return
+      // Recortar buffer antiguo.
+      if (sb.buffered.length > 0) {
+        const end = sb.buffered.end(0)
+        const start = sb.buffered.start(0)
+        if (end - start > BUFFER_KEEP_S) {
+          try { sb.remove(start, end - BUFFER_KEEP_S) } catch { /* noop */ }
+        }
+      }
+      snapToLiveEdge()
+      flushQueue()
+    }
+
+    // ── inicializar MediaSource ──────────────────────────────────────────────
+    const initMediaSource = (mimeType: string): boolean => {
+      const video = videoRef.current
+      if (!video || !('MediaSource' in window)) return false
+      try {
+        if (!MediaSource.isTypeSupported(mimeType)) return false
+        const ms  = new MediaSource()
+        msRef.current = ms
+        const url = URL.createObjectURL(ms)
+        objectUrlRef.current = url
+        video.src = url
+        ms.addEventListener('sourceopen', () => {
+          if (destroyed) return
+          try {
+            const sb = ms.addSourceBuffer(mimeType)
+            // mode=segments es obligatorio para streams vivos.
+            sb.mode = 'segments'
+            sbRef.current = sb
+            sb.addEventListener('updateend', onUpdateEnd)
+            flushQueue()
+          } catch { /* noop */ }
+        })
+        return true
+      } catch { return false }
+    }
+
+    // ── decodificar base64 y encolar ─────────────────────────────────────────
+    const appendChunk = (b64: string) => {
+      try {
+        const binary = atob(b64)
+        const bytes  = new Uint8Array(binary.length)
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+        queueRef.current.push(bytes.buffer)
+        flushQueue()
+        const video = videoRef.current
+        if (video && video.paused) video.play().catch(() => {})
+      } catch { /* noop */ }
+    }
+
+    // ── suscripción al canal ─────────────────────────────────────────────────
+    const channel = supabase
+      .channel(liveChannelName(alertId), { config: { broadcast: { ack: false } } })
+      .on('broadcast', { event: 'status' }, ({ payload }) => {
+        const p = payload as LiveStatusPayload
+        setIsLive(p.live)
+        if (!p.live) return
+        setWaiting(false)
+        setMode(p.mode)
+        if (p.mode === 'video' && p.mimeType && !mimeRef.current) {
+          mimeRef.current = p.mimeType
+          initMediaSource(p.mimeType)
+        }
+      })
+      .on('broadcast', { event: 'video_chunk' }, ({ payload }) => {
+        const p = payload as VideoChunkPayload
+        setIsLive(true)
+        setWaiting(false)
+        setMode('video')
+
+        // Si status aún no llegó pero el primer chunk trae mimeType, usarlo.
+        if (!mimeRef.current && p.mimeType) {
+          mimeRef.current = p.mimeType
+        }
+        if (!mimeRef.current) return
+
+        if (p.seq === 0 && !sbRef.current) {
+          // Encolar el chunk ANTES de initMediaSource; sourceopen lo procesará.
+          const binary = atob(p.chunk)
+          const bytes  = new Uint8Array(binary.length)
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+          queueRef.current.unshift(bytes.buffer) // al frente: es la cabecera
+          initMediaSource(mimeRef.current)
+        } else {
+          appendChunk(p.chunk)
+        }
+      })
+      .on('broadcast', { event: 'frame' }, ({ payload }) => {
+        const p = payload as LiveFramePayload
+        setIsLive(true)
+        setWaiting(false)
+        setMode('jpeg')
+        setJpgFrame(p.img)
+      })
+      .subscribe()
+
+    return () => {
+      destroyed = true
+      supabase.removeChannel(channel)
+      const ms = msRef.current
+      if (ms && ms.readyState === 'open') { try { ms.endOfStream() } catch { /* noop */ } }
+      if (objectUrlRef.current) { URL.revokeObjectURL(objectUrlRef.current); objectUrlRef.current = null }
+      const video = videoRef.current
+      if (video) { video.pause(); video.playbackRate = 1; video.src = '' }
+      msRef.current = null; sbRef.current = null; queueRef.current = []; mimeRef.current = null
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alertId])
+
+  // ── Estado "esperando" ───────────────────────────────────────────────────
+  if (waiting) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-12 text-muted-foreground">
+        <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
+          <Radio className="w-8 h-8 text-destructive animate-pulse" />
+        </div>
+        <div className="text-center">
+          <p className="text-sm font-medium text-foreground">Esperando transmisión…</p>
+          <p className="text-xs mt-1">El video aparecerá en cuanto la cámara comience a enviar.</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-2 px-1">
+      <div className="relative rounded-xl overflow-hidden bg-black">
+        <div className={`absolute top-2 left-2 z-10 flex items-center gap-1 text-white text-xs px-2 py-0.5 rounded-full font-semibold ${isLive ? 'bg-destructive' : 'bg-black/60'}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-white animate-pulse' : 'bg-gray-400'}`} />
+          {isLive ? 'EN VIVO' : 'Transmisión terminada'}
+        </div>
+
+        {/* Video real (MediaSource) */}
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          playsInline
+          className={`w-full rounded-xl object-cover max-h-72 ${mode === 'video' ? 'block' : 'hidden'}`}
+          style={{ background: '#000' }}
+        />
+
+        {/* Fallback JPEG */}
+        {mode === 'jpeg' && jpgFrame && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={jpgFrame} alt="Transmisión en vivo" className="w-full rounded-xl object-cover max-h-72" />
+        )}
+      </div>
     </div>
   )
 }
@@ -120,7 +342,7 @@ Nunca te presentes como "Claude".`
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export function EmergencyChat() {
-  const { contacts, currentLocation, sosActive } = useAppStore()
+  const { contacts, currentLocation, sosActive, sosAlert } = useAppStore()
   const supabase = createClient()
 
   const [open, setOpen] = useState(false)
@@ -428,9 +650,11 @@ export function EmergencyChat() {
 
   const SOS_REC_ID = '__local_sos__'
   const hasLocalRecs = messages.some(m => m.contactId === SOS_REC_ID)
+  const isLiveItem = activeId === LIVE_ID
 
   const allItems = [
     { id: AI_ID, name: 'SOSecure AI', subtitle: 'Consejos de seguridad y emergencias', isAI: true },
+    ...(sosActive && sosAlert ? [{ id: LIVE_ID, name: '🔴 Transmisión en vivo', subtitle: 'Video de cámara en tiempo real — SOS activo', isAI: false, isLive: true, alertId: sosAlert.id }] : []),
     ...(hasLocalRecs ? [{ id: SOS_REC_ID, name: 'Mis grabaciones SOS', subtitle: 'Grabaciones automáticas de emergencia', isAI: false, isSosRec: true }] : []),
     ...primaryContacts.map(c => {
       const email = (c as any).email as string | undefined
@@ -476,6 +700,8 @@ export function EmergencyChat() {
           <div className="flex items-center gap-2 min-w-0">
             {isAIActive ? (
               <Sparkles className="w-5 h-5 text-primary flex-shrink-0" />
+            ) : isLiveItem ? (
+              <Camera className="w-5 h-5 text-destructive flex-shrink-0" />
             ) : activeContact ? (
               <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
                 <span className="text-primary font-bold text-xs">{activeContact.name.charAt(0).toUpperCase()}</span>
@@ -484,17 +710,18 @@ export function EmergencyChat() {
               <MessageCircle className="w-5 h-5 text-primary flex-shrink-0" />
             )}
             <span className="font-semibold text-sm truncate">
-              {isAIActive ? 'SOSecure AI' : activeContact ? activeContact.name : 'Chat'}
+              {isAIActive ? 'SOSecure AI' : isLiveItem ? 'Transmisión en vivo' : activeContact ? activeContact.name : 'Chat'}
             </span>
             {isAIActive && <Badge variant="outline" className="text-xs border-primary/40 text-primary flex-shrink-0">IA</Badge>}
-            {activeContact && !isAIActive && (
+            {isLiveItem && <Badge variant="destructive" className="text-xs animate-pulse flex-shrink-0 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-white" />EN VIVO</Badge>}
+            {activeContact && !isAIActive && !isLiveItem && (
               activeHasAccount === false
                 ? <Badge variant="outline" className="text-xs text-muted-foreground flex-shrink-0"><WifiOff className="w-2.5 h-2.5 mr-1 inline" />Sin cuenta</Badge>
                 : activeHasAccount
                   ? <Badge variant="outline" className="text-xs text-green-600 border-green-500/40 flex-shrink-0">En SOSecure</Badge>
                   : <Badge variant="outline" className="text-xs flex-shrink-0">…</Badge>
             )}
-            {sosActive && <Badge variant="destructive" className="text-xs animate-pulse flex-shrink-0">SOS</Badge>}
+            {sosActive && !isLiveItem && <Badge variant="destructive" className="text-xs animate-pulse flex-shrink-0">SOS</Badge>}
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
             {activeId && (
@@ -519,12 +746,14 @@ export function EmergencyChat() {
                   onClick={() => openChat(item.id)}
                   className="w-full flex items-center gap-3 p-3 rounded-xl bg-muted/40 hover:bg-muted/80 active:scale-[0.98] transition-all text-left"
                 >
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${(item as any).isSosRec ? 'bg-destructive/20' : 'bg-primary/20'}`}>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${(item as any).isLive ? 'bg-destructive/20 ring-2 ring-destructive animate-pulse' : (item as any).isSosRec ? 'bg-destructive/20' : 'bg-primary/20'}`}>
                     {item.isAI
                       ? <Shield className="w-5 h-5 text-primary" />
-                      : (item as any).isSosRec
-                        ? <Video className="w-5 h-5 text-destructive" />
-                        : <span className="text-primary font-bold text-sm">{item.name.charAt(0).toUpperCase()}</span>
+                      : (item as any).isLive
+                        ? <Camera className="w-5 h-5 text-destructive" />
+                        : (item as any).isSosRec
+                          ? <Video className="w-5 h-5 text-destructive" />
+                          : <span className="text-primary font-bold text-sm">{item.name.charAt(0).toUpperCase()}</span>
                     }
                   </div>
                   <div className="flex-1 min-w-0">
@@ -548,7 +777,12 @@ export function EmergencyChat() {
         {activeId && (
           <>
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              {convoMessages.length === 0 && !isAIActive && (
+              {/* Vista de transmisión en vivo */}
+              {isLiveItem && sosAlert && (
+                <LiveStreamViewer alertId={sosAlert.id} />
+              )}
+
+              {!isLiveItem && convoMessages.length === 0 && !isAIActive && (
                 <p className="text-xs text-muted-foreground text-center pt-4">
                   {activeHasAccount
                     ? `Escribe para chatear con ${activeContact?.name ?? 'este contacto'} dentro de SOSecure`
@@ -595,7 +829,8 @@ export function EmergencyChat() {
               <div ref={bottomRef} />
             </div>
 
-            {/* Acciones rápidas */}
+            {/* Acciones rápidas — ocultas en vista de transmisión en vivo */}
+            {!isLiveItem && (
             <div className="flex gap-2 px-3 pt-2 flex-shrink-0 flex-wrap">
               <button
                 onClick={() => handleSend('location')}
@@ -620,8 +855,10 @@ export function EmergencyChat() {
               </a>
           )}
             </div>
+            )}
 
-            {/* Input */}
+            {/* Input — oculto en vista de transmisión en vivo */}
+            {!isLiveItem && (
             <div className="flex items-center gap-2 p-3 border-t border-border flex-shrink-0">
               <input
                 ref={inputRef}
@@ -649,6 +886,7 @@ export function EmergencyChat() {
                 }
               </Button>
             </div>
+            )}
           </>
         )}
       </div>

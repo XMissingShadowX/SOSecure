@@ -1,4 +1,4 @@
-/*
+﻿/*
   Este archivo define el componente HomeTab, que es una de las pestañas principales de la aplicación SOSecure. 
   En esta pestaña, los usuarios pueden ver su ubicación actual, gestionar sus contactos de emergencia, y administrar 
   sus lugares frecuentes. El componente utiliza varios hooks personalizados para obtener la geolocalización del
@@ -275,27 +275,46 @@ export function HomeTab() {
     <div className="flex flex-col gap-6 pb-40">
       {/* Status Banner */}
       <Card className={cn("border-2", nearbyDangerCount > 0 ? "border-warning bg-warning/10" : "border-safe bg-safe/10")}>
-        <CardContent className="flex items-center gap-4 p-4">
-          <div className={cn("p-3 rounded-full", nearbyDangerCount > 0 ? "bg-warning/20" : "bg-safe/20")}>
-            <Shield className={cn("w-8 h-8", nearbyDangerCount > 0 ? "text-warning" : "text-safe")} />
-          </div>
-          <div className="flex-1">
-            <h2 className={cn("font-semibold text-lg", nearbyDangerCount > 0 ? "text-warning" : "text-safe")}>
+        <CardContent className="flex items-center justify-center gap-3 py-2 px-3">
+          <Shield className={cn("w-5 h-5 shrink-0", nearbyDangerCount > 0 ? "text-warning" : "text-safe")} />
+          <div className="text-center">
+            <p className={cn("font-semibold text-base", nearbyDangerCount > 0 ? "text-warning" : "text-safe")}>
               {nearbyDangerCount > 0 ? `${nearbyDangerCount} Alerta${nearbyDangerCount > 1 ? 's' : ''} Cercana${nearbyDangerCount > 1 ? 's' : ''}` : 'Zona Aparentemente Segura'}
-            </h2>
+            </p>
             <p className="text-sm text-muted-foreground">
               {locationLoading ? 'Obteniendo ubicación...'
                 : locationError ? locationError
                 : coordinates ? `${coordinates.latitude.toFixed(4)}, ${coordinates.longitude.toFixed(4)}`
-                : 'Activa la ubicación para usar las funciones de seguridad'}
+                : 'Activa la ubicación'}
             </p>
           </div>
         </CardContent>
       </Card>
 
+      {/* Consejos de Seguridad */}
+      <Card>
+        <CardHeader className="pb-0">
+          <CardTitle className="text-base">Consejos de Seguridad</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {[
+            { n: 1, bold: 'Mantén presionado SOS 2 segundos', rest: ' para activar el modo de emergencia' },
+            { n: 2, bold: 'Revisa el mapa', rest: ' para ver incidentes reportados cerca de ti' },
+            { n: 3, bold: 'Usa el temporizador de seguridad', rest: ' si sales a un lugar desconocido' },
+          ].map(t => (
+            <div key={t.n} className="flex items-start gap-3 text-sm">
+              <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <span className="text-primary font-semibold text-xs">{t.n}</span>
+              </div>
+              <p className="text-muted-foreground"><strong className="text-foreground">{t.bold}</strong>{t.rest}</p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
       {/* Ubicación Actual */}
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <MapPin className="w-5 h-5 text-primary" />
             Ubicación Actual
@@ -327,7 +346,7 @@ export function HomeTab() {
 
       {/* Lugares Frecuentes */}
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-0">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-base">
               <Navigation className="w-5 h-5 text-primary" />
@@ -455,7 +474,7 @@ export function HomeTab() {
 
       {/* Contactos de Emergencia */}
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-0">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-base">
               <Users className="w-5 h-5 text-primary" />
@@ -657,26 +676,7 @@ export function HomeTab() {
         </CardContent>
       </Card>
 
-      {/* Consejos de Seguridad */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Consejos de Seguridad</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {[
-            { n: 1, bold: 'Mantén presionado SOS 2 segundos', rest: ' para activar el modo de emergencia' },
-            { n: 2, bold: 'Revisa el mapa', rest: ' para ver incidentes reportados cerca de ti' },
-            { n: 3, bold: 'Usa el temporizador de seguridad', rest: ' si sales a un lugar desconocido' },
-          ].map(t => (
-            <div key={t.n} className="flex items-start gap-3 text-sm">
-              <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <span className="text-primary font-semibold text-xs">{t.n}</span>
-              </div>
-              <p className="text-muted-foreground"><strong className="text-foreground">{t.bold}</strong>{t.rest}</p>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+      
     </div>
   )
 }

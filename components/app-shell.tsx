@@ -24,11 +24,12 @@ import { MedicTab } from './tabs/medic-tab'
 import { BeforeTab } from './tabs/before-tab'
 import { DuringTab } from './tabs/during-tab'
 import { AfterTab } from './tabs/after-tab'
-import { Shield, Settings, LogOut, BellRing, WifiOff, Sun, Moon, UserCircle, Trash2, Lock, LockOpen, KeyRound, CheckCircle2, Delete } from 'lucide-react'
+import { Shield, Settings, LogOut, BellRing, WifiOff, Sun, Moon, UserCircle, Trash2, Lock, LockOpen, KeyRound, CheckCircle2, Delete, ShieldCheck } from 'lucide-react'
 import { PinLock } from './pin-lock'
 import { hashPin } from '@/lib/pin'
 import { Button } from '@/components/ui/button'
 import { FamilyPlanSection } from './family-plan-section'
+import { PremiumPlanSection } from './premium-plan-section'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -112,9 +113,13 @@ export function AppShell() {
       el.style.color = isDarkTheme ? 'oklch(0.65 0.02 260)' : 'oklch(0.45 0.02 260)'
     })
 
+    const hasBgClass = (el: HTMLElement, word: string) =>
+      Array.from(el.classList).some(c => c.startsWith(`bg-${word}`))
+
     document.querySelectorAll<HTMLElement>('.bg-card, [class*="card"]').forEach(el => {
       if (el.tagName === 'BUTTON') return
       if (inPortal(el)) return
+      if (!hasBgClass(el, 'card')) return
       if (el.classList.contains('leaflet-container') || el.closest('.leaflet-container')) return
       el.style.backgroundColor = card
       el.style.color = fg
@@ -124,6 +129,7 @@ export function AppShell() {
     document.querySelectorAll<HTMLElement>('.bg-muted, [class*="muted"]').forEach(el => {
       if (el.tagName === 'BUTTON' || el.closest('nav')) return
       if (inPortal(el)) return
+      if (!hasBgClass(el, 'muted')) return
       el.style.backgroundColor = muted
     })
 
@@ -211,22 +217,6 @@ export function AppShell() {
     }
   }, [setNearbyIncidents])
 
-
-  // Completar una invitación de plan familiar pendiente tras iniciar sesión
-  useEffect(() => {
-    if (!user) return
-    const token = localStorage.getItem('sosecure-pending-invite')
-    if (!token) return
-    fetch('/api/family/accept', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token }),
-    })
-      .then(r => r.json())
-      .then(() => localStorage.removeItem('sosecure-pending-invite'))
-      .catch(() => { /* se reintenta en el próximo arranque */ })
-  }, [user])
-
   // Broadcasting de ubicación en vivo — persiste en todas las pestañas
   useEffect(() => {
     if (!user || !isLiveSharing) {
@@ -311,6 +301,20 @@ export function AppShell() {
       try { recognition.stop() } catch { /* ignore */ }
     }
   }, [voiceKeyword])
+
+  // Auto-aceptar invitación de plan familiar pendiente tras iniciar sesión
+  useEffect(() => {
+    if (!user) return
+    const token = localStorage.getItem('sosecure-pending-invite')
+    if (!token) return
+    fetch('/api/family/accept', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    })
+      .then(() => localStorage.removeItem('sosecure-pending-invite'))
+      .catch(() => {})
+  }, [user])
 
   // Load PIN profile and check if lock screen should show
   useEffect(() => {
@@ -503,7 +507,7 @@ export function AppShell() {
         <header className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border safe-area-top">
           <div className="flex items-center justify-between h-14 px-4 max-w-lg mx-auto">
             <div className="flex items-center gap-2">
-              <Shield className="w-6 h-6 text-primary" />
+              <ShieldCheck className="w-6 h-6 text-primary" />
               <span className="font-bold text-lg">SOSecure</span>
               {!isOnline && (
                 <div className="flex items-center gap-1 px-2 py-0.5 bg-warning/20 rounded-full">
@@ -555,7 +559,7 @@ export function AppShell() {
                   <DialogTitle>Ajustes</DialogTitle>
                 </DialogHeader>
 
-                <div className="space-y-6 pt-2">
+                <div className="space-y-6 pt-2 max-h-[70vh] overflow-y-auto pr-1">
                   {/* Tema */}
                   <div>
                     <p className="text-sm font-medium mb-3">Apariencia</p>
@@ -632,7 +636,16 @@ export function AppShell() {
                             <select
                               value={pinProfile.pin_timeout_minutes}
                               onChange={e => changeTimeout(Number(e.target.value))}
-                              style={{ fontSize: '0.875rem', padding: '4px 8px', borderRadius: '6px', border: '1px solid', cursor: 'pointer' }}
+                              style={{
+                                fontSize: '0.875rem',
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                border: '1px solid',
+                                cursor: 'pointer',
+                                backgroundColor: isDark ? 'oklch(0.22 0.02 260)' : 'oklch(0.95 0.01 260)',
+                                color: isDark ? 'oklch(0.95 0.01 260)' : 'oklch(0.15 0.01 260)',
+                                borderColor: isDark ? 'oklch(0.28 0.02 260)' : 'oklch(0.90 0.01 260)',
+                              }}
                             >
                               <option value={1}>1 minuto</option>
                               <option value={5}>5 minutos</option>
@@ -726,6 +739,9 @@ export function AppShell() {
                       )}
                     </div>
                   </div>
+
+                  {/* Plan Premium (individual) */}
+                  <PremiumPlanSection />
 
                   {/* Plan Familiar */}
                   <FamilyPlanSection />

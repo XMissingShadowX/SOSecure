@@ -32,27 +32,28 @@ function isNativePlatform(): boolean {
 }
 
 export function useVolumeSOS({ onActivate, disabled = false }: UseVolumeSOSOptions) {
-  const pressTimesRef = useRef<number[]>([])
-  const listenerRef   = useRef<{ remove: () => void } | null>(null)
+  const pressTimesRef  = useRef<number[]>([])
+  const listenerRef    = useRef<{ remove: () => void } | null>(null)
+  // Mantener referencia estable a onActivate para evitar re-ejecuciones de efectos.
+  const onActivateRef  = useRef(onActivate)
+  useEffect(() => { onActivateRef.current = onActivate }, [onActivate])
 
   const handlePress = useCallback(() => {
     if (disabled) return
-
     const now = Date.now()
     pressTimesRef.current = [
       ...pressTimesRef.current.filter(t => now - t < TIME_WINDOW_MS),
       now,
     ]
-
     if (pressTimesRef.current.length >= PRESSES_REQUIRED) {
       pressTimesRef.current = []
-      onActivate()
+      onActivateRef.current()
     }
-  }, [disabled, onActivate])
+  }, [disabled])
 
   // ── Android nativo: VolumeButtonPlugin ──────────────────────────────────
   useEffect(() => {
-    if (!isNativePlatform()) return
+    if (!isNativePlatform() || disabled) return
 
     let cancelled = false
 
@@ -73,35 +74,45 @@ export function useVolumeSOS({ onActivate, disabled = false }: UseVolumeSOSOptio
       }
     }
 
-    if (!disabled) setup()
+    setup()
 
     return () => {
       cancelled = true
       listenerRef.current?.remove()
       listenerRef.current = null
-
       const plugin = window.Capacitor?.Plugins?.VolumeButton as CapacitorPlugin | undefined
       plugin?.call('stopListening').catch(() => {})
     }
   }, [disabled, handlePress])
 
-  // ── Web / PWA: evento volumechange ──────────────────────────────────────
+  // ── Web / PWA: KeyboardEvent para teclas de volumen (MediaSession API) ──
+  // Los navegadores de escritorio exponen ArrowUp/ArrowDown con MediaSession,
+  // pero la forma más confiable en web es escuchar el evento 'keydown' para
+  // las teclas de volumen (Android Chrome las emite como 'AudioVolumeUp' /
+  // 'AudioVolumeDown'). Como fallback adicional, se escucha 'volumechange'
+  // en un <video> que el usuario haya interactuado previamente.
   useEffect(() => {
     if (isNativePlatform() || disabled) return
 
-    const audio = document.createElement('audio')
-    audio.src    = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsBAADYCwAAAgAMACAAAABkYXRhAAAA'
-    audio.loop   = true
-    audio.volume = 0.001
-    audio.play().catch(() => {})
+    // Teclas de volumen físicas en Android Chrome PWA y algunos escritorios.
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'AudioVolumeUp' || e.key === 'AudioVolumeDown' ||
+          e.key === 'VolumeUp'      || e.key === 'VolumeDown') {
+        e.preventDefault()
+        handlePress()
+      }
+    }
 
+    // Fallback: volumechange en el documento (funciona si hay un <video>/<audio>
+    // activo en la página con el que el usuario ya interactuó).
     const onVolumeChange = () => handlePress()
-    audio.addEventListener('volumechange', onVolumeChange)
+
+    window.addEventListener('keydown', onKeyDown, { capture: true })
+    document.addEventListener('volumechange', onVolumeChange, { capture: true })
 
     return () => {
-      audio.removeEventListener('volumechange', onVolumeChange)
-      audio.pause()
-      audio.src = ''
+      window.removeEventListener('keydown', onKeyDown, { capture: true })
+      document.removeEventListener('volumechange', onVolumeChange, { capture: true })
     }
   }, [disabled, handlePress])
 }

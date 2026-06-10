@@ -122,9 +122,24 @@ export function SOSButton() {
     let activeStream: MediaStream | null = null
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: { facingMode: { ideal: 'environment' } }
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 48000,
+          channelCount: 2,
+        },
+        video: {
+          facingMode: { ideal: 'environment' },
+          width:     { ideal: 1920, min: 1280 },
+          height:    { ideal: 1080, min: 720  },
+          frameRate: { ideal: 30,   min: 24   },
+        }
       }).catch(
+        () => navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } }
+        })
+      ).catch(
         () => navigator.mediaDevices.getUserMedia({ audio: true, video: true })
       ).catch(
         () => navigator.mediaDevices.getUserMedia({ audio: true })
@@ -134,6 +149,8 @@ export function SOSButton() {
 
       const mimeType = (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus'))
         ? 'video/webm;codecs=vp9,opus'
+        : (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus'))
+        ? 'video/webm;codecs=vp8,opus'
         : (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('video/webm'))
         ? 'video/webm'
         : 'video/mp4'
@@ -142,7 +159,7 @@ export function SOSButton() {
       recordingChunksRef.current = []
       recordingStartRef.current  = Date.now()
 
-      const recorder = new MediaRecorder(stream, { mimeType })
+      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4_000_000 })
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) recordingChunksRef.current.push(e.data)
       }
@@ -548,16 +565,31 @@ export function SOSButton() {
                     onClick={async () => {
                       try {
                         const stream = await navigator.mediaDevices.getUserMedia({
-                          audio: true,
-                          video: { facingMode: { ideal: 'environment' } }
+                          audio: {
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            sampleRate: 48000,
+                            channelCount: 2,
+                          },
+                          video: {
+                            facingMode: { ideal: 'environment' },
+                            width:     { ideal: 1920, min: 1280 },
+                            height:    { ideal: 1080, min: 720  },
+                            frameRate: { ideal: 30,   min: 24   },
+                          }
                         }).catch(
                           () => navigator.mediaDevices.getUserMedia({ audio: true, video: true })
                         ).catch(
                           () => navigator.mediaDevices.getUserMedia({ audio: true })
                         )
                         setRecordingStream(stream)
-                        const recorder = new MediaRecorder(stream)
-                        recorder.start()
+                        const rMime = (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus'))
+                          ? 'video/webm;codecs=vp9,opus'
+                          : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
+                          ? 'video/webm;codecs=vp8,opus'
+                          : 'video/webm'
+                        const recorder = new MediaRecorder(stream, { mimeType: rMime, videoBitsPerSecond: 4_000_000 })
+                        recorder.start(500)
                         setMediaRecorder(recorder)
                         setIsRecording(true)
                         // Reanudar también la transmisión en vivo para los contactos.

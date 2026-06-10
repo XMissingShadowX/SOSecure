@@ -9,14 +9,14 @@
 
 'use client'
 
-import { Home, Brain, ShieldCheck, Radio, CheckCircle } from 'lucide-react'
+import { Home, Brain, TriangleAlert, Radio, CheckCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/lib/store'
 import type { TabId } from '@/lib/types'
 
 const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: 'home', label: 'Inicio', icon: Home },
-  { id: 'before', label: 'Antes', icon: ShieldCheck },
+  { id: 'before', label: 'Antes', icon: TriangleAlert },
   { id: 'during', label: 'Durante', icon: Radio },
   { id: 'after', label: 'Después', icon: CheckCircle },
   { id: 'medic', label: 'Apoyo', icon: Brain },

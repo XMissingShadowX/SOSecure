@@ -1,4 +1,4 @@
-/*
+﻿/*
   Este componente representa la pestaña "Durante" de la aplicación SOSecure, donde el usuario puede activar un modo de 
   emergencia, grabar audio y video como evidencia, y ver su historial de ubicación reciente. El componente maneja el 
   estado de la grabación, la conexión a internet, y la interacción con los contactos de emergencia. También incluye 
@@ -368,9 +368,21 @@ export function DuringTab() {
       // reflejar que la grabación de video está activa.
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' } },
-          audio: true
-        })
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            sampleRate: 48000,
+            channelCount: 2,
+          },
+          video: {
+            facingMode: { ideal: 'environment' },
+            width:     { ideal: 1920, min: 1280 },
+            height:    { ideal: 1080, min: 720  },
+            frameRate: { ideal: 30,   min: 24   },
+          }
+        }).catch(
+          () => navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+        )
         // Si se obtiene el stream de video, se asigna al elemento de video para mostrar la vista previa al usuario.
         setVideoStream(stream)
         setIsRecordingVideo(true)
@@ -380,15 +392,17 @@ export function DuringTab() {
         videoStartRef.current = Date.now()
 
         // Se asigna el stream al elemento de video para mostrar la vista previa al usuario mientras graba.
-        const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+        const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+          ? 'video/webm;codecs=vp9,opus'
+          : MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
           ? 'video/webm;codecs=vp9'
+          : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
+          ? 'video/webm;codecs=vp8,opus'
           : MediaRecorder.isTypeSupported('video/webm')
           ? 'video/webm'
           : 'video/mp4'
 
-        // Se crea un MediaRecorder para manejar la grabación de video, configurando el tipo MIME según lo que sea 
-        // compatible con el navegador.
-        const recorder = new MediaRecorder(stream, { mimeType })
+        const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4_000_000 })
         recorder.ondataavailable = (e) => {
           if (e.data.size > 0) videoChunksRef.current.push(e.data)
         }
@@ -436,13 +450,13 @@ export function DuringTab() {
     <div className="flex flex-col gap-6 pb-40">
       {/* Status */}
       <Card className={sosActive ? 'border-destructive bg-destructive/10' : 'border-primary/30 bg-primary/5'}>
-        <CardContent className="p-4 flex items-center gap-3">
-          <Radio className={`w-6 h-6 ${sosActive ? 'text-destructive animate-pulse' : 'text-primary'}`} />
-          <div>
-            <p className="font-semibold text-sm">{sosActive ? '🚨 SOS ACTIVO' : 'Modo DURANTE'}</p>
-            <div className="flex items-center gap-2 mt-0.5">
+        <CardContent className="flex items-center justify-center gap-3 py-2 px-3">
+          <Radio className={`w-5 h-5 shrink-0 ${sosActive ? 'text-destructive animate-pulse' : 'text-primary'}`} />
+          <div className="text-center">
+            <p className="font-semibold text-base">{sosActive ? '🚨 SOS ACTIVO' : 'Modo DURANTE'}</p>
+            <div className="flex items-center justify-center gap-1.5">
               {isOnline ? <Wifi className="w-3 h-3 text-safe" /> : <WifiOff className="w-3 h-3 text-destructive" />}
-              <p className="text-xs text-muted-foreground">{isOnline ? 'En línea' : 'Sin internet — datos guardados localmente'}</p>
+              <p className="text-sm text-muted-foreground">{isOnline ? 'En línea' : 'Sin internet'}</p>
             </div>
           </div>
         </CardContent>
@@ -450,7 +464,7 @@ export function DuringTab() {
 
       {/* Secret activation */}
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <AlertTriangle className="w-5 h-5 text-warning" />
             Activación Alternativa de SOS
@@ -514,7 +528,7 @@ export function DuringTab() {
 
       {/* Recording */}
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <Video className="w-5 h-5 text-primary" />
             Grabación de Emergencia
@@ -643,7 +657,7 @@ export function DuringTab() {
 
       {/* Location history */}
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <WifiOff className="w-5 h-5 text-primary" />
             Historial de Ubicación (últimos 10 min)

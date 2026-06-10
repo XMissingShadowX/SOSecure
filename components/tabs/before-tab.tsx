@@ -1,8 +1,8 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import dynamic from 'next/dynamic'
-import { ShieldCheck, Clock, Users, Timer, AlertTriangle, Map, Navigation, ChevronDown, ChevronUp, Radio, UserCheck, UserX, RefreshCw, Mic } from 'lucide-react'
+import { Shield, ShieldCheck, Clock, Users, Timer, AlertTriangle, Map, Navigation, ChevronDown, ChevronUp, Radio, UserCheck, UserX, RefreshCw, Mic, TriangleAlert, MapPinCheck, MapPinCheckInside, CircleAlert } from 'lucide-react'
 import { RoutesTab, calculateSafetyScore } from './routes-tab'
 import { MapTab } from './map-tab'
 import { useAppStore } from '@/lib/store'
@@ -277,11 +277,11 @@ export function BeforeTab() {
   return (
     <div className="flex flex-col gap-6 pb-60">
       <Card className="border-primary/30 bg-primary/5">
-        <CardContent className="p-4 flex items-center gap-3">
-          <ShieldCheck className="w-6 h-6 text-primary" />
-          <div>
-            <p className="font-semibold text-sm">Modo ANTES</p>
-            <p className="text-xs text-muted-foreground">Prepárate antes de salir</p>
+        <CardContent className="flex items-center justify-center gap-3 py-2 px-3">
+          <TriangleAlert className="w-5 h-5 shrink-0 text-primary" />
+          <div className="text-center">
+            <p className="font-semibold text-base">Modo ANTES</p>
+            <p className="text-sm text-muted-foreground">Prepárate antes de salir</p>
           </div>
         </CardContent>
       </Card>
@@ -365,7 +365,7 @@ export function BeforeTab() {
 
       {/* Temporizador de Seguridad */}
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <Timer className="w-5 h-5 text-primary" />
             Temporizador de Seguridad
@@ -442,9 +442,9 @@ export function BeforeTab() {
 
       {/* Zonas Seguras */}
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
-            <ShieldCheck className="w-5 h-5 text-safe" />
+            <MapPinCheckInside className="w-5 h-5 text-safe" />
             Zonas Seguras Cercanas
           </CardTitle>
         </CardHeader>
@@ -491,7 +491,7 @@ export function BeforeTab() {
 
       {/* Seguimiento en Vivo — modelo Life360 */}
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <Users className="w-5 h-5 text-primary" />
             Ubicaciones en Vivo
@@ -615,7 +615,7 @@ export function BeforeTab() {
 
       {/* Palabra Clave de Voz */}
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <Mic className="w-5 h-5 text-primary" />
             Palabra Clave de Voz
@@ -686,9 +686,9 @@ export function BeforeTab() {
 
       {/* Contactos listos para alertar */}
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
-            <AlertTriangle className="w-5 h-5 text-warning" />
+            <CircleAlert className="w-5 h-5 text-warning" />
             Contactos listos para alertar
           </CardTitle>
         </CardHeader>
