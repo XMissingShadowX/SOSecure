@@ -55,13 +55,45 @@ export function SOSButton() {
   const recordingChunksRef = useRef<Blob[]>([])
   const recordingMimeRef   = useRef<string>('video/webm')
   const recordingStartRef  = useRef<number>(0)
+  const segmentIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const segmentCountRef    = useRef<number>(0)
 
   const holdTimerRef = useRef<NodeJS.Timeout | null>(null)
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const tapTimesRef = useRef<number[]>([])
-  const voiceListeningRef = useRef(false)
   const videoPreviewRef = useRef<HTMLVideoElement>(null)
   const liveBroadcasterRef = useRef<LiveBroadcaster | null>(null)
+
+  // Sube los chunks acumulados hasta ahora como un segmento y dispara el evento para el chat.
+  const uploadSegmentToChat = useCallback(async (alertId: string | null, isFinal = false) => {
+    const chunks = recordingChunksRef.current
+    if (!chunks.length) return
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const mime = recordingMimeRef.current
+      const ext  = mime.includes('mp4') ? 'mp4' : 'webm'
+      const segId = crypto.randomUUID()
+      const blob  = new Blob([...chunks], { type: mime })
+      const path  = `${user.id}/segments/${segId}.${ext}`
+      const { error } = await supabase.storage
+        .from('recordings')
+        .upload(path, blob, { contentType: mime, upsert: false })
+      if (error) return
+      const { data: { publicUrl } } = supabase.storage.from('recordings').getPublicUrl(path)
+      const segNum = ++segmentCountRef.current
+      window.dispatchEvent(new CustomEvent('sosecure:recording-segment', {
+        detail: {
+          url: publicUrl,
+          mimeType: mime,
+          alertId,
+          segmentNumber: segNum,
+          isFinal,
+        }
+      }))
+    } catch { /* sin conexión */ }
+  }, [])
 
   // Detiene la transmisión de video en vivo (si está activa) sin afectar la grabación.
   const stopLive = useCallback(() => {
@@ -138,6 +170,12 @@ export function SOSButton() {
       if (alert) {
         setSosAlert(alert)
         setActiveAlertId(alert.id)
+
+        // ── Segmentos periódicos al chat (cada 60s) ───────────────────
+        segmentCountRef.current = 0
+        segmentIntervalRef.current = setInterval(() => {
+          uploadSegmentToChat(alert.id, false)
+        }, 60_000)
 
         // ── Transmisión de VIDEO EN VIVO ──────────────────────────────
         // Empezamos a enviar fotogramas en tiempo real al canal de la alerta
@@ -239,34 +277,6 @@ export function SOSButton() {
     return () => window.removeEventListener('sosecure:activate', handler)
   }, [sosActive, activateSOS])
 
-  useEffect(() => {
-    if (sosActive || voiceListeningRef.current) return
-    if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) return
-
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SpeechRecognition) return
-
-    const recognition = new SpeechRecognition()
-    recognition.continuous = true
-    recognition.lang = 'es-MX'
-
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase()
-      if (transcript.includes('auxilio') || transcript.includes('ayuda') || transcript.includes('sos') || transcript.includes('emergencia')) {
-        activateSOS()
-      }
-    }
-
-    try {
-      recognition.start()
-      voiceListeningRef.current = true
-    } catch { /* ignore */ }
-
-    return () => {
-      try { recognition.stop() } catch { /* ignore */ }
-      voiceListeningRef.current = false
-    }
-  }, [sosActive, activateSOS])
 
   const handleHoldStart = useCallback(() => {
     if (sosActive) return
@@ -351,7 +361,11 @@ export function SOSButton() {
         setDownloadReady(true)
         downloadRecording()
       }
-      if (activeAlertId) await saveRecordingToCloud(activeAlertId)
+      if (segmentIntervalRef.current) { clearInterval(segmentIntervalRef.current); segmentIntervalRef.current = null }
+      if (activeAlertId) {
+        await saveRecordingToCloud(activeAlertId)
+        await uploadSegmentToChat(activeAlertId, true)
+      }
       setIsSaving(false)
       setMinimized(true)
     }
@@ -365,6 +379,7 @@ export function SOSButton() {
   }, [mediaRecorder, recordingStream, activeAlertId])
 
   const cancelSOS = useCallback(async () => {
+    if (segmentIntervalRef.current) { clearInterval(segmentIntervalRef.current); segmentIntervalRef.current = null }
     stopLive()
     if (mediaRecorder) { try { mediaRecorder.stop() } catch { /* ignore */ } }
     if (recordingStream) { recordingStream.getTracks().forEach(t => t.stop()) }
@@ -390,7 +405,11 @@ export function SOSButton() {
     recordingChunksRef.current = []
   }, [setSosActive, setSosAlert, mediaRecorder, recordingStream])
 
-  useEffect(() => () => { clearTimers(); stopLive() }, [clearTimers, stopLive])
+  useEffect(() => () => {
+    clearTimers()
+    stopLive()
+    if (segmentIntervalRef.current) clearInterval(segmentIntervalRef.current)
+  }, [clearTimers, stopLive])
 
   // ── Activación por botones de volumen ──────────────────────────────────
   // 5 pulsaciones (subir o bajar) en menos de 3 segundos activan el SOS.

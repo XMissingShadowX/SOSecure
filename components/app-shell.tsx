@@ -14,6 +14,8 @@ import { useAppStore } from '@/lib/store'
 import { useGeolocation } from '@/hooks/use-geolocation'
 import { createClient } from '@/lib/supabase/client'
 import { PermissionGate } from './permission-gate'
+import { checkIncidentReminders } from '@/lib/incident-reminder'
+import { sendAlarmNotification } from '@/lib/notifications'
 import { BottomNavigation } from './bottom-navigation'
 import { SOSButton } from './sos-button'
 import { EmergencyChat } from './emergency-chat'
@@ -22,8 +24,11 @@ import { MedicTab } from './tabs/medic-tab'
 import { BeforeTab } from './tabs/before-tab'
 import { DuringTab } from './tabs/during-tab'
 import { AfterTab } from './tabs/after-tab'
-import { Shield, Settings, LogOut, BellRing, WifiOff, Sun, Moon, UserCircle, Trash2 } from 'lucide-react'
+import { Shield, Settings, LogOut, BellRing, WifiOff, Sun, Moon, UserCircle, Trash2, Lock, LockOpen, KeyRound, CheckCircle2, Delete } from 'lucide-react'
+import { PinLock } from './pin-lock'
+import { hashPin } from '@/lib/pin'
 import { Button } from '@/components/ui/button'
+import { FamilyPlanSection } from './family-plan-section'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,11 +61,30 @@ export function AppShell() {
   const [user, setUser] = useState<User | null>(null)
   const liveBroadcastRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const voiceRecognitionRef = useRef<any>(null)
+  const sosActiveRef = useRef(sosActive)
   const [isOnline, setIsOnline] = useState(true)
   const [isDark, setIsDark] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [deletingAccount, setDeletingAccount] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  // PIN state
+  const [pinLocked, setPinLocked] = useState(false)
+  const [pinProfile, setPinProfile] = useState<{
+    pin_enabled: boolean
+    pin_hash: string | null
+    pin_timeout_minutes: number
+  }>({ pin_enabled: false, pin_hash: null, pin_timeout_minutes: 5 })
+  const [forgotPinSent, setForgotPinSent] = useState(false)
+  const [forgotPinLoading, setForgotPinLoading] = useState(false)
+
+  // PIN setup wizard state (inside settings)
+  type PinStep = 'idle' | 'enter-new' | 'confirm-new' | 'done'
+  const [pinStep, setPinStep] = useState<PinStep>('idle')
+  const [pinNewDigits, setPinNewDigits] = useState<string[]>([])
+  const [pinConfirmDigits, setPinConfirmDigits] = useState<string[]>([])
+  const [pinMismatch, setPinMismatch] = useState(false)
+  const [pinSaving, setPinSaving] = useState(false)
 
   const applyTheme = (theme: string) => {
     const isDarkTheme = theme === 'dark'
@@ -148,6 +172,10 @@ export function AppShell() {
   }, [])
 
   useEffect(() => {
+    checkIncidentReminders((title, body) => sendAlarmNotification(title, body))
+  }, [])
+
+  useEffect(() => {
     const supabase = createClient()
 
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -183,6 +211,22 @@ export function AppShell() {
     }
   }, [setNearbyIncidents])
 
+
+  // Completar una invitación de plan familiar pendiente tras iniciar sesión
+  useEffect(() => {
+    if (!user) return
+    const token = localStorage.getItem('sosecure-pending-invite')
+    if (!token) return
+    fetch('/api/family/accept', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    })
+      .then(r => r.json())
+      .then(() => localStorage.removeItem('sosecure-pending-invite'))
+      .catch(() => { /* se reintenta en el próximo arranque */ })
+  }, [user])
+
   // Broadcasting de ubicación en vivo — persiste en todas las pestañas
   useEffect(() => {
     if (!user || !isLiveSharing) {
@@ -210,35 +254,48 @@ export function AppShell() {
     return () => { if (liveBroadcastRef.current) { clearInterval(liveBroadcastRef.current); liveBroadcastRef.current = null } }
   }, [user, isLiveSharing])
 
-  // Reconocimiento de voz global — activo en todas las pestañas mientras haya palabra clave configurada
+  // Mantener la ref sincronizada para que onend pueda leer el valor actual sin capturarlo en closure
+  useEffect(() => {
+    sosActiveRef.current = sosActive
+  }, [sosActive])
+
+  // Reconocimiento de voz global — activo en todas las pestañas mientras haya palabra clave configurada.
+  // Solo se recrea cuando cambia la palabra clave; sosActive se lee desde la ref para evitar closures stale.
   useEffect(() => {
     if (typeof window === 'undefined') return
     if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) return
 
-    // Detener instancia anterior si existe
     if (voiceRecognitionRef.current) {
       try { voiceRecognitionRef.current.stop() } catch { /* ignore */ }
       voiceRecognitionRef.current = null
     }
 
-    if (!voiceKeyword || sosActive) return
+    if (!voiceKeyword) return
 
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     const recognition = new SR()
     recognition.continuous = true
-    recognition.lang = 'es-MX'
+    recognition.lang = navigator.language.startsWith('es') ? navigator.language : 'es'
     recognition.interimResults = false
 
     recognition.onresult = (event: any) => {
+      if (sosActiveRef.current) return
       const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase()
       if (transcript.includes(voiceKeyword)) {
         window.dispatchEvent(new Event('sosecure:activate'))
       }
     }
 
+    recognition.onerror = (event: any) => {
+      // No reiniciar en errores de permiso o de no-speech para evitar bucles
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        voiceRecognitionRef.current = null
+      }
+    }
+
     recognition.onend = () => {
-      // Reiniciar automáticamente para mantenerlo activo
-      if (voiceRecognitionRef.current === recognition && !sosActive) {
+      // Leer sosActive desde la ref para evitar el closure stale
+      if (voiceRecognitionRef.current === recognition && !sosActiveRef.current) {
         try { recognition.start() } catch { /* ignore */ }
       }
     }
@@ -249,10 +306,152 @@ export function AppShell() {
     } catch { /* ignore */ }
 
     return () => {
-      try { recognition.stop() } catch { /* ignore */ }
+      // Marcar primero la ref como null para que onend no reintente tras el cleanup
       voiceRecognitionRef.current = null
+      try { recognition.stop() } catch { /* ignore */ }
     }
-  }, [voiceKeyword, sosActive])
+  }, [voiceKeyword])
+
+  // Load PIN profile and check if lock screen should show
+  useEffect(() => {
+    if (!user) return
+    const supabase = createClient()
+    supabase
+      .from('profiles')
+      .select('pin_enabled, pin_hash, pin_timeout_minutes')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => {
+        if (!data) return
+        const profile = {
+          pin_enabled: data.pin_enabled ?? false,
+          pin_hash: data.pin_hash ?? null,
+          pin_timeout_minutes: data.pin_timeout_minutes ?? 5,
+        }
+        setPinProfile(profile)
+
+        if (!profile.pin_enabled || !profile.pin_hash) return
+
+        const lastActive = sessionStorage.getItem('sosecure-last-active')
+        if (!lastActive) {
+          setPinLocked(true)
+          return
+        }
+        const elapsed = (Date.now() - parseInt(lastActive)) / 60000
+        if (elapsed >= profile.pin_timeout_minutes) {
+          setPinLocked(true)
+        }
+      })
+  }, [user])
+
+  // Track visibility changes to enforce PIN timeout
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        sessionStorage.setItem('sosecure-last-active', Date.now().toString())
+      } else if (document.visibilityState === 'visible' && pinProfile.pin_enabled && pinProfile.pin_hash) {
+        const lastActive = sessionStorage.getItem('sosecure-last-active')
+        if (!lastActive) return
+        const elapsed = (Date.now() - parseInt(lastActive)) / 60000
+        if (elapsed >= pinProfile.pin_timeout_minutes) {
+          setPinLocked(true)
+        }
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [pinProfile])
+
+  const handlePinUnlock = () => {
+    sessionStorage.setItem('sosecure-last-active', Date.now().toString())
+    setPinLocked(false)
+  }
+
+  const handleForgotPin = async () => {
+    if (!user) return
+    setForgotPinLoading(true)
+    await fetch('/api/pin', { method: 'DELETE' })
+    setForgotPinLoading(false)
+    setForgotPinSent(true)
+  }
+
+  // PIN setup helpers (used in settings dialog)
+  const pinSetupDigit = (d: string, step: 'new' | 'confirm') => {
+    if (step === 'new') {
+      if (pinNewDigits.length >= 4) return
+      const next = [...pinNewDigits, d]
+      setPinNewDigits(next)
+      if (next.length === 4) setPinStep('confirm-new')
+    } else {
+      if (pinConfirmDigits.length >= 4) return
+      const next = [...pinConfirmDigits, d]
+      setPinConfirmDigits(next)
+      if (next.length === 4) {
+        if (next.join('') !== pinNewDigits.join('')) {
+          setPinMismatch(true)
+          setTimeout(() => {
+            setPinConfirmDigits([])
+            setPinMismatch(false)
+          }, 700)
+        } else {
+          savePinSetup(next.join(''))
+        }
+      }
+    }
+  }
+
+  const savePinSetup = async (pin: string) => {
+    if (!user) return
+    setPinSaving(true)
+    const hash = await hashPin(pin, user.id)
+    await fetch('/api/pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin_hash: hash, pin_enabled: true }),
+    })
+    setPinProfile(prev => ({ ...prev, pin_enabled: true, pin_hash: hash }))
+    setPinStep('done')
+    setPinSaving(false)
+    setTimeout(() => {
+      setPinStep('idle')
+      setPinNewDigits([])
+      setPinConfirmDigits([])
+    }, 1500)
+  }
+
+  const togglePinEnabled = async (enabled: boolean) => {
+    if (!user) return
+    if (!enabled) {
+      await fetch('/api/pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin_enabled: false }),
+      })
+      setPinProfile(prev => ({ ...prev, pin_enabled: false }))
+    } else {
+      // If hash exists, just enable; otherwise start setup
+      if (pinProfile.pin_hash) {
+        await fetch('/api/pin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin_enabled: true }),
+        })
+        setPinProfile(prev => ({ ...prev, pin_enabled: true }))
+      } else {
+        setPinStep('enter-new')
+      }
+    }
+  }
+
+  const changeTimeout = async (minutes: number) => {
+    if (!user) return
+    await fetch('/api/pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin_timeout_minutes: minutes }),
+    })
+    setPinProfile(prev => ({ ...prev, pin_timeout_minutes: minutes }))
+  }
 
   const handleSignOut = async () => {
     const supabase = createClient()
@@ -271,6 +470,31 @@ export function AppShell() {
       setDeleteError(body.error ?? 'Error al eliminar la cuenta')
       setDeletingAccount(false)
     }
+  }
+
+  // Render PIN lock overlay (takes over the entire screen)
+  if (pinLocked && pinProfile.pin_hash && user) {
+    if (forgotPinSent) {
+      return (
+        <div className="fixed inset-0 z-[99999] bg-background flex flex-col items-center justify-center p-6 text-center gap-4">
+          <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center">
+            <Shield className="w-9 h-9 text-primary" />
+          </div>
+          <h2 className="text-lg font-bold">Revisa tu correo</h2>
+          <p className="text-sm text-muted-foreground max-w-xs">
+            Enviamos un enlace a <strong>{user.email}</strong> para restablecer tu PIN. Al ingresar, podrás configurar uno nuevo.
+          </p>
+        </div>
+      )
+    }
+    return (
+      <PinLock
+        userId={user.id}
+        pinHash={pinProfile.pin_hash}
+        onUnlock={handlePinUnlock}
+        onForgotPin={handleForgotPin}
+      />
+    )
   }
 
   return (
@@ -346,6 +570,165 @@ export function AppShell() {
                       </Button>
                     </div>
                   </div>
+
+                  {/* PIN de seguridad */}
+                  <div>
+                    <p className="text-sm font-medium mb-3">PIN de seguridad</p>
+                    <div className="rounded-lg border border-border p-3 space-y-3">
+
+                      {/* Toggle activar/desactivar — inline styles para evitar override del tema */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Lock className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm">Activar PIN</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => togglePinEnabled(!pinProfile.pin_enabled)}
+                          style={{
+                            position: 'relative',
+                            width: '44px',
+                            height: '24px',
+                            borderRadius: '9999px',
+                            border: 'none',
+                            cursor: 'pointer',
+                            flexShrink: 0,
+                            backgroundColor: pinProfile.pin_enabled && pinProfile.pin_hash
+                              ? (isDark ? 'oklch(0.75 0.15 180)' : 'oklch(0.55 0.15 180)')
+                              : (isDark ? 'oklch(0.35 0.02 260)' : 'oklch(0.78 0.01 260)'),
+                            transition: 'background-color 0.2s',
+                          }}
+                        >
+                          <span style={{
+                            position: 'absolute',
+                            top: '4px',
+                            left: '0',
+                            width: '16px',
+                            height: '16px',
+                            borderRadius: '9999px',
+                            backgroundColor: 'white',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                            transition: 'transform 0.2s',
+                            transform: pinProfile.pin_enabled && pinProfile.pin_hash ? 'translateX(24px)' : 'translateX(4px)',
+                          }} />
+                        </button>
+                      </div>
+
+                      {/* Configurar / Cambiar PIN */}
+                      {pinProfile.pin_enabled && pinProfile.pin_hash && pinStep === 'idle' && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => { setPinStep('enter-new'); setPinNewDigits([]); setPinConfirmDigits([]) }}
+                            className="flex items-center gap-2 text-sm text-primary hover:underline"
+                          >
+                            <KeyRound className="w-4 h-4" />
+                            Cambiar PIN
+                          </button>
+
+                          {/* Tiempo de bloqueo */}
+                          <div className="flex items-center justify-between pt-1">
+                            <span className="text-sm text-muted-foreground">Bloquear tras</span>
+                            <select
+                              value={pinProfile.pin_timeout_minutes}
+                              onChange={e => changeTimeout(Number(e.target.value))}
+                              style={{ fontSize: '0.875rem', padding: '4px 8px', borderRadius: '6px', border: '1px solid', cursor: 'pointer' }}
+                            >
+                              <option value={1}>1 minuto</option>
+                              <option value={5}>5 minutos</option>
+                              <option value={15}>15 minutos</option>
+                              <option value={30}>30 minutos</option>
+                            </select>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Wizard: ingresar nuevo PIN */}
+                      {(pinStep === 'enter-new' || pinStep === 'confirm-new') && (
+                        <div className="space-y-3 pt-1">
+                          <p className="text-xs text-muted-foreground font-medium text-center">
+                            {pinStep === 'enter-new' ? 'Ingresa tu nuevo PIN (4 dígitos)' : 'Confirma tu nuevo PIN'}
+                          </p>
+
+                          {/* Dots */}
+                          <div className="flex gap-4 justify-center py-1">
+                            {[0,1,2,3].map(i => {
+                              const d = pinStep === 'enter-new' ? pinNewDigits : pinConfirmDigits
+                              const primary = isDark ? 'oklch(0.75 0.15 180)' : 'oklch(0.55 0.15 180)'
+                              const empty = isDark ? 'oklch(0.45 0.02 260)' : 'oklch(0.75 0.01 260)'
+                              const filled = pinMismatch ? 'oklch(0.6 0.2 25)' : primary
+                              return (
+                                <div key={i} style={{
+                                  width: '14px', height: '14px', borderRadius: '9999px', border: '2px solid',
+                                  borderColor: i < d.length ? filled : empty,
+                                  backgroundColor: i < d.length ? filled : 'transparent',
+                                  transition: 'all 0.15s',
+                                }} />
+                              )
+                            })}
+                          </div>
+
+                          {pinMismatch && (
+                            <p className="text-xs text-destructive text-center">Los PINs no coinciden, intenta de nuevo</p>
+                          )}
+
+                          {/* Keypad 3×4 */}
+                          {(() => {
+                            const keyBg = isDark ? 'oklch(0.22 0.02 260)' : 'oklch(0.91 0.01 260)'
+                            const keyColor = isDark ? 'oklch(0.95 0.01 260)' : 'oklch(0.15 0.01 260)'
+                            const stepKey = pinStep === 'enter-new' ? 'new' : 'confirm'
+                            return (
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', width: '100%' }}>
+                                {(['1','2','3','4','5','6','7','8','9','','0','del'] as const).map((k, idx) => {
+                                  if (k === '') return <div key={idx} />
+                                  if (k === 'del') return (
+                                    <button key={idx} type="button"
+                                      onClick={() => {
+                                        if (pinStep === 'enter-new') setPinNewDigits(p => p.slice(0,-1))
+                                        else setPinConfirmDigits(p => p.slice(0,-1))
+                                      }}
+                                      style={{ height: '44px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer', backgroundColor: 'transparent', color: keyColor }}
+                                    >
+                                      <Delete className="w-4 h-4" />
+                                    </button>
+                                  )
+                                  return (
+                                    <button key={idx} type="button"
+                                      onClick={() => pinSetupDigit(k, stepKey)}
+                                      disabled={pinSaving}
+                                      style={{ height: '44px', borderRadius: '10px', fontSize: '1.1rem', fontWeight: '600', border: 'none', cursor: 'pointer', backgroundColor: keyBg, color: keyColor, transition: 'opacity 0.1s' }}
+                                      onMouseDown={e => (e.currentTarget.style.opacity = '0.6')}
+                                      onMouseUp={e => (e.currentTarget.style.opacity = '1')}
+                                    >
+                                      {k}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            )
+                          })()}
+
+                          <button
+                            type="button"
+                            onClick={() => { setPinStep('idle'); setPinNewDigits([]); setPinConfirmDigits([]) }}
+                            className="text-xs text-muted-foreground hover:text-foreground w-full text-center pt-1"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      )}
+
+                      {pinStep === 'done' && (
+                        <div className="flex items-center gap-2 text-sm text-primary py-1">
+                          <CheckCircle2 className="w-4 h-4" />
+                          PIN configurado correctamente
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Plan Familiar */}
+                  <FamilyPlanSection />
 
                   {/* Cuenta */}
                   <div>

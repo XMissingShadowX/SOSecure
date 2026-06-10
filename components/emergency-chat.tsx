@@ -13,7 +13,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   MessageCircle, X, Send, MapPin, AlertTriangle, Phone,
-  Bot, Loader2, Shield, ChevronLeft, Sparkles, UserCircle2, WifiOff, FileVideo, FileAudio
+  Bot, Loader2, Shield, ChevronLeft, Sparkles, UserCircle2, WifiOff, FileVideo, FileAudio, Video
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { Button } from '@/components/ui/button'
@@ -233,6 +233,60 @@ export function EmergencyChat() {
   const contactsRef = useRef(primaryContacts)
   useEffect(() => { contactsRef.current = primaryContacts })
 
+  // ── Grabación en tiempo real → chat ──────────────────────────────────────
+  const myIdRef = useRef(myId)
+  useEffect(() => { myIdRef.current = myId }, [myId])
+  const resolvedIdsRef = useRef(resolvedIds)
+  useEffect(() => { resolvedIdsRef.current = resolvedIds }, [resolvedIds])
+
+  useEffect(() => {
+    const handler = async (e: Event) => {
+      const { url, mimeType, segmentNumber, isFinal } = (e as CustomEvent).detail as {
+        url: string; mimeType: string; segmentNumber: number; isFinal: boolean
+      }
+      const currentMyId = myIdRef.current
+      if (!currentMyId) return
+
+      const isVideo = mimeType.includes('mp4') || mimeType.includes('webm')
+      const label = isFinal
+        ? `🎥 Grabación completa SOS`
+        : `🎥 Grabación en vivo — segmento ${segmentNumber}`
+
+      const content = `${label}\n${url}`
+
+      for (const contact of contactsRef.current) {
+        const email = (contact as any).email as string | undefined
+        const receiverId = email ? resolvedIdsRef.current[email] : null
+        if (!receiverId || receiverId === currentMyId) continue
+
+        const { data: inserted } = await supabase
+          .from('chat_messages')
+          .insert({ sender_id: currentMyId, receiver_id: receiverId, content, type: 'media' })
+          .select()
+          .single()
+        if (inserted) {
+          setMessages(prev => [...prev, dbToUI(inserted as DBMessage, currentMyId)])
+          await upsertConversation(supabase, currentMyId, receiverId, label)
+        }
+      }
+
+      // Mostrar también en la conversación local para el usuario
+      setMessages(prev => [...prev, {
+        id: `rec-local-${Date.now()}`,
+        contactId: '__local_sos__',
+        contactName: 'SOSecure',
+        text: content,
+        timestamp: Date.now(),
+        isMe: true,
+        type: 'media',
+      }])
+      setOpen(true)
+    }
+
+    window.addEventListener('sosecure:recording-segment', handler)
+    return () => window.removeEventListener('sosecure:recording-segment', handler)
+  }, [])
+
   useEffect(() => {
     if (!sosActive || !myId) return
     const sosText = currentLocation
@@ -372,8 +426,12 @@ export function EmergencyChat() {
   const activeReceiverUUID = activeContactEmail ? resolvedIds[activeContactEmail] : undefined
   const activeHasAccount = activeReceiverUUID != null
 
+  const SOS_REC_ID = '__local_sos__'
+  const hasLocalRecs = messages.some(m => m.contactId === SOS_REC_ID)
+
   const allItems = [
     { id: AI_ID, name: 'SOSecure AI', subtitle: 'Consejos de seguridad y emergencias', isAI: true },
+    ...(hasLocalRecs ? [{ id: SOS_REC_ID, name: 'Mis grabaciones SOS', subtitle: 'Grabaciones automáticas de emergencia', isAI: false, isSosRec: true }] : []),
     ...primaryContacts.map(c => {
       const email = (c as any).email as string | undefined
       const uuid = email ? resolvedIds[email] : undefined
@@ -461,10 +519,12 @@ export function EmergencyChat() {
                   onClick={() => openChat(item.id)}
                   className="w-full flex items-center gap-3 p-3 rounded-xl bg-muted/40 hover:bg-muted/80 active:scale-[0.98] transition-all text-left"
                 >
-                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${(item as any).isSosRec ? 'bg-destructive/20' : 'bg-primary/20'}`}>
                     {item.isAI
                       ? <Shield className="w-5 h-5 text-primary" />
-                      : <span className="text-primary font-bold text-sm">{item.name.charAt(0).toUpperCase()}</span>
+                      : (item as any).isSosRec
+                        ? <Video className="w-5 h-5 text-destructive" />
+                        : <span className="text-primary font-bold text-sm">{item.name.charAt(0).toUpperCase()}</span>
                     }
                   </div>
                   <div className="flex-1 min-w-0">

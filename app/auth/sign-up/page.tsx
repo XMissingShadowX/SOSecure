@@ -33,6 +33,8 @@ export default function SignUpPage() {
   const [password, setPassword] = useState('')
   const [phone, setPhone] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -41,6 +43,10 @@ export default function SignUpPage() {
     // Prevenir el comportamiento por defecto del formulario y restablecer errores y estado de carga
     e.preventDefault()
     setError(null)
+    if (!acceptedTerms || !acceptedPrivacy) {
+      setError('Debes aceptar los Términos y Condiciones y el Aviso de Privacidad para continuar.')
+      return
+    }
     setLoading(true)
 
     // Crear una instancia de Supabase para interactuar con la autenticación
@@ -174,7 +180,41 @@ export default function SignUpPage() {
                   </p>
                 </Field>
 
-                <Button type="submit" className="w-full" disabled={loading}>
+                <div className="space-y-3 pt-1">
+                  <label className="flex items-start gap-2 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={acceptedTerms}
+                      onChange={(e) => setAcceptedTerms(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-input accent-primary flex-shrink-0"
+                    />
+                    <span className="text-xs text-muted-foreground leading-snug">
+                      He leído y acepto los{' '}
+                      <Link href="/terminos" target="_blank" className="text-primary hover:underline font-medium">
+                        Términos y Condiciones
+                      </Link>
+                      {' '}de uso de SOSecure.
+                    </span>
+                  </label>
+
+                  <label className="flex items-start gap-2 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={acceptedPrivacy}
+                      onChange={(e) => setAcceptedPrivacy(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-input accent-primary flex-shrink-0"
+                    />
+                    <span className="text-xs text-muted-foreground leading-snug">
+                      He leído y acepto el{' '}
+                      <Link href="/privacidad" target="_blank" className="text-primary hover:underline font-medium">
+                        Aviso de Privacidad
+                      </Link>
+                      {' '}y autorizo el tratamiento de mis datos personales.
+                    </span>
+                  </label>
+                </div>
+
+                <Button type="submit" className="w-full" disabled={loading || !acceptedTerms || !acceptedPrivacy}>
                   {loading ? 'Creando cuenta...' : 'Crear Cuenta'}
                 </Button>
               </FieldGroup>

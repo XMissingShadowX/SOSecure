@@ -14,6 +14,7 @@ import { Plus, RefreshCw, AlertTriangle, Filter, ShieldCheck, Pencil, Trash2, Lo
 import { useAppStore } from '@/lib/store'
 import { useGeolocation } from '@/hooks/use-geolocation'
 import { createClient } from '@/lib/supabase/client'
+import { scheduleIncidentReminder, cancelIncidentReminder } from '@/lib/incident-reminder'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -301,6 +302,7 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
       setReportError(null)
       setShowReportDialog(false)
       loadIncidents()
+      if (data) scheduleIncidentReminder(data.id)
     }
 
     // Si el incidente se insertó correctamente y se obtuvo el ID del nuevo incidente, se invoca una función de 
@@ -335,20 +337,22 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
       incident_type: editingIncident.incident_type,
       severity: editingIncident.severity,
     }).eq('id', editingIncident.id)
+    cancelIncidentReminder(editingIncident.id)
     setShowEditDialog(false)
     setEditingIncident(null)
     loadIncidents()
   }
 
-  // Función para manejar la acción de eliminar un incidente. Recibe el ID del incidente a eliminar como argumento, 
-  // muestra una confirmación al usuario para asegurarse de que desea eliminar el incidente, y si el usuario 
-  // confirma, envía una solicitud de eliminación a la tabla 'incidents' en Supabase para eliminar el incidente 
-  // con el ID especificado. Después de eliminar el incidente, se recarga la lista de incidentes para reflejar 
+  // Función para manejar la acción de eliminar un incidente. Recibe el ID del incidente a eliminar como argumento,
+  // muestra una confirmación al usuario para asegurarse de que desea eliminar el incidente, y si el usuario
+  // confirma, envía una solicitud de eliminación a la tabla 'incidents' en Supabase para eliminar el incidente
+  // con el ID especificado. Después de eliminar el incidente, se recarga la lista de incidentes para reflejar
   // la eliminación.
   const handleDelete = async (incidentId: string) => {
     if (!confirm('¿Seguro que quieres eliminar este incidente?')) return
     const supabase = createClient()
     await supabase.from('incidents').delete().eq('id', incidentId)
+    cancelIncidentReminder(incidentId)
     loadIncidents()
   }
 
