@@ -5,9 +5,11 @@ const config: CapacitorConfig = {
   appName: 'sosecure',
   webDir: 'out',
   server: {
-    url: 'https://sosecure-ten.vercel.app/',
-    cleartext: true,
+    url: 'https://www.sosecure.site',
     androidScheme: 'https',
+  },
+  android: {
+    allowMixedContent: true,
   },
 };
 

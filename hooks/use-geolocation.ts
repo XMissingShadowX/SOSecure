@@ -34,7 +34,7 @@ export function useGeolocation(options: UseGeolocationOptions = {}): Geolocation
   const {
     watch = false,
     enableHighAccuracy = true,
-    timeout = 10000,
+    timeout = 30000,
     maximumAge = 0,
   } = options
 
@@ -67,40 +67,68 @@ export function useGeolocation(options: UseGeolocationOptions = {}): Geolocation
   // de la ubicación, de lo contrario, se obtiene la ubicación una sola vez. También se maneja la limpieza del monitoreo
   // cuando el componente se desmonta.
   useEffect(() => {
-    // Verificar si la geolocalización es compatible con el entorno actual. Si no lo es, se actualiza el estado con 
-    // un mensaje de error.
     const positionOptions = {
       enableHighAccuracy,
       timeout,
       maximumAge,
     }
 
-    // Si el entorno no es compatible con la geolocalización, se actualiza el estado con un mensaje de error.
-    if (watch) {
-      Geolocation.watchPosition(positionOptions, (position, err) => {
-        if (err || !position) {
-          onError('Unable to retrieve location.')
+    let cancelled = false
+
+    const start = async () => {
+      try {
+        const { location } = await Geolocation.checkPermissions()
+        if (location === 'denied') {
+          onError('Location access denied. Enable location in settings.')
           return
         }
-        onSuccess(position.coords.latitude, position.coords.longitude, position.coords.accuracy)
-      }).then((id) => {
-        watchIdRef.current = id
-      }).catch(() => {
-        onError('Location access denied. Enable location in settings.')
-      })
-    } else {
-      Geolocation.getCurrentPosition(positionOptions)
-        .then((position) => {
+        if (location !== 'granted') {
+          const result = await Geolocation.requestPermissions()
+          if (result.location !== 'granted') {
+            onError('Location access denied. Enable location in settings.')
+            return
+          }
+        }
+      } catch {
+        // checkPermissions no disponible en web — continuar igualmente
+      }
+
+      if (cancelled) return
+
+      if (watch) {
+        Geolocation.watchPosition(positionOptions, (position, err) => {
+          if (cancelled) return
+          if (err || !position) {
+            onError('Unable to retrieve location.')
+            return
+          }
           onSuccess(position.coords.latitude, position.coords.longitude, position.coords.accuracy)
-        })
-        .catch(() => {
+        }).then((id) => {
+          if (cancelled) {
+            Geolocation.clearWatch({ id })
+          } else {
+            watchIdRef.current = id
+          }
+        }).catch(() => {
           onError('Location access denied. Enable location in settings.')
         })
+      } else {
+        Geolocation.getCurrentPosition(positionOptions)
+          .then((position) => {
+            if (!cancelled) onSuccess(position.coords.latitude, position.coords.longitude, position.coords.accuracy)
+          })
+          .catch(() => {
+            onError('Location access denied. Enable location in settings.')
+          })
+      }
     }
+
+    start()
 
     // Limpiar el monitoreo de geolocalización cuando el componente se desmonta para evitar fugas de memoria y llamadas
     // innecesarias.
     return () => {
+      cancelled = true
       if (watchIdRef.current !== null) {
         Geolocation.clearWatch({ id: watchIdRef.current })
         watchIdRef.current = null

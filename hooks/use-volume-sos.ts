@@ -15,7 +15,8 @@ interface CapacitorPlugin {
     event: string,
     handler: (data: { button: string; timestamp: number }) => void
   ) => Promise<{ remove: () => void }>
-  call: (method: string) => Promise<void>
+  startListening: () => Promise<void>
+  stopListening: () => Promise<void>
 }
 
 declare global {
@@ -62,7 +63,7 @@ export function useVolumeSOS({ onActivate, disabled = false }: UseVolumeSOSOptio
         const plugin = window.Capacitor?.Plugins?.VolumeButton as CapacitorPlugin | undefined
         if (!plugin) return
 
-        await plugin.call('startListening')
+        await plugin.startListening()
 
         const handle = await plugin.addListener('volumeButtonPressed', () => {
           if (!cancelled) handlePress()
@@ -81,7 +82,7 @@ export function useVolumeSOS({ onActivate, disabled = false }: UseVolumeSOSOptio
       listenerRef.current?.remove()
       listenerRef.current = null
       const plugin = window.Capacitor?.Plugins?.VolumeButton as CapacitorPlugin | undefined
-      plugin?.call('stopListening').catch(() => {})
+      plugin?.stopListening().catch(() => {})
     }
   }, [disabled, handlePress])
 

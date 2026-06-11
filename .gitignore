@@ -57,3 +57,5 @@ android/app/src/main/assets/public/
 
 # Claude
 .claude/settings.json
+
+certificates
