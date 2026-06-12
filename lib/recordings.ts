@@ -100,24 +100,9 @@ export async function sendRecordingToContacts(
       const publicUrl = urlData?.publicUrl
 
       if (publicUrl) {
-        const primary = contacts.find(c => c.importance === 'primary') ?? contacts[0]
-        const phone = primary.phone.replace(/\D/g, '')
-        const fullMessage = `${shareText}\n🎥 Grabación: ${publicUrl}`
-        if (phone) {
-          window.open(`https://wa.me/${phone}?text=${encodeURIComponent(fullMessage)}`, '_blank', 'noopener')
-          return { success: true, method: 'whatsapp+url' }
-        }
         return { success: true, method: 'url' }
       }
     }
-  }
-
-  // Último fallback: solo WhatsApp con texto
-  const primary = contacts.find(c => c.importance === 'primary') ?? contacts[0]
-  const phone = primary.phone.replace(/\D/g, '')
-  if (phone) {
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(shareText)}`, '_blank', 'noopener')
-    return { success: true, method: 'whatsapp' }
   }
 
   return { success: false, method: 'none' }

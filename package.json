@@ -13,7 +13,7 @@
     "cap:sync": "npx cap sync",
     "cap:android": "npx cap open android",
     "android": "npx cap sync && npx cap open android",
-    "android:dev": "npx cap run android --live-reload --host=192.168.100.98 --port=3000 --forwardPorts=3000:3000"
+    "android:dev": "npx cap run android --live-reload --host=localhost --port=3000 --forwardPorts=3000:3000"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",

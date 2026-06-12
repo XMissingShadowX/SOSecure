@@ -15,7 +15,6 @@ import { useEffect, useState } from 'react'
 import { Shield, MapPin, Users, Plus, Trash2, AlertCircle, Star, Home, Briefcase, BookOpen, Heart, Navigation, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/lib/store'
-import { useGeolocation } from '@/hooks/use-geolocation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -73,8 +72,7 @@ const placeIcons: Record<string, React.ElementType> = {
 export function HomeTab() {
   // Se utilizan varios hooks para manejar la geolocalización del usuario, el estado global de la aplicación, y 
   // el estado local del componente.
-  const { coordinates, loading: locationLoading, error: locationError } = useGeolocation({ watch: true })
-  const { setCurrentLocation, contacts, setContacts, nearbyIncidents, frequentPlaces, addFrequentPlace, removeFrequentPlace } = useAppStore()
+  const { currentLocation: coordinates, locationLoading, locationError, contacts, setContacts, nearbyIncidents, frequentPlaces, addFrequentPlace, removeFrequentPlace } = useAppStore()
   // Estados locales para manejar la visibilidad de los diálogos de agregar contacto y lugar, el contacto que se 
   // está editando, los datos del nuevo contacto y lugar que se están agregando, las sugerencias de lugares basadas 
   // en la búsqueda, y el estado de carga de los contactos.
@@ -105,14 +103,6 @@ export function HomeTab() {
   const [placeSuggestions, setPlaceSuggestions] = useState<{ display_name: string; lat: string; lon: string }[]>([])
   // El estado loading se utiliza para indicar si los contactos de emergencia están siendo cargados desde la base de datos,
   const [loading, setLoading] = useState(true)
-
-  // Se utiliza un efecto para actualizar la ubicación actual en el estado global de la aplicación cada vez que 
-  // cambian las coordenadas obtenidas por el hook de geolocalización.
-  useEffect(() => {
-    if (coordinates) {
-      setCurrentLocation(coordinates)
-    }
-  }, [coordinates, setCurrentLocation])
 
   // Se utiliza un efecto para cargar los contactos de emergencia desde la base de datos cuando el componente se monta.
   useEffect(() => {
@@ -259,7 +249,21 @@ export function HomeTab() {
 
   // Se calcula la cantidad de incidentes cercanos que tienen una severidad alta para determinar el estado de 
   // alerta en el banner de estado.
-  const nearbyDangerCount = nearbyIncidents.filter(i => i.severity === 'high').length
+  // Filtra incidentes dentro de ~20 km (radio típico de una ciudad)
+  const cityIncidents = coordinates
+    ? nearbyIncidents.filter(i => {
+        const R = 6371
+        const dLat = (i.latitude - coordinates.latitude) * Math.PI / 180
+        const dLon = (i.longitude - coordinates.longitude) * Math.PI / 180
+        const a =
+          Math.sin(dLat / 2) ** 2 +
+          Math.cos(coordinates.latitude * Math.PI / 180) *
+          Math.cos(i.latitude * Math.PI / 180) *
+          Math.sin(dLon / 2) ** 2
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) <= 20
+      })
+    : nearbyIncidents
+  const nearbyDangerCount = cityIncidents.filter(i => i.severity === 'high').length
   const importanceColor = (importance: string) => {
     if (importance === 'primary') return 'bg-destructive/20 text-destructive'
     if (importance === 'secondary') return 'bg-warning/20 text-warning'
@@ -274,12 +278,12 @@ export function HomeTab() {
   return (
     <div className="flex flex-col gap-6 pb-40">
       {/* Status Banner */}
-      <Card className={cn("border-2", nearbyDangerCount > 0 ? "border-warning bg-warning/10" : "border-safe bg-safe/10")}>
+      <Card className={cn("border-2", !coordinates ? "border-muted bg-muted/10" : nearbyDangerCount > 0 ? "border-warning bg-warning/10" : "border-safe bg-safe/10")}>
         <CardContent className="flex items-center justify-center gap-3 py-2 px-3">
-          <Shield className={cn("w-5 h-5 shrink-0", nearbyDangerCount > 0 ? "text-warning" : "text-safe")} />
+          <Shield className={cn("w-5 h-5 shrink-0", !coordinates ? "text-muted-foreground" : nearbyDangerCount > 0 ? "text-warning" : "text-safe")} />
           <div className="text-center">
-            <p className={cn("font-semibold text-base", nearbyDangerCount > 0 ? "text-warning" : "text-safe")}>
-              {nearbyDangerCount > 0 ? `${nearbyDangerCount} Alerta${nearbyDangerCount > 1 ? 's' : ''} Cercana${nearbyDangerCount > 1 ? 's' : ''}` : 'Zona Aparentemente Segura'}
+            <p className={cn("font-semibold text-base", !coordinates ? "text-muted-foreground" : nearbyDangerCount > 0 ? "text-warning" : "text-safe")}>
+              {!coordinates ? 'Determinando ubicación...' : nearbyDangerCount > 0 ? `${nearbyDangerCount} Alerta${nearbyDangerCount > 1 ? 's' : ''} Cercana${nearbyDangerCount > 1 ? 's' : ''}` : 'Zona Aparentemente Segura'}
             </p>
             <p className="text-sm text-muted-foreground">
               {locationLoading ? 'Obteniendo ubicación...'

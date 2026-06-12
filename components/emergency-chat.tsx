@@ -527,9 +527,6 @@ export function EmergencyChat() {
           .single()
         if (inserted) setMessages(prev => [...prev, dbToUI(inserted as DBMessage, myId)])
         await upsertConversation(supabase, myId, receiverId, sosText)
-      } else if (c.phone) {
-        const phone = c.phone.replace(/\D/g, '')
-        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(sosText)}`, '_blank', 'noopener')
       }
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -698,7 +695,11 @@ export function EmergencyChat() {
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-primary/10 flex-shrink-0">
           <div className="flex items-center gap-2 min-w-0">
-            {isAIActive ? (
+            {activeId ? (
+              <button onClick={() => setActiveId(null)} className="flex items-center gap-1 text-xs text-muted-foreground px-2 py-1 rounded hover:bg-muted flex-shrink-0">
+                <ChevronLeft className="w-4 h-4" /> Volver
+              </button>
+            ) : isAIActive ? (
               <Sparkles className="w-5 h-5 text-primary flex-shrink-0" />
             ) : isLiveItem ? (
               <Camera className="w-5 h-5 text-destructive flex-shrink-0" />
@@ -724,11 +725,6 @@ export function EmergencyChat() {
             {sosActive && !isLiveItem && <Badge variant="destructive" className="text-xs animate-pulse flex-shrink-0">SOS</Badge>}
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
-            {activeId && (
-              <button onClick={() => setActiveId(null)} className="flex items-center gap-1 text-xs text-muted-foreground px-2 py-1 rounded hover:bg-muted">
-                <ChevronLeft className="w-3 h-3" /> Volver
-              </button>
-            )}
             <button onClick={() => setOpen(false)} className="p-1 rounded hover:bg-muted">
               <X className="w-4 h-4 text-muted-foreground" />
             </button>

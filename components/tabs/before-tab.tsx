@@ -6,7 +6,6 @@ import { Shield, ShieldCheck, Clock, Users, Timer, AlertTriangle, Map, Navigatio
 import { RoutesTab, calculateSafetyScore } from './routes-tab'
 import { MapTab } from './map-tab'
 import { useAppStore } from '@/lib/store'
-import { useGeolocation } from '@/hooks/use-geolocation'
 import { useTracking } from '@/hooks/use-tracking'
 import { useIncomingTracking } from '@/hooks/use-incoming-tracking'
 import { useLiveLocation } from '@/hooks/use-live-location'
@@ -194,8 +193,8 @@ export function BeforeTab() {
     showRoutes, selectedRoute, routeOrigin, routeDestination, nearbyIncidents,
     setRouteOptions, setRouteInfo,
     sosActive, voiceKeyword, setVoiceKeyword,
+    currentLocation: coordinates,
   } = useAppStore()
-  const { coordinates } = useGeolocation({ watch: true })
   const { session, members, loading: trackingLoading, error: trackingError, startTracking, stopTracking, syncTimer } = useTracking()
 
   const [countdown, setCountdown] = useState<number | null>(null)

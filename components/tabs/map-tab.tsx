@@ -12,7 +12,6 @@ import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { Plus, RefreshCw, AlertTriangle, Filter, ShieldCheck, Pencil, Trash2, LocateFixed } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
-import { useGeolocation } from '@/hooks/use-geolocation'
 import { createClient } from '@/lib/supabase/client'
 import { scheduleIncidentReminder, cancelIncidentReminder } from '@/lib/incident-reminder'
 import { Button } from '@/components/ui/button'
@@ -114,7 +113,6 @@ function calculateSeverity(answers: string[]): IncidentSeverity {
 // de nuevos incidentes, la edición y eliminación de incidentes propios, la aplicación de filtros, y la sincronización 
 // de reportes cuando el usuario está offline.
 export function MapTab({ embedded = false, customMap }: { embedded?: boolean; customMap?: React.ReactNode }) {
-  const { coordinates } = useGeolocation({ watch: true })
   const [mapTheme, setMapTheme] = useState(() => {
     if (typeof window === 'undefined') return 'dark'
     return document.documentElement.className === 'dark' ? 'dark' : 'light'
@@ -133,6 +131,7 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
   // Uso del estado global para manejar los incidentes cercanos, la ubicación actual del usuario, y la cola de reportes
   // offline.
   const { nearbyIncidents, setNearbyIncidents, currentLocation, addToOfflineQueue, offlineQueue } = useAppStore()
+  const coordinates = currentLocation
   const [showReportDialog, setShowReportDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [editingIncident, setEditingIncident] = useState<Incident | null>(null)
@@ -409,7 +408,7 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
           <IncidentMap
             key={mapTheme}
             incidents={filteredIncidents}
-            userLocation={currentLocation || coordinates || null}
+            userLocation={currentLocation}
             showHeatZones={true}
             currentUserId={currentUserId}
             isAdmin={isAdmin}

@@ -24,6 +24,9 @@ interface AppState {
   // Ubicación
   currentLocation: Coordinates | null
   setCurrentLocation: (location: Coordinates) => void
+  locationLoading: boolean
+  locationError: string | null
+  setLocationStatus: (loading: boolean, error: string | null) => void
 
   // Historial de ubicación — mantener últimos 10 min
   locationHistory: LocationHistory[]
@@ -48,6 +51,8 @@ interface AppState {
   setSosActive: (active: boolean) => void
   sosAlert: SOSAlert | null
   setSosAlert: (alert: SOSAlert | null) => void
+  sosStream: MediaStream | null
+  setSosStream: (stream: MediaStream | null) => void
 
   // Rutas
   routeOrigin: Coordinates | null
@@ -82,6 +87,12 @@ interface AppState {
   voiceKeyword: string
   setVoiceKeyword: (keyword: string) => void
 
+  // Activación por botones de volumen
+  volumePresses: number
+  setVolumePresses: (n: number) => void
+  volumeWindow: number
+  setVolumeWindow: (ms: number) => void
+
   // Cola sin conexión (incidentes para enviar cuando se vuelva en línea)
   offlineQueue: Incident[]
   addToOfflineQueue: (incident: Omit<Incident, 'id' | 'reported_at' | 'is_active' | 'resolved_at'>) => void
@@ -99,10 +110,13 @@ export const useAppStore = create<AppState>()(
       activeTab: 'home',
       setActiveTab: (tab) => set({ activeTab: tab }),
 
-      // Ubicacion 
+      // Ubicacion
       currentLocation: null,
+      locationLoading: true,
+      locationError: null,
+      setLocationStatus: (loading, error) => set({ locationLoading: loading, locationError: error }),
       setCurrentLocation: (location) => {
-        set({ currentLocation: location })
+        set({ currentLocation: location, locationLoading: false, locationError: null })
         get().addLocationHistory(location)
       },
 
@@ -135,6 +149,8 @@ export const useAppStore = create<AppState>()(
       setSosActive: (active) => set({ sosActive: active }),
       sosAlert: null,
       setSosAlert: (alert) => set({ sosAlert: alert }),
+      sosStream: null,
+      setSosStream: (stream) => set({ sosStream: stream }),
 
       // Rutas
       routeOrigin: null,
@@ -169,6 +185,12 @@ export const useAppStore = create<AppState>()(
       voiceKeyword: 'socorro',
       setVoiceKeyword: (keyword) => set({ voiceKeyword: keyword }),
 
+      // Activación por botones de volumen
+      volumePresses: 5,
+      setVolumePresses: (n) => set({ volumePresses: n }),
+      volumeWindow: 3000,
+      setVolumeWindow: (ms) => set({ volumeWindow: ms }),
+
       // Cola sin conexión
       offlineQueue: [],
       addToOfflineQueue: (incident) => {
@@ -194,6 +216,8 @@ export const useAppStore = create<AppState>()(
         offlineQueue: state.offlineQueue,
         isLiveSharing: state.isLiveSharing,
         voiceKeyword: state.voiceKeyword,
+        volumePresses: state.volumePresses,
+        volumeWindow: state.volumeWindow,
       }),
     }
   )

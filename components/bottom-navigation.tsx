@@ -27,7 +27,7 @@ export function BottomNavigation() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-sm border-t border-border safe-area-bottom">
-      <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2 overflow-x-auto gap-1">
+      <div className="flex items-center h-16 w-full max-w-lg mx-auto">
         {tabs.map((tab) => {
           const Icon = tab.icon
           const isActive = activeTab === tab.id
@@ -36,7 +36,7 @@ export function BottomNavigation() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'flex flex-col items-center gap-1 px-2 py-2 rounded-xl transition-colors flex-shrink-0',
+                'flex flex-1 flex-col items-center justify-center gap-1 py-2 rounded-xl transition-colors',
                 isActive
                   ? 'text-primary'
                   : 'text-muted-foreground hover:text-foreground'

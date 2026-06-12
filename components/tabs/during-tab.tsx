@@ -14,7 +14,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Mic, MicOff, Video, VideoOff, AlertTriangle, WifiOff, Wifi, Radio, Save, Send, Upload, CheckCircle, MessageCircle } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
-import { useGeolocation } from '@/hooks/use-geolocation'
 import { sendAlarmNotification, playAlarmSound } from '@/lib/notifications'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -116,8 +115,7 @@ function useStreetNames(locationHistory: { coordinates: { latitude: number; long
 // para el modo de emergencia activo, la grabación de audio y video, la conexión a internet, y la interacción 
 // con los contactos de emergencia.
 export function DuringTab() {
-  const { sosActive, setSosActive, contacts, locationHistory, voiceKeyword } = useAppStore()
-  const { coordinates } = useGeolocation({ watch: true })
+  const { sosActive, setSosActive, contacts, locationHistory, voiceKeyword, currentLocation: coordinates, sosStream } = useAppStore()
     const [isOnline, setIsOnline] = useState(true)
   const [isRecordingAudio, setIsRecordingAudio] = useState(false)
   const [isRecordingVideo, setIsRecordingVideo] = useState(false)
@@ -136,6 +134,7 @@ export function DuringTab() {
   const tapCountRef = useRef(0)
   const tapTimerRef = useRef<NodeJS.Timeout | null>(null)
   const [tapCountDisplay, setTapCountDisplay] = useState(0)
+  const [recordingError, setRecordingError] = useState<string | null>(null)
   // Efecto para manejar los eventos de conexión y desconexión a internet, actualizando el estado de conexión en consecuencia.
   useEffect(() => {
     const update = () => setIsOnline(navigator.onLine)
@@ -183,17 +182,23 @@ export function DuringTab() {
       // exitoso, se configura el MediaRecorder para manejar los datos de audio y se actualiza el estado para 
       // reflejar que la grabación ha comenzado.
       try {
-        // Se solicita acceso al micrófono utilizando la API de getUserMedia. Si el usuario concede el acceso, 
-        // se obtiene un stream de audio que se almacena en el estado. Se inicializan las referencias para el 
-        // tiempo de inicio de la grabación y los chunks de audio, y se crea un MediaRecorder para manejar la 
-        // grabación de audio. Se configuran los eventos 'ondataavailable' para almacenar los chunks de audio a 
-        // medida que se generan, y 'onstop' para procesar los datos de audio grabados cuando se detiene la grabación. 
-        // Finalmente, se inicia la grabación y se actualiza el estado para reflejar que la grabación de audio está activa.
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        setRecordingError(null)
+        if (!navigator.mediaDevices?.getUserMedia && !sosStream) {
+          setRecordingError('Micrófono no disponible en contexto no seguro (HTTP). Usa la app instalada o HTTPS.')
+          return
+        }
+        const stream = sosStream
+          ? new MediaStream(sosStream.getAudioTracks())
+          : await navigator.mediaDevices.getUserMedia({ audio: true })
         setAudioStream(stream)
         audioStartRef.current = Date.now()
         audioChunksRef.current = []
-        const recorder = new MediaRecorder(stream)
+        const audioMime =
+          MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' :
+          MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' :
+          MediaRecorder.isTypeSupported('video/webm;codecs=opus') ? 'video/webm;codecs=opus' :
+          MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : ''
+        const recorder = audioMime ? new MediaRecorder(stream, { mimeType: audioMime }) : new MediaRecorder(stream)
         recorder.ondataavailable = (e) => {
           if (e.data.size > 0) audioChunksRef.current.push(e.data)
         }
@@ -234,13 +239,12 @@ export function DuringTab() {
         setIsRecordingAudio(true)
         setLastRecording(null)
         setStatusMsg('')
-      } catch {
-        // Si ocurre un error al intentar acceder al micrófono (por ejemplo, si el usuario deniega el permiso), 
-        // se envía una notificación de alarma.
-        sendAlarmNotification('⚠️ SOSecure', 'No se pudo acceder al micrófono')
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Error desconocido'
+        setRecordingError(`Micrófono: ${msg}`)
       }
     }
-  }, [isRecordingAudio, audioRecorder, audioStream, coordinates])
+  }, [isRecordingAudio, audioRecorder, audioStream, coordinates, sosStream])
 
   // Guardar localmente 
   const handleSaveLocally = useCallback(() => {
@@ -367,22 +371,21 @@ export function DuringTab() {
       // grabados cuando se detiene la grabación. Finalmente, se inicia la grabación y se actualiza el estado para 
       // reflejar que la grabación de video está activa.
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            sampleRate: 48000,
-            channelCount: 2,
-          },
-          video: {
-            facingMode: { ideal: 'environment' },
-            width:     { ideal: 1920, min: 1280 },
-            height:    { ideal: 1080, min: 720  },
-            frameRate: { ideal: 30,   min: 24   },
-          }
-        }).catch(
-          () => navigator.mediaDevices.getUserMedia({ audio: true, video: true })
-        )
+        setRecordingError(null)
+        if (!navigator.mediaDevices?.getUserMedia && !sosStream) {
+          setRecordingError('Cámara no disponible en contexto no seguro (HTTP). Usa la app instalada o HTTPS.')
+          return
+        }
+        const stream = sosStream
+          ? new MediaStream([...sosStream.getVideoTracks(), ...sosStream.getAudioTracks()])
+          : await navigator.mediaDevices.getUserMedia({
+              audio: { echoCancellation: true, noiseSuppression: true },
+              video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+            }).catch(
+              () => navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+            ).catch(
+              () => navigator.mediaDevices.getUserMedia({ audio: true })
+            )
         // Si se obtiene el stream de video, se asigna al elemento de video para mostrar la vista previa al usuario.
         setVideoStream(stream)
         setIsRecordingVideo(true)
@@ -431,11 +434,12 @@ export function DuringTab() {
         }
         recorder.start(100)
         videoRecorderRef.current = recorder
-      } catch {
-        sendAlarmNotification('⚠️ SOSecure', 'No se pudo acceder a la cámara')
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Error desconocido'
+        setRecordingError(`Cámara: ${msg}`)
       }
     }
-  }, [isRecordingVideo, videoStream, coordinates])
+  }, [isRecordingVideo, videoStream, coordinates, sosStream])
 
   // Se utiliza el hook personalizado useStreetNames para obtener los nombres de las calles correspondientes 
   // a las coordenadas del historial de ubicaciones, y se extraen los últimos 5 registros de ubicación para 
@@ -556,6 +560,12 @@ export function DuringTab() {
             )}
           </div>
 
+          {recordingError && (
+            <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg text-sm text-destructive">
+              ⚠️ {recordingError}
+            </div>
+          )}
+
           <div className="flex gap-3">
             <Button
               onClick={toggleAudio}
@@ -671,7 +681,8 @@ export function DuringTab() {
               {lastLocations.reverse().map((loc, i) => (
                 <div key={i} className="flex items-center gap-2 p-2 bg-muted/50 rounded text-xs">
                   <Badge variant="outline" className="text-xs">{i === 0 ? 'Ahora' : `Hace ${Math.round((Date.now() - loc.timestamp) / 60000)} min`}</Badge>
-<span className="text-muted-foreground">{streetNames[`${loc.coordinates.latitude.toFixed(5)},${loc.coordinates.longitude.toFixed(5)}`] ?? '📍 Cargando...'}</span>                </div>
+                  <span className="text-muted-foreground">{streetNames[`${loc.coordinates.latitude.toFixed(5)},${loc.coordinates.longitude.toFixed(5)}`] ?? '📍 Cargando...'}</span>
+                </div>
               ))}
             </div>
           )}

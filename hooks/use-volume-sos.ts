@@ -1,56 +1,50 @@
 'use client'
 
 import { useEffect, useRef, useCallback } from 'react'
-
-const PRESSES_REQUIRED = 5
-const TIME_WINDOW_MS   = 3000
+import { registerPlugin } from '@capacitor/core'
 
 interface UseVolumeSOSOptions {
   onActivate: () => void
   disabled?: boolean
+  pressesRequired?: number
+  timeWindowMs?: number
 }
 
-interface CapacitorPlugin {
+interface VolumeButtonPlugin {
   addListener: (
-    event: string,
+    event: 'volumeButtonPressed',
     handler: (data: { button: string; timestamp: number }) => void
   ) => Promise<{ remove: () => void }>
   startListening: () => Promise<void>
   stopListening: () => Promise<void>
 }
 
-declare global {
-  interface Window {
-    Capacitor?: {
-      isNativePlatform: () => boolean
-      Plugins?: Record<string, CapacitorPlugin>
-    }
-  }
-}
+const VolumeButton = registerPlugin<VolumeButtonPlugin>('VolumeButton')
 
 function isNativePlatform(): boolean {
   return typeof window !== 'undefined' && !!window.Capacitor?.isNativePlatform?.()
 }
 
-export function useVolumeSOS({ onActivate, disabled = false }: UseVolumeSOSOptions) {
+export function useVolumeSOS({ onActivate, disabled = false, pressesRequired = 5, timeWindowMs = 3000 }: UseVolumeSOSOptions) {
   const pressTimesRef  = useRef<number[]>([])
   const listenerRef    = useRef<{ remove: () => void } | null>(null)
   // Mantener referencia estable a onActivate para evitar re-ejecuciones de efectos.
   const onActivateRef  = useRef(onActivate)
   useEffect(() => { onActivateRef.current = onActivate }, [onActivate])
 
-  const handlePress = useCallback(() => {
+  const handlePressRef = useRef<() => void>(() => {})
+  handlePressRef.current = () => {
     if (disabled) return
     const now = Date.now()
     pressTimesRef.current = [
-      ...pressTimesRef.current.filter(t => now - t < TIME_WINDOW_MS),
+      ...pressTimesRef.current.filter(t => now - t < timeWindowMs),
       now,
     ]
-    if (pressTimesRef.current.length >= PRESSES_REQUIRED) {
+    if (pressTimesRef.current.length >= pressesRequired) {
       pressTimesRef.current = []
       onActivateRef.current()
     }
-  }, [disabled])
+  }
 
   // ── Android nativo: VolumeButtonPlugin ──────────────────────────────────
   useEffect(() => {
@@ -60,13 +54,10 @@ export function useVolumeSOS({ onActivate, disabled = false }: UseVolumeSOSOptio
 
     const setup = async () => {
       try {
-        const plugin = window.Capacitor?.Plugins?.VolumeButton as CapacitorPlugin | undefined
-        if (!plugin) return
+        await VolumeButton.startListening()
 
-        await plugin.startListening()
-
-        const handle = await plugin.addListener('volumeButtonPressed', () => {
-          if (!cancelled) handlePress()
+        const handle = await VolumeButton.addListener('volumeButtonPressed', () => {
+          if (!cancelled) handlePressRef.current()
         })
 
         listenerRef.current = handle
@@ -81,10 +72,9 @@ export function useVolumeSOS({ onActivate, disabled = false }: UseVolumeSOSOptio
       cancelled = true
       listenerRef.current?.remove()
       listenerRef.current = null
-      const plugin = window.Capacitor?.Plugins?.VolumeButton as CapacitorPlugin | undefined
-      plugin?.stopListening().catch(() => {})
+      VolumeButton.stopListening().catch(() => {})
     }
-  }, [disabled, handlePress])
+  }, [disabled])
 
   // ── Web / PWA: KeyboardEvent para teclas de volumen (MediaSession API) ──
   // Los navegadores de escritorio exponen ArrowUp/ArrowDown con MediaSession,
@@ -100,13 +90,13 @@ export function useVolumeSOS({ onActivate, disabled = false }: UseVolumeSOSOptio
       if (e.key === 'AudioVolumeUp' || e.key === 'AudioVolumeDown' ||
           e.key === 'VolumeUp'      || e.key === 'VolumeDown') {
         e.preventDefault()
-        handlePress()
+        handlePressRef.current()
       }
     }
 
     // Fallback: volumechange en el documento (funciona si hay un <video>/<audio>
     // activo en la página con el que el usuario ya interactuó).
-    const onVolumeChange = () => handlePress()
+    const onVolumeChange = () => handlePressRef.current()
 
     window.addEventListener('keydown', onKeyDown, { capture: true })
     document.addEventListener('volumechange', onVolumeChange, { capture: true })
@@ -115,5 +105,5 @@ export function useVolumeSOS({ onActivate, disabled = false }: UseVolumeSOSOptio
       window.removeEventListener('keydown', onKeyDown, { capture: true })
       document.removeEventListener('volumechange', onVolumeChange, { capture: true })
     }
-  }, [disabled, handlePress])
+  }, [disabled])
 }

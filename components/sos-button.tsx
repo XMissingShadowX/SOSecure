@@ -16,7 +16,6 @@ import { useVolumeSOS } from '@/hooks/use-volume-sos'
 import { AlertTriangle, X, Bell, Mic, Video, StopCircle, Minimize2, ChevronUp, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/lib/store'
-import { useGeolocation } from '@/hooks/use-geolocation'
 import { createClient } from '@/lib/supabase/client'
 import { createLiveBroadcaster, type LiveBroadcaster } from '@/lib/live-stream'
 import { sendAlarmNotification, playAlarmSound } from '@/lib/notifications'
@@ -37,8 +36,7 @@ const SECRET_TAP_COUNT = 5
 const SECRET_TAP_WINDOW = 3000
 
 export function SOSButton() {
-  const { sosActive, setSosActive, setSosAlert, contacts, setActiveTab } = useAppStore()
-  const { coordinates } = useGeolocation({ watch: true })
+  const { sosActive, setSosActive, setSosAlert, setSosStream, contacts, setActiveTab, currentLocation: coordinates, volumePresses, volumeWindow } = useAppStore()
   const [holdProgress, setHoldProgress] = useState(0)
   const [isHolding, setIsHolding] = useState(false)
   const [showCancelDialog, setShowCancelDialog] = useState(false)
@@ -146,6 +144,7 @@ export function SOSButton() {
       )
       activeStream = stream
       setRecordingStream(stream)
+      setSosStream(stream)
 
       const mimeType = (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus'))
         ? 'video/webm;codecs=vp9,opus'
@@ -264,13 +263,14 @@ export function SOSButton() {
       if (!coordinates || !activeAlertId) return
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        await supabase.from('sos_locations').upsert({
-          alert_id: activeAlertId,
-          user_id: user.id,
-          latitude: coordinates.latitude,
-          longitude: coordinates.longitude,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'alert_id' })
+        await supabase.from('sos_locations')
+          .update({
+            latitude: coordinates.latitude,
+            longitude: coordinates.longitude,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('alert_id', activeAlertId)
+          .eq('user_id', user.id)
       }
     }
 
@@ -373,6 +373,7 @@ export function SOSButton() {
       stopLive()
       if (recordingStream) recordingStream.getTracks().forEach(t => t.stop())
       setRecordingStream(null)
+      setSosStream(null)
       setIsRecording(false)
       if (recordingChunksRef.current.length > 0) {
         setDownloadReady(true)
@@ -402,6 +403,7 @@ export function SOSButton() {
     if (recordingStream) { recordingStream.getTracks().forEach(t => t.stop()) }
     setMediaRecorder(null)
     setRecordingStream(null)
+    setSosStream(null)
 
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -433,6 +435,8 @@ export function SOSButton() {
   useVolumeSOS({
     onActivate: activateSOS,
     disabled: sosActive,
+    pressesRequired: volumePresses,
+    timeWindowMs: volumeWindow,
   })
 
   if (sosActive) {
@@ -553,6 +557,7 @@ export function SOSButton() {
                       if (mediaRecorder) { try { mediaRecorder.stop() } catch { /**/ } }
                       recordingStream.getTracks().forEach(t => t.stop())
                       setRecordingStream(null)
+                      setSosStream(null)
                       setIsRecording(false)
                     }}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border bg-card text-foreground text-sm hover:bg-muted transition-colors"

@@ -303,3 +303,35 @@ npm run cap:android  # Luego Build > Generate Signed APK en Android Studio
 - Las Edge Functions de Supabase (`notify-contacts`, `notify-nearby-users`) viven en `supabase/functions/`
 - El PIN de seguridad se hashea en `lib/pin.ts` antes de guardarse
 - Las grabaciones se suben a Supabase Storage con límite de tamaño definido en `lib/recordings.ts`
+
+---
+
+## Arquitectura — Decisiones Importantes
+
+### Geolocalización centralizada
+- **Un solo watcher GPS** vive en `app-shell.tsx` (`useGeolocation({ watch: true })`).
+- El resultado se guarda en el store (`currentLocation`, `locationLoading`, `locationError`).
+- Todos los tabs y componentes consumen `currentLocation` del store — **no llaman `useGeolocation` directamente**.
+- El `VolumeButtonPlugin` existe solo como `.java` (`android/app/src/main/java/com/sosecure/app/VolumeButtonPlugin.java`). **No crear versión `.kt`** — causaría redeclaración en tiempo de compilación.
+
+### Stream de cámara/mic durante SOS
+- Cuando el SOS se activa, `sos-button.tsx` obtiene el `MediaStream` de cámara/mic y lo guarda en `sosStream` del store (no persistido).
+- `during-tab.tsx` reutiliza ese stream en vez de llamar `getUserMedia` (que falla en Android con la cámara ocupada).
+- Al cancelar el SOS, `sosStream` se limpia con `setSosStream(null)`.
+
+### Reconocimiento de voz — sincronización con SOS
+- `app-shell.tsx` usa `voicePausedRef` (ref síncrona) para pausar/reanudar el reconocimiento de voz al activar/cancelar el SOS.
+- **No usar `sosActiveRef`** para esta lógica — tiene condición de carrera con el ciclo de renders de React.
+
+### `sos_locations` — actualización de ubicación
+- El insert inicial al activar SOS crea el registro.
+- Las actualizaciones periódicas (cada 1 s) usan `.update().eq('alert_id', ...)` — **no `.upsert()`**, porque `alert_id` no tiene restricción `UNIQUE` en la tabla.
+
+### Desarrollo en dispositivo Android
+- `npm run android:dev` usa `--host=localhost` con `--forwardPorts=3000:3000` (ADB port forward).
+- **No usar la IP de la PC** como host — HTTP sobre IP no es "secure context" y `navigator.mediaDevices` queda `undefined`.
+- `navigator.mediaDevices` requiere HTTPS o `localhost`; en la APK de producción funciona por el esquema `https://` de Capacitor.
+
+### Notificaciones SOS no abren WhatsApp
+- Los contactos se notifican **solo por correo** (Resend + Edge Function `notify-contacts`).
+- Los fallbacks a WhatsApp fueron eliminados de `lib/recordings.ts` y `components/emergency-chat.tsx`.

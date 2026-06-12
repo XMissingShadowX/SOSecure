@@ -18,7 +18,6 @@ import dynamic from 'next/dynamic'
 import { Navigation, MapPin, AlertTriangle, Clock, Shield, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/lib/store'
-import { useGeolocation } from '@/hooks/use-geolocation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -86,11 +85,11 @@ export function calculateSafetyScore(
 // funciones para buscar destinos utilizando la API de Photon, seleccionar rutas, y mostrar información relevante sobre la 
 // seguridad de cada ruta. También muestra consejos de seguridad para los usuarios al planear sus rutas.
 export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
-  const { coordinates } = useGeolocation({ watch: true })
   const {
     nearbyIncidents, routeOrigin, routeDestination, setRouteOrigin, setRouteDestination, frequentPlaces,
     showRoutes, setShowRoutes, selectedRoute, setSelectedRoute,
     routeOptions, setRouteOptions, routeInfo, setRouteInfo,
+    currentLocation: coordinates,
   } = useAppStore()
   const [destinationInput, setDestinationInput] = useState('')
   const [suggestions, setSuggestions] = useState<{ display_name: string; lat: string; lon: string }[]>([])

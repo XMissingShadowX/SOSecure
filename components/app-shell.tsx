@@ -24,7 +24,7 @@ import { MedicTab } from './tabs/medic-tab'
 import { BeforeTab } from './tabs/before-tab'
 import { DuringTab } from './tabs/during-tab'
 import { AfterTab } from './tabs/after-tab'
-import { Shield, Settings, LogOut, BellRing, WifiOff, Sun, Moon, UserCircle, Trash2, Lock, LockOpen, KeyRound, CheckCircle2, Delete, ShieldCheck } from 'lucide-react'
+import { Shield, Settings, LogOut, BellRing, WifiOff, Sun, Moon, UserCircle, Trash2, Lock, LockOpen, KeyRound, CheckCircle2, Delete, ShieldCheck, Volume2 } from 'lucide-react'
 import { PinLock } from './pin-lock'
 import { hashPin } from '@/lib/pin'
 import { Button } from '@/components/ui/button'
@@ -57,12 +57,13 @@ import {
 import type { User } from '@supabase/supabase-js'
 
 export function AppShell() {
-  const { activeTab, setCurrentLocation, setNearbyIncidents, offlineQueue, isLiveSharing, voiceKeyword, sosActive } = useAppStore()
-  const { coordinates } = useGeolocation({ watch: true })
+  const { activeTab, setCurrentLocation, setLocationStatus, setNearbyIncidents, offlineQueue, isLiveSharing, voiceKeyword, sosActive, volumePresses, setVolumePresses, volumeWindow, setVolumeWindow } = useAppStore()
+  const { coordinates, loading: locationLoading, error: locationError } = useGeolocation({ watch: true })
   const [user, setUser] = useState<User | null>(null)
   const liveBroadcastRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const voiceRecognitionRef = useRef<any>(null)
   const sosActiveRef = useRef(sosActive)
+  const voicePausedRef = useRef(false)
   const [isOnline, setIsOnline] = useState(true)
   const [isDark, setIsDark] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -161,8 +162,10 @@ export function AppShell() {
   useEffect(() => {
     if (coordinates) {
       setCurrentLocation(coordinates)
+    } else {
+      setLocationStatus(locationLoading, locationError)
     }
-  }, [coordinates, setCurrentLocation])
+  }, [coordinates, locationLoading, locationError, setCurrentLocation, setLocationStatus])
 
   useEffect(() => {
     const saved = localStorage.getItem('sosecure-theme') || 'dark'
@@ -244,9 +247,21 @@ export function AppShell() {
     return () => { if (liveBroadcastRef.current) { clearInterval(liveBroadcastRef.current); liveBroadcastRef.current = null } }
   }, [user, isLiveSharing])
 
-  // Mantener la ref sincronizada para que onend pueda leer el valor actual sin capturarlo en closure
+  // Sincronizar sosActiveRef y pausar/reanudar el reconocimiento de voz síncronamente
+  // para evitar la condición de carrera donde onend se dispara antes de que React actualice la ref.
   useEffect(() => {
     sosActiveRef.current = sosActive
+    if (sosActive) {
+      voicePausedRef.current = true
+      if (voiceRecognitionRef.current) {
+        try { voiceRecognitionRef.current.stop() } catch { /* ignore */ }
+      }
+    } else {
+      voicePausedRef.current = false
+      if (voiceRecognitionRef.current) {
+        try { voiceRecognitionRef.current.start() } catch { /* ignore */ }
+      }
+    }
   }, [sosActive])
 
   // Reconocimiento de voz global — activo en todas las pestañas mientras haya palabra clave configurada.
@@ -284,8 +299,8 @@ export function AppShell() {
     }
 
     recognition.onend = () => {
-      // Leer sosActive desde la ref para evitar el closure stale
-      if (voiceRecognitionRef.current === recognition && !sosActiveRef.current) {
+      // Usar voicePausedRef (actualizada síncronamente) para evitar reinicios durante el SOS
+      if (voiceRecognitionRef.current === recognition && !voicePausedRef.current) {
         try { recognition.start() } catch { /* ignore */ }
       }
     }
@@ -737,6 +752,90 @@ export function AppShell() {
                           PIN configurado correctamente
                         </div>
                       )}
+                    </div>
+                  </div>
+
+                  {/* Botón de volumen SOS */}
+                  <div>
+                    <p className="text-sm font-medium mb-3 flex items-center gap-2">
+                      <Volume2 className="w-4 h-4" />
+                      Activación por volumen
+                    </p>
+                    <div className="rounded-lg border border-border p-3 space-y-4">
+
+                      {/* Número de pulsaciones */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm text-muted-foreground">Pulsaciones requeridas</span>
+                          <span className="text-sm font-bold text-primary">{volumePresses}×</span>
+                        </div>
+                        <div className="flex gap-2">
+                          {[3, 4, 5, 7, 10].map(n => (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => setVolumePresses(n)}
+                              style={{
+                                flex: 1,
+                                padding: '6px 0',
+                                borderRadius: '8px',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                border: '1px solid',
+                                cursor: 'pointer',
+                                backgroundColor: volumePresses === n
+                                  ? (isDark ? 'oklch(0.75 0.15 180)' : 'oklch(0.55 0.15 180)')
+                                  : (isDark ? 'oklch(0.22 0.02 260)' : 'oklch(0.91 0.01 260)'),
+                                borderColor: volumePresses === n
+                                  ? (isDark ? 'oklch(0.75 0.15 180)' : 'oklch(0.55 0.15 180)')
+                                  : (isDark ? 'oklch(0.28 0.02 260)' : 'oklch(0.90 0.01 260)'),
+                                color: volumePresses === n ? 'white' : (isDark ? 'oklch(0.95 0.01 260)' : 'oklch(0.15 0.01 260)'),
+                              }}
+                            >
+                              {n}×
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Ventana de tiempo */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm text-muted-foreground">Ventana de tiempo</span>
+                          <span className="text-sm font-bold text-primary">{volumeWindow / 1000}s</span>
+                        </div>
+                        <div className="flex gap-2">
+                          {[2000, 3000, 4000, 5000].map(ms => (
+                            <button
+                              key={ms}
+                              type="button"
+                              onClick={() => setVolumeWindow(ms)}
+                              style={{
+                                flex: 1,
+                                padding: '6px 0',
+                                borderRadius: '8px',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                border: '1px solid',
+                                cursor: 'pointer',
+                                backgroundColor: volumeWindow === ms
+                                  ? (isDark ? 'oklch(0.75 0.15 180)' : 'oklch(0.55 0.15 180)')
+                                  : (isDark ? 'oklch(0.22 0.02 260)' : 'oklch(0.91 0.01 260)'),
+                                borderColor: volumeWindow === ms
+                                  ? (isDark ? 'oklch(0.75 0.15 180)' : 'oklch(0.55 0.15 180)')
+                                  : (isDark ? 'oklch(0.28 0.02 260)' : 'oklch(0.90 0.01 260)'),
+                                color: volumeWindow === ms ? 'white' : (isDark ? 'oklch(0.95 0.01 260)' : 'oklch(0.15 0.01 260)'),
+                              }}
+                            >
+                              {ms / 1000}s
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-muted-foreground">
+                        Presiona volumen <strong>{volumePresses}×</strong> en menos de <strong>{volumeWindow / 1000}s</strong> para activar el SOS.
+                      </p>
                     </div>
                   </div>
 
