@@ -22,7 +22,7 @@ interface VolumeButtonPlugin {
 const VolumeButton = registerPlugin<VolumeButtonPlugin>('VolumeButton')
 
 function isNativePlatform(): boolean {
-  return typeof window !== 'undefined' && !!window.Capacitor?.isNativePlatform?.()
+  return typeof window !== 'undefined' && !!(window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.()
 }
 
 export function useVolumeSOS({ onActivate, disabled = false, pressesRequired = 5, timeWindowMs = 3000 }: UseVolumeSOSOptions) {
