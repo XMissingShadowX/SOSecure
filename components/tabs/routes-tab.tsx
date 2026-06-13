@@ -248,6 +248,31 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
   // también se muestran consejos de seguridad para los usuarios.
   return (
     <div className="flex flex-col gap-4">
+      {!showRoutes && (
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <h4 className="font-medium flex items-center gap-2">
+              <Shield className="w-5 h-5 text-primary" />
+              Consejos de Seguridad en Ruta
+            </h4>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li className="flex items-start gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-safe mt-2 flex-shrink-0" />
+                Elige rutas con mayor puntuación de seguridad cuando sea posible
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-warning mt-2 flex-shrink-0" />
+                Evita zonas con incidentes recientes de alta severidad
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2 flex-shrink-0" />
+                Las calles principales bien iluminadas son más seguras de noche
+              </li>
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -316,7 +341,7 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
           </div>
 
           <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-            <div className="w-3 h-3 rounded-full bg-primary" />
+            <MapPin className="w-4 h-4 text-destructive flex-shrink-0" />
             <div className="flex-1 relative">
               <Input
                 placeholder="¿A dónde vas?"
@@ -491,30 +516,6 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
         </div>
       )}
 
-      {!showRoutes && (
-        <Card>
-          <CardContent className="p-4 space-y-3">
-            <h4 className="font-medium flex items-center gap-2">
-              <Shield className="w-5 h-5 text-primary" />
-              Consejos de Seguridad en Ruta
-            </h4>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li className="flex items-start gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-safe mt-2 flex-shrink-0" />
-                Elige rutas con mayor puntuación de seguridad cuando sea posible
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-warning mt-2 flex-shrink-0" />
-                Evita zonas con incidentes recientes de alta severidad
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2 flex-shrink-0" />
-                Las calles principales bien iluminadas son más seguras de noche
-              </li>
-            </ul>
-          </CardContent>
-        </Card>
-      )}
     </div>
   )
 }

@@ -103,6 +103,11 @@ function LoginContent() {
                     </InputGroupAddon>
                   </InputGroup>
                 </Field>
+                <div className="flex justify-end">
+                  <Link href="/auth/forgot-password" className="text-xs text-primary hover:underline">
+                    ¿Olvidaste tu contraseña?
+                  </Link>
+                </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
                 </Button>

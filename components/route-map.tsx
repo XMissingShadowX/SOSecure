@@ -11,6 +11,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { MapPin } from 'lucide-react'
 import { MapContainer, TileLayer, Marker, Polyline, Circle, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import type { Coordinates, Incident } from '@/lib/types'
@@ -46,9 +48,11 @@ const originIcon = new L.DivIcon({
 
 const destinationIcon = new L.DivIcon({
   className: '',
-  html: `<div style="width:14px;height:14px;background:#ef4444;border:3px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.3)"></div>`,
-  iconSize: [14, 14],
-  iconAnchor: [7, 7],
+  html: renderToStaticMarkup(
+    <MapPin size={32} color="#ef4444" fill="#ef4444" strokeWidth={1.5} stroke="white" />
+  ),
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
 })
 
 interface RouteGeometry {

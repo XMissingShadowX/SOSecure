@@ -78,7 +78,7 @@ export function MedicTab() {
   const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_MESSAGE])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const bottomRef = useRef<HTMLDivElement>(null)
 
   // Historial en el formato que espera la API (excluye el mensaje inicial del sistema)
   const apiHistory = messages
@@ -88,10 +88,8 @@ export function MedicTab() {
   // Efecto para hacer scroll automático hacia el final del área de mensajes cada vez que se actualiza la lista de 
   // mensajes. Esto asegura que el usuario siempre vea el mensaje más reciente sin tener que desplazarse manualmente.
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
-  }, [messages])
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, isLoading])
 
   // Función para enviar un mensaje. Verifica que el mensaje no esté vacío y que no se esté cargando una respuesta,
   // luego agrega el mensaje del usuario a la lista de mensajes, limpia la entrada y establece el estado de carga. 
@@ -151,7 +149,7 @@ export function MedicTab() {
   // desplaza automáticamente hacia el final cada vez que se actualiza la lista de mensajes, y el botón de enviar se 
   // desactiva si la entrada está vacía o si se está cargando una respuesta del asistente.
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] pb-24">
+    <div className="flex flex-col h-[calc(100vh-8rem)] pb-36">
       <Card className="mb-4 border-primary/30 bg-primary/5">
         <CardContent className="flex items-center justify-center gap-3 py-2 px-3">
           <AlertCircle className="w-5 h-5 text-primary shrink-0" />
@@ -165,7 +163,7 @@ export function MedicTab() {
         </CardContent>
       </Card>
 
-      <ScrollArea className="flex-1 pr-4" ref={scrollRef}>
+      <ScrollArea className="flex-1 pr-4">
         <div className="space-y-4 pb-4">
           {messages.map((message) => (
             <div key={message.id} className={cn('flex gap-3', message.role === 'user' ? 'justify-end' : 'justify-start')}>
@@ -193,6 +191,7 @@ export function MedicTab() {
               </div>
             </div>
           )}
+          <div ref={bottomRef} />
         </div>
       </ScrollArea>
 

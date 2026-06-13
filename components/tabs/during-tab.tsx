@@ -12,13 +12,24 @@
 // para manejar la lógica de grabación, geolocalización, notificaciones, y la interfaz de usuario.
 'use client'
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Mic, MicOff, Video, VideoOff, AlertTriangle, WifiOff, Wifi, Radio, Save, Send, Upload, CheckCircle, MessageCircle } from 'lucide-react'
+import { Mic, MicOff, Video, VideoOff, AlertTriangle, WifiOff, Wifi, Radio, Save, Send, Upload, CheckCircle, MessageCircle, Plus, CirclePlus } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { sendAlarmNotification, playAlarmSound } from '@/lib/notifications'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/lib/supabase/client'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { FieldGroup, Field, FieldLabel } from '@/components/ui/field'
+import { scheduleIncidentReminder } from '@/lib/incident-reminder'
+import type { IncidentType, IncidentSeverity } from '@/lib/types'
 import {
   saveRecordingLocally,
   sendRecordingToContacts,
@@ -26,6 +37,38 @@ import {
   generateRecordingId,
   type RecordingMeta,
 } from '@/lib/recordings'
+
+const incidentTypesForm: { value: IncidentType; label: string }[] = [
+  { value: 'theft-assault-violence', label: 'Robo/Asalto/Violencia' },
+  { value: 'harassment-suspicious', label: 'Acoso/Actividad Sospechosa' },
+  { value: 'accident', label: 'Accidente' },
+  { value: 'SOS', label: 'Alerta SOS' },
+]
+
+const incidentQuestions: Partial<Record<IncidentType, string[]>> = {
+  'theft-assault-violence': [
+    '¿Hubo uso de arma o amenaza con arma?',
+    '¿Hubo violencia física contra alguna persona?',
+    '¿La víctima resultó herida?',
+  ],
+  'harassment-suspicious': [
+    '¿La persona sospechosa está siguiendo o persiguiendo a alguien?',
+    '¿Hubo amenazas directas o comportamiento agresivo?',
+    '¿Existe riesgo inmediato para una persona vulnerable?',
+  ],
+  'accident': [
+    '¿Hay personas lesionadas?',
+    '¿Hay riesgo de incendio, explosión o fuga de combustible?',
+    '¿El accidente bloquea completamente la circulación?',
+  ],
+}
+
+function calculateSeverity(answers: string[]): IncidentSeverity {
+  const score = answers.reduce((sum, a) => sum + (a === 'si' ? 1 : a === 'no_se' ? 0.5 : 0), 0)
+  if (score >= 3) return 'high'
+  if (score === 0) return 'low'
+  return 'medium'
+}
 
 // Función para realizar geocodificación inversa utilizando la API de Photon, que toma latitud y longitud como entrada
 // y devuelve una dirección legible. Si la API falla o no devuelve resultados, se muestra la latitud y longitud formateadas.
@@ -135,6 +178,49 @@ export function DuringTab() {
   const tapTimerRef = useRef<NodeJS.Timeout | null>(null)
   const [tapCountDisplay, setTapCountDisplay] = useState(0)
   const [recordingError, setRecordingError] = useState<string | null>(null)
+
+  // Estado para el formulario de reporte de incidentes
+  const [incidentType, setIncidentType] = useState<IncidentType>('theft-assault-violence')
+  const [incidentDescription, setIncidentDescription] = useState('')
+  const [questionAnswers, setQuestionAnswers] = useState<string[]>(['', '', ''])
+  const [reportError, setReportError] = useState<string | null>(null)
+  const [reportStatus, setReportStatus] = useState<'idle' | 'sending' | 'done'>('idle')
+
+  const reportIncident = useCallback(async () => {
+    setReportError(null)
+    const questions = incidentQuestions[incidentType] || []
+    const allAnswered = questions.length === 0 || questionAnswers.every(a => a !== '')
+    if (!coordinates || !allAnswered) {
+      if (!coordinates) setReportError('Activa la ubicación para reportar.')
+      else setReportError('Responde todas las preguntas.')
+      return
+    }
+    setReportStatus('sending')
+    const autoTitle = incidentTypesForm.find(t => t.value === incidentType)?.label || 'Incidente'
+    const autoSeverity: IncidentSeverity = questions.length > 0 ? calculateSeverity(questionAnswers) : 'medium'
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data, error } = await supabase.from('incidents').insert({
+      user_id: user?.id || null,
+      title: autoTitle,
+      description: incidentDescription || null,
+      incident_type: incidentType,
+      severity: autoSeverity,
+      latitude: coordinates.latitude,
+      longitude: coordinates.longitude,
+    }).select().single()
+    if (error) {
+      setReportError(error.message || 'Error al enviar el reporte.')
+      setReportStatus('idle')
+    } else {
+      if (data) scheduleIncidentReminder(data.id)
+      setIncidentDescription('')
+      setQuestionAnswers(['', '', ''])
+      setReportStatus('done')
+      setTimeout(() => setReportStatus('idle'), 3000)
+    }
+  }, [incidentType, incidentDescription, questionAnswers, coordinates])
+
   // Efecto para manejar los eventos de conexión y desconexión a internet, actualizando el estado de conexión en consecuencia.
   useEffect(() => {
     const update = () => setIsOnline(navigator.onLine)
@@ -372,10 +458,6 @@ export function DuringTab() {
       // reflejar que la grabación de video está activa.
       try {
         setRecordingError(null)
-        if (!navigator.mediaDevices?.getUserMedia && !sosStream) {
-          setRecordingError('Cámara no disponible en contexto no seguro (HTTP). Usa la app instalada o HTTPS.')
-          return
-        }
         const stream = sosStream
           ? new MediaStream([...sosStream.getVideoTracks(), ...sosStream.getAudioTracks()])
           : await navigator.mediaDevices.getUserMedia({
@@ -466,6 +548,88 @@ export function DuringTab() {
         </CardContent>
       </Card>
 
+      {/* Reporte de incidente */}
+      <Card>
+        <CardHeader className="pb-0">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <CirclePlus className="w-5 h-5 text-warning" />
+            Reportar un Incidente
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 pt-3">
+          <FieldGroup>
+            <Field>
+              <FieldLabel>Tipo de Incidente</FieldLabel>
+              <Select value={incidentType} onValueChange={(v) => {
+                setIncidentType(v as IncidentType)
+                setQuestionAnswers(['', '', ''])
+              }}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {incidentTypesForm.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            {(incidentQuestions[incidentType] || []).map((question, idx) => (
+              <Field key={idx}>
+                <FieldLabel>{question}</FieldLabel>
+                <div className="flex gap-2">
+                  {(['si', 'no', 'no_se'] as const).map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => {
+                        const next = [...questionAnswers]
+                        next[idx] = opt
+                        setQuestionAnswers(next)
+                      }}
+                      className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
+                        questionAnswers[idx] === opt
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                      }`}
+                    >
+                      {opt === 'si' ? 'Sí' : opt === 'no' ? 'No' : 'No sé'}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+            ))}
+            <Field>
+              <FieldLabel>Detalles (Opcional)</FieldLabel>
+              <Textarea
+                placeholder="Detalles adicionales..."
+                rows={2}
+                value={incidentDescription}
+                onChange={(e) => setIncidentDescription(e.target.value)}
+              />
+            </Field>
+          </FieldGroup>
+          {reportError && (
+            <p className="text-sm text-destructive">{reportError}</p>
+          )}
+          {reportStatus === 'done' ? (
+            <div className="flex items-center justify-center gap-2 p-3 bg-primary/10 rounded-lg">
+              <CheckCircle className="w-4 h-4 text-primary" />
+              <p className="text-sm text-primary font-medium">¡Incidente reportado con éxito!</p>
+            </div>
+          ) : (
+            <Button
+              className="w-full"
+              onClick={reportIncident}
+              disabled={reportStatus === 'sending' || !coordinates || ((incidentQuestions[incidentType]?.length ?? 0) > 0 && questionAnswers.some(a => a === ''))}
+            >
+              {reportStatus === 'sending' ? 'Enviando...' : 'Enviar Reporte'}
+            </Button>
+          )}
+          {!coordinates && (
+            <p className="text-xs text-muted-foreground text-center">Activa la ubicación para poder reportar</p>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Secret activation */}
       <Card>
         <CardHeader className="pb-0">
@@ -483,7 +647,7 @@ export function DuringTab() {
               <span className="text-2xl">👆</span>
               <div>
                 <p className="text-sm font-medium">Secuencia de taps</p>
-                <p className="text-xs text-muted-foreground">Toca el botón de abajo 5 veces rápido</p>
+                <p className="text-xs text-muted-foreground">Toca el botón de abajo 3 veces rápido</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
