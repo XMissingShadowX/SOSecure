@@ -97,6 +97,10 @@ interface AppState {
   offlineQueue: Incident[]
   addToOfflineQueue: (incident: Omit<Incident, 'id' | 'reported_at' | 'is_active' | 'resolved_at'>) => void
   clearOfflineQueue: () => void
+
+  // Modo Simple (accesibilidad para adultos mayores y niños)
+  simpleMode: boolean
+  setSimpleMode: (value: boolean) => void
 }
 
 // Crear el estado global de la aplicación utilizando Zustand y persistirlo en el almacenamiento local del navegador con 
@@ -191,6 +195,10 @@ export const useAppStore = create<AppState>()(
       volumeWindow: 3000,
       setVolumeWindow: (ms) => set({ volumeWindow: ms }),
 
+      // Modo Simple
+      simpleMode: false,
+      setSimpleMode: (value) => set({ simpleMode: value }),
+
       // Cola sin conexión
       offlineQueue: [],
       addToOfflineQueue: (incident) => {
@@ -218,6 +226,7 @@ export const useAppStore = create<AppState>()(
         voiceKeyword: state.voiceKeyword,
         volumePresses: state.volumePresses,
         volumeWindow: state.volumeWindow,
+        simpleMode: state.simpleMode,
       }),
     }
   )

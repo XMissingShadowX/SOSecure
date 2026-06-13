@@ -38,7 +38,7 @@ interface StoredRecording {
 
 export function AfterTab() {
   const { isPremium } = usePremium()
-  const { nearbyIncidents, contacts } = useAppStore()
+  const { nearbyIncidents, contacts, simpleMode } = useAppStore()
   const [dangerZones, setDangerZones] = useState<{ lat: number; lng: number; count: number }[]>([])
   const [notifiedZoneCount, setNotifiedZoneCount] = useState(-1)
   const [arrivedSent, setArrivedSent] = useState(false)
@@ -207,6 +207,7 @@ export function AfterTab() {
           <p className="text-sm text-muted-foreground">
             Avisa a tus contactos que llegaste bien. Si tienen SOSecure, recibirán el mensaje en la app; de lo contrario se enviará por WhatsApp.
           </p>
+          {simpleMode && <p className="text-base text-muted-foreground">Avisa a tus contactos que llegaste bien.</p>}
           {arrivedSent && arrivedResult ? (
             <div className="space-y-2">
               {arrivedResult.internal > 0 && (
@@ -224,7 +225,7 @@ export function AfterTab() {
             </div>
           ) : (
             <Button
-              className="w-full bg-safe hover:bg-safe/90 text-white"
+              className={`w-full bg-safe hover:bg-safe/90 text-white ${simpleMode ? 'h-14 text-base font-bold' : ''}`}
               disabled={sendingArrived || contacts.length === 0}
               onClick={handleArrivedWell}
             >
@@ -246,8 +247,8 @@ export function AfterTab() {
         </CardContent>
       </Card>
 
-      {/* Historial de Alertas SOS */}
-      <Card>
+      {/* Historial de Alertas SOS — oculto en Modo Simple */}
+      {!simpleMode && <Card>
         <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <ShieldAlert className="w-5 h-5 text-destructive" />
@@ -307,10 +308,10 @@ export function AfterTab() {
             </>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
-      {/* Grabaciones */}
-      <Card>
+      {/* Grabaciones — ocultas en Modo Simple */}
+      {!simpleMode && <Card>
         <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <Video className="w-5 h-5 text-primary" />
@@ -370,9 +371,10 @@ export function AfterTab() {
             </div>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
-      {dangerZones.length > 0 && (
+      {/* Zonas de peligro — ocultas en Modo Simple */}
+      {!simpleMode && dangerZones.length > 0 && (
         <Card className="border-warning bg-warning/10">
           <CardHeader className="pb-0">
             <CardTitle className="flex items-center gap-2 text-base text-warning">

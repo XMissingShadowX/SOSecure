@@ -196,6 +196,7 @@ export function BeforeTab() {
     setRouteOptions, setRouteInfo,
     sosActive, voiceKeyword, setVoiceKeyword,
     currentLocation: coordinates,
+    simpleMode,
   } = useAppStore()
   const { session, members, loading: trackingLoading, error: trackingError, startTracking, stopTracking, syncTimer } = useTracking()
 
@@ -327,39 +328,42 @@ export function BeforeTab() {
         )
         return (
           <>
-            {/* Planificación de rutas */}
-            <div>
-              <button
-                onClick={() => setRoutesExpanded(v => !v)}
-                className="w-full flex items-center justify-between text-base font-semibold mb-3"
-              >
-                <span className="flex items-center gap-2">
-                  <Navigation className="w-5 h-5 text-primary" />
-                  Planear Ruta Segura
-                </span>
-                {routesExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-              </button>
-              {routesExpanded && <RoutesTab hideMap />}
-              {/* Mapa aquí solo cuando la sección de mapa está colapsada */}
-              {routesExpanded && !mapExpanded && (
-                <div className="mt-3">{sharedMap}</div>
-              )}
-            </div>
+            {/* Planificación de rutas — oculta en Modo Simple (usar tab Rutas) */}
+            {!simpleMode && (
+              <div>
+                <button
+                  onClick={() => setRoutesExpanded(v => !v)}
+                  className="w-full flex items-center justify-between text-base font-semibold mb-3"
+                >
+                  <span className="flex items-center gap-2">
+                    <Navigation className="w-5 h-5 text-primary" />
+                    Planear Ruta Segura
+                  </span>
+                  {routesExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                </button>
+                {routesExpanded && <RoutesTab hideMap />}
+                {routesExpanded && !mapExpanded && (
+                  <div className="mt-3">{sharedMap}</div>
+                )}
+              </div>
+            )}
 
-            {/* Sección de mapa independiente */}
-            <div>
-              <button
-                onClick={() => setMapExpanded(v => !v)}
-                className="w-full flex items-center justify-between text-base font-semibold mb-2"
-              >
-                <span className="flex items-center gap-2">
-                  <Map className="w-5 h-5 text-primary" />
-                  {showRoutes && routeDestination ? 'Mapa de Ruta + Incidentes' : 'Mapa de Incidentes'}
-                </span>
-                {mapExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-              </button>
-              {mapExpanded && sharedMap}
-            </div>
+            {/* Sección de mapa independiente — oculta en Modo Simple */}
+            {!simpleMode && (
+              <div>
+                <button
+                  onClick={() => setMapExpanded(v => !v)}
+                  className="w-full flex items-center justify-between text-base font-semibold mb-2"
+                >
+                  <span className="flex items-center gap-2">
+                    <Map className="w-5 h-5 text-primary" />
+                    {showRoutes && routeDestination ? 'Mapa de Ruta + Incidentes' : 'Mapa de Incidentes'}
+                  </span>
+                  {mapExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                </button>
+                {mapExpanded && sharedMap}
+              </div>
+            )}
           </>
         )
       })()}
@@ -422,7 +426,7 @@ export function BeforeTab() {
                       />
                     </Field>
                     <div className="flex gap-2 flex-wrap">
-                      {[5, 10, 15, 30, 60].map(m => (
+                      {(simpleMode ? [15, 30, 60] : [5, 10, 15, 30, 60]).map(m => (
                         <button key={m} onClick={() => setTimerMinutes(m.toString())}
                           className={`px-3 py-1.5 rounded-md text-sm ${timerMinutes === m.toString() ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
                           {m} min
@@ -614,8 +618,8 @@ export function BeforeTab() {
         </CardContent>
       </Card>}
 
-      {/* Palabra Clave de Voz */}
-      <Card>
+      {/* Palabra Clave de Voz — oculta en Modo Simple */}
+      {!simpleMode && <Card>
         <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <Mic className="w-5 h-5 text-primary" />
@@ -683,7 +687,7 @@ export function BeforeTab() {
             </DialogContent>
           </Dialog>
         </CardContent>
-      </Card>
+      </Card>}
 
       {/* Contactos listos para alertar */}
       <Card>

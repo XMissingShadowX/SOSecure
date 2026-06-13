@@ -23,11 +23,11 @@ const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
 ]
 
 export function BottomNavigation() {
-  const { activeTab, setActiveTab } = useAppStore()
+  const { activeTab, setActiveTab, simpleMode } = useAppStore()
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-sm border-t border-border safe-area-bottom">
-      <div className="flex items-center h-16 w-full max-w-lg mx-auto">
+      <div className={cn('flex items-center w-full max-w-lg mx-auto', simpleMode ? 'h-20' : 'h-16')}>
         {tabs.map((tab) => {
           const Icon = tab.icon
           const isActive = activeTab === tab.id
@@ -36,14 +36,13 @@ export function BottomNavigation() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'flex flex-1 flex-col items-center justify-center gap-1 py-2 rounded-xl transition-colors',
-                isActive
-                  ? 'text-primary'
-                  : 'text-muted-foreground hover:text-foreground'
+                'flex flex-1 flex-col items-center justify-center gap-1 rounded-xl transition-colors',
+                simpleMode ? 'py-3' : 'py-2',
+                isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              <Icon className={cn('w-5 h-5', isActive && 'text-primary')} />
-              <span className={cn('text-[10px] font-medium', isActive && 'text-primary')}>
+              <Icon className={cn(simpleMode ? 'w-7 h-7' : 'w-5 h-5', isActive && 'text-primary')} />
+              <span className={cn(simpleMode ? 'text-xs font-semibold' : 'text-[10px] font-medium', isActive && 'text-primary')}>
                 {tab.label}
               </span>
             </button>

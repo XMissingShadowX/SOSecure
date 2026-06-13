@@ -36,7 +36,7 @@ const SECRET_TAP_COUNT = 5
 const SECRET_TAP_WINDOW = 3000
 
 export function SOSButton() {
-  const { sosActive, setSosActive, setSosAlert, setSosStream, contacts, setActiveTab, currentLocation: coordinates, volumePresses, volumeWindow } = useAppStore()
+  const { sosActive, setSosActive, setSosAlert, setSosStream, contacts, setActiveTab, currentLocation: coordinates, volumePresses, volumeWindow, simpleMode } = useAppStore()
   const [holdProgress, setHoldProgress] = useState(0)
   const [isHolding, setIsHolding] = useState(false)
   const [showCancelDialog, setShowCancelDialog] = useState(false)
@@ -658,9 +658,9 @@ export function SOSButton() {
   }
 
   return (
-    <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 safe-area-bottom flex flex-col items-center gap-2">
+    <div className={`fixed left-1/2 -translate-x-1/2 z-50 safe-area-bottom flex flex-col items-center gap-2 ${simpleMode ? 'bottom-24' : 'bottom-20'}`}>
       <div
-        className="absolute -top-8 w-20 h-8 opacity-0 cursor-pointer"
+        className={`absolute -top-8 opacity-0 cursor-pointer ${simpleMode ? 'w-28 h-8' : 'w-20 h-8'}`}
         onClick={handleSecretTap}
         aria-label="Activación alternativa SOS"
       />
@@ -672,7 +672,8 @@ export function SOSButton() {
         onTouchStart={handleHoldStart}
         onTouchEnd={handleHoldEnd}
         className={cn(
-          "relative w-20 h-20 rounded-full bg-destructive text-destructive-foreground",
+          `relative rounded-full bg-destructive text-destructive-foreground`,
+          simpleMode ? "w-28 h-28" : "w-20 h-20",
           "flex items-center justify-center",
           "shadow-lg shadow-destructive/30",
           "transition-transform active:scale-95",
@@ -682,21 +683,25 @@ export function SOSButton() {
       >
         {isHolding && (
           <svg className="absolute inset-0 w-full h-full -rotate-90">
-            <circle cx="40" cy="40" r="36" fill="none" stroke="currentColor" strokeWidth="4"
-              strokeDasharray={`${2 * Math.PI * 36}`}
-              strokeDashoffset={`${2 * Math.PI * 36 * (1 - holdProgress / 100)}`}
+            <circle
+              cx={simpleMode ? 56 : 40}
+              cy={simpleMode ? 56 : 40}
+              r={simpleMode ? 50 : 36}
+              fill="none" stroke="currentColor" strokeWidth="4"
+              strokeDasharray={`${2 * Math.PI * (simpleMode ? 50 : 36)}`}
+              strokeDashoffset={`${2 * Math.PI * (simpleMode ? 50 : 36) * (1 - holdProgress / 100)}`}
               className="opacity-50"
             />
           </svg>
         )}
         <div className="flex flex-col items-center">
-          <AlertTriangle className="w-8 h-8" />
-          <span className="text-xs font-bold mt-0.5">SOS</span>
+          <AlertTriangle className={simpleMode ? "w-12 h-12" : "w-8 h-8"} />
+          <span className={`font-bold mt-0.5 ${simpleMode ? 'text-base' : 'text-xs'}`}>SOS</span>
         </div>
       </button>
 
       <p
-        className="whitespace-nowrap text-sm font-medium px-3 py-1 rounded-full -mt-1"
+        className={`whitespace-nowrap font-medium px-3 py-1 rounded-full -mt-1 ${simpleMode ? 'text-base' : 'text-sm'}`}
         style={{ backgroundColor: 'rgba(220, 38, 38, 0.2)', color: '#991b1b' }}
       >
         {isHolding ? 'Mantén presionado...' : 'Presiona'}

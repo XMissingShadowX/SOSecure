@@ -151,7 +151,7 @@ Usa **Zustand** con `persist` en localStorage. Acceder siempre con el hook:
 const { contacts, currentLocation, sosActive, ... } = useAppStore()
 ```
 
-**Campos persistidos:** `contacts`, `mapCenter`, `mapZoom`, `frequentPlaces`, `locationHistory`, `offlineQueue`, `isLiveSharing`, `voiceKeyword`
+**Campos persistidos:** `contacts`, `mapCenter`, `mapZoom`, `frequentPlaces`, `locationHistory`, `offlineQueue`, `isLiveSharing`, `voiceKeyword`, `simpleMode`
 
 **Campos en memoria:** `activeTab`, `currentLocation`, `sosActive`, `nearbyIncidents`, `routeOptions`
 
@@ -335,3 +335,17 @@ npm run cap:android  # Luego Build > Generate Signed APK en Android Studio
 ### Notificaciones SOS no abren WhatsApp
 - Los contactos se notifican **solo por correo** (Resend + Edge Function `notify-contacts`).
 - Los fallbacks a WhatsApp fueron eliminados de `lib/recordings.ts` y `components/emergency-chat.tsx`.
+
+### Modo Simple (accesibilidad)
+- `simpleMode: boolean` en el store Zustand, **persistido** en localStorage.
+- Se activa con un toggle en el dialog de Ajustes (`app-shell.tsx`).
+- Todos los tabs leen `simpleMode` del store y adaptan su UI mediante renderizado condicional — **no se duplican componentes**.
+- Efectos en cada tab:
+  - **`bottom-navigation.tsx`**: íconos `w-7 h-7`, texto `text-xs font-semibold`, barra `h-20`
+  - **`home-tab.tsx`**: oculta tips de seguridad, coordenadas GPS (muestra "Ubicación activa ✓"), badge de prioridad, campos email/relationship/importancia en formularios de contacto
+  - **`before-tab.tsx`**: oculta sección de rutas, mapa, tracking en vivo y palabra clave de voz; temporizador solo muestra botones 15/30/60 min
+  - **`during-tab.tsx`**: oculta preguntas yes/no/unsure del incidente, sección de activación secreta e historial de ubicación; post-grabación muestra solo "Enviar a contactos"; countdown de video con texto más grande
+  - **`after-tab.tsx`**: oculta historial SOS, grabaciones y zonas de peligro; botón "Llegué bien" con `h-14`
+  - **`routes-tab.tsx`**: oculta tips de seguridad, muestra solo la ruta más segura (índice 0), reemplaza score numérico con emoji ✅/⚠️/❌, oculta conteo de incidentes
+  - **`medic-tab.tsx`**: botones de acceso rápido más grandes, textarea `min-h-[80px]`
+  - **`app-shell.tsx`**: `<main>` con clase `text-lg` cuando activo; banner amarillo bajo el header

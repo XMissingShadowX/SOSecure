@@ -162,7 +162,7 @@ const VIDEO_FREE_LIMIT_MS = 30_000
 
 export function DuringTab() {
   const { isPremium } = usePremium()
-  const { sosActive, setSosActive, contacts, locationHistory, voiceKeyword, currentLocation: coordinates, sosStream } = useAppStore()
+  const { sosActive, setSosActive, contacts, locationHistory, voiceKeyword, currentLocation: coordinates, sosStream, simpleMode } = useAppStore()
   const [isOnline, setIsOnline] = useState(true)
   const [isRecordingAudio, setIsRecordingAudio] = useState(false)
   const [isRecordingVideo, setIsRecordingVideo] = useState(false)
@@ -603,7 +603,7 @@ export function DuringTab() {
                 </SelectContent>
               </Select>
             </Field>
-            {(incidentQuestions[incidentType] || []).map((question, idx) => (
+            {!simpleMode && (incidentQuestions[incidentType] || []).map((question, idx) => (
               <Field key={idx}>
                 <FieldLabel>{question}</FieldLabel>
                 <div className="flex gap-2">
@@ -650,7 +650,7 @@ export function DuringTab() {
             <Button
               className="w-full"
               onClick={reportIncident}
-              disabled={reportStatus === 'sending' || !coordinates || ((incidentQuestions[incidentType]?.length ?? 0) > 0 && questionAnswers.some(a => a === ''))}
+              disabled={reportStatus === 'sending' || !coordinates || (!simpleMode && (incidentQuestions[incidentType]?.length ?? 0) > 0 && questionAnswers.some(a => a === ''))}
             >
               {reportStatus === 'sending' ? 'Enviando...' : 'Enviar Reporte'}
             </Button>
@@ -661,8 +661,8 @@ export function DuringTab() {
         </CardContent>
       </Card>
 
-      {/* Secret activation */}
-      <Card>
+      {/* Secret activation — oculto en Modo Simple */}
+      {!simpleMode && <Card>
         <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <AlertTriangle className="w-5 h-5 text-warning" />
@@ -723,7 +723,7 @@ export function DuringTab() {
             </span>
           </button>
         </CardContent>
-      </Card>
+      </Card>}
 
       {/* Recording */}
       <Card>
@@ -754,8 +754,8 @@ export function DuringTab() {
               </div>
             )}
             {videoSecondsLeft !== null && (
-              <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded font-mono">
-                {videoSecondsLeft}s restantes (free)
+              <div className={`absolute top-2 right-2 bg-black/70 text-white px-2 py-1 rounded font-mono ${simpleMode ? 'text-lg font-bold' : 'text-xs'}`}>
+                {simpleMode ? `Tiempo restante: ${videoSecondsLeft}s` : `${videoSecondsLeft}s restantes (free)`}
               </div>
             )}
           </div>
@@ -797,15 +797,17 @@ export function DuringTab() {
 
               {recordingStatus !== 'done' && (
                 <div className="flex flex-col gap-2">
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={handleSaveLocally}
-                    disabled={recordingStatus !== 'idle'}
-                  >
-                    <Save className="w-4 h-4 mr-2" />
-                    Guardar en dispositivo
-                  </Button>
+                  {!simpleMode && (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleSaveLocally}
+                      disabled={recordingStatus !== 'idle'}
+                    >
+                      <Save className="w-4 h-4 mr-2" />
+                      Guardar en dispositivo
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     className="w-full"
@@ -816,24 +818,28 @@ export function DuringTab() {
                     Enviar a contactos de emergencia
                     {contacts.length === 0 && <span className="ml-1 text-xs text-muted-foreground">(sin contactos)</span>}
                   </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={handleSendViaChat}
-                    disabled={recordingStatus !== 'idle'}
-                  >
-                    <MessageCircle className="w-4 h-4 mr-2" />
-                    Enviar por Chat de Emergencia
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={handleUploadToDB}
-                    disabled={recordingStatus !== 'idle'}
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Guardar en la nube (Supabase)
-                  </Button>
+                  {!simpleMode && (
+                    <>
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={handleSendViaChat}
+                        disabled={recordingStatus !== 'idle'}
+                      >
+                        <MessageCircle className="w-4 h-4 mr-2" />
+                        Enviar por Chat de Emergencia
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={handleUploadToDB}
+                        disabled={recordingStatus !== 'idle'}
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        Guardar en la nube (Supabase)
+                      </Button>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -865,8 +871,8 @@ export function DuringTab() {
         </CardContent>
       </Card>
 
-      {/* Location history */}
-      <Card>
+      {/* Location history — oculto en Modo Simple */}
+      {!simpleMode && <Card>
         <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <WifiOff className="w-5 h-5 text-primary" />
@@ -890,7 +896,7 @@ export function DuringTab() {
             Este historial se comparte con contactos de confianza en caso de secuestro o robo
           </p>
         </CardContent>
-      </Card>
+      </Card>}
     </div>
   )
 }

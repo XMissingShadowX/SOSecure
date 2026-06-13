@@ -72,7 +72,7 @@ const placeIcons: Record<string, React.ElementType> = {
 export function HomeTab() {
   const { isPremium } = usePremium()
   const MAX_CONTACTS = isPremium ? PREMIUM_PLAN.features.maxContacts : FREE_MAX_CONTACTS
-  const { currentLocation: coordinates, locationLoading, locationError, contacts, setContacts, nearbyIncidents, frequentPlaces, addFrequentPlace, removeFrequentPlace } = useAppStore()
+  const { currentLocation: coordinates, locationLoading, locationError, contacts, setContacts, nearbyIncidents, frequentPlaces, addFrequentPlace, removeFrequentPlace, simpleMode } = useAppStore()
   // Estados locales para manejar la visibilidad de los diálogos de agregar contacto y lugar, el contacto que se 
   // está editando, los datos del nuevo contacto y lugar que se están agregando, las sugerencias de lugares basadas 
   // en la búsqueda, y el estado de carga de los contactos.
@@ -295,26 +295,28 @@ export function HomeTab() {
         </CardContent>
       </Card>
 
-      {/* Consejos de Seguridad */}
-      <Card>
-        <CardHeader className="pb-0">
-          <CardTitle className="text-base">Consejos de Seguridad</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {[
-            { n: 1, bold: 'Mantén presionado SOS 2 segundos', rest: ' para activar el modo de emergencia' },
-            { n: 2, bold: 'Revisa el mapa', rest: ' para ver incidentes reportados cerca de ti' },
-            { n: 3, bold: 'Usa el temporizador de seguridad', rest: ' si sales a un lugar desconocido' },
-          ].map(t => (
-            <div key={t.n} className="flex items-start gap-3 text-sm">
-              <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <span className="text-primary font-semibold text-xs">{t.n}</span>
+      {/* Consejos de Seguridad — ocultos en Modo Simple */}
+      {!simpleMode && (
+        <Card>
+          <CardHeader className="pb-0">
+            <CardTitle className="text-base">Consejos de Seguridad</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {[
+              { n: 1, bold: 'Mantén presionado SOS 2 segundos', rest: ' para activar el modo de emergencia' },
+              { n: 2, bold: 'Revisa el mapa', rest: ' para ver incidentes reportados cerca de ti' },
+              { n: 3, bold: 'Usa el temporizador de seguridad', rest: ' si sales a un lugar desconocido' },
+            ].map(t => (
+              <div key={t.n} className="flex items-start gap-3 text-sm">
+                <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-primary font-semibold text-xs">{t.n}</span>
+                </div>
+                <p className="text-muted-foreground"><strong className="text-foreground">{t.bold}</strong>{t.rest}</p>
               </div>
-              <p className="text-muted-foreground"><strong className="text-foreground">{t.bold}</strong>{t.rest}</p>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Ubicación Actual */}
       <Card>
@@ -336,12 +338,19 @@ export function HomeTab() {
               <span>{locationError}</span>
             </div>
           ) : coordinates ? (
-            <div className="space-y-2 bg-muted">
-              <p className="font-mono text-sm bg-muted px-3 py-2 rounded">
-                {coordinates.latitude.toFixed(6)}, {coordinates.longitude.toFixed(6)}
-              </p>
-              <p className="text-xs text-muted-foreground">Tu ubicación se monitorea para funciones de seguridad</p>
-            </div>
+            simpleMode ? (
+              <div className="flex items-center gap-2 p-3 bg-safe/10 rounded-lg">
+                <span className="text-safe text-lg">✓</span>
+                <p className="font-medium text-safe">Ubicación activa</p>
+              </div>
+            ) : (
+              <div className="space-y-2 bg-muted">
+                <p className="font-mono text-sm bg-muted px-3 py-2 rounded">
+                  {coordinates.latitude.toFixed(6)}, {coordinates.longitude.toFixed(6)}
+                </p>
+                <p className="text-xs text-muted-foreground">Tu ubicación se monitorea para funciones de seguridad</p>
+              </div>
+            )
           ) : (
             <p className="text-muted-foreground">Ubicación no disponible</p>
           )}
@@ -510,9 +519,11 @@ export function HomeTab() {
                     <div>
                       <div className="flex items-center gap-2">
                         <p className="font-medium">{contact.name}</p>
-                        <Badge className={cn('text-xs px-1.5 py-0', importanceColor(contact.importance || 'secondary'))}>
-                          {importanceLevels.find(i => i.value === (contact.importance || 'secondary'))?.label}
-                        </Badge>
+                        {!simpleMode && (
+                          <Badge className={cn('text-xs px-1.5 py-0', importanceColor(contact.importance || 'secondary'))}>
+                            {importanceLevels.find(i => i.value === (contact.importance || 'secondary'))?.label}
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-sm text-muted-foreground">{contact.phone}</p>
                       {contact.relationship && <p className="text-xs text-muted-foreground">{contact.relationship}</p>}
@@ -572,30 +583,34 @@ export function HomeTab() {
                     <FieldLabel>Teléfono</FieldLabel>
                     <Input type="tel" placeholder="+52 555 000 0000" value={newContact.phone} onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })} />
                   </Field>
-                  <Field>
-                    <FieldLabel>Email (para alertas automáticas)</FieldLabel>
-                    <Input
-                      type="email"
-                      placeholder="correo@ejemplo.com"
-                      value={newContact.email || ''}
-                      onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel>Relación (Opcional)</FieldLabel>
-                    <Select value={newContact.relationship} onValueChange={(v) => setNewContact({ ...newContact, relationship: v })}>
-                      <SelectTrigger><SelectValue placeholder="Selecciona relación" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="parent">Padre/Madre</SelectItem>
-                        <SelectItem value="spouse">Esposo/a</SelectItem>
-                        <SelectItem value="sibling">Hermano/a</SelectItem>
-                        <SelectItem value="friend">Amigo/a</SelectItem>
-                        <SelectItem value="partner">Pareja</SelectItem>
-                        <SelectItem value="other">Otro</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field>
+                  {!simpleMode && (
+                    <>
+                      <Field>
+                        <FieldLabel>Email (para alertas automáticas)</FieldLabel>
+                        <Input
+                          type="email"
+                          placeholder="correo@ejemplo.com"
+                          value={newContact.email || ''}
+                          onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
+                        />
+                      </Field>
+                      <Field>
+                        <FieldLabel>Relación (Opcional)</FieldLabel>
+                        <Select value={newContact.relationship} onValueChange={(v) => setNewContact({ ...newContact, relationship: v })}>
+                          <SelectTrigger><SelectValue placeholder="Selecciona relación" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="parent">Padre/Madre</SelectItem>
+                            <SelectItem value="spouse">Esposo/a</SelectItem>
+                            <SelectItem value="sibling">Hermano/a</SelectItem>
+                            <SelectItem value="friend">Amigo/a</SelectItem>
+                            <SelectItem value="partner">Pareja</SelectItem>
+                            <SelectItem value="other">Otro</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                    </>
+                  )}
+                  {!simpleMode && <Field>
                     <FieldLabel>Importancia</FieldLabel>
                     <div className="flex gap-2">
                       {importanceLevels.map((level) => (
@@ -611,7 +626,7 @@ export function HomeTab() {
                         </button>
                       ))}
                     </div>
-                  </Field>
+                  </Field>}
                 </FieldGroup>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setShowAddContact(false)}>Cancelar</Button>
@@ -637,30 +652,34 @@ export function HomeTab() {
                   <FieldLabel>Teléfono</FieldLabel>
                   <Input type="tel" placeholder="+52 555 000 0000" value={editContact.phone} onChange={(e) => setEditContact({ ...editContact, phone: e.target.value })} />
                 </Field>
-                <Field>
-                  <FieldLabel>Email</FieldLabel>
-                  <Input
-                    type="email"
-                    placeholder="correo@ejemplo.com"
-                    value={editContact.email || ''}
-                    onChange={(e) => setEditContact({ ...editContact, email: e.target.value })}
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel>Relación (Opcional)</FieldLabel>
-                  <Select value={editContact.relationship} onValueChange={(v) => setEditContact({ ...editContact, relationship: v })}>
-                    <SelectTrigger><SelectValue placeholder="Selecciona relación" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="parent">Padre/Madre</SelectItem>
-                      <SelectItem value="spouse">Esposo/a</SelectItem>
-                      <SelectItem value="sibling">Hermano/a</SelectItem>
-                      <SelectItem value="friend">Amigo/a</SelectItem>
-                      <SelectItem value="partner">Pareja</SelectItem>
-                      <SelectItem value="other">Otro</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field>
+                {!simpleMode && (
+                  <>
+                    <Field>
+                      <FieldLabel>Email</FieldLabel>
+                      <Input
+                        type="email"
+                        placeholder="correo@ejemplo.com"
+                        value={editContact.email || ''}
+                        onChange={(e) => setEditContact({ ...editContact, email: e.target.value })}
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel>Relación (Opcional)</FieldLabel>
+                      <Select value={editContact.relationship} onValueChange={(v) => setEditContact({ ...editContact, relationship: v })}>
+                        <SelectTrigger><SelectValue placeholder="Selecciona relación" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="parent">Padre/Madre</SelectItem>
+                          <SelectItem value="spouse">Esposo/a</SelectItem>
+                          <SelectItem value="sibling">Hermano/a</SelectItem>
+                          <SelectItem value="friend">Amigo/a</SelectItem>
+                          <SelectItem value="partner">Pareja</SelectItem>
+                          <SelectItem value="other">Otro</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  </>
+                )}
+                {!simpleMode && <Field>
                   <FieldLabel>Importancia</FieldLabel>
                   <div className="flex gap-2">
                     {importanceLevels.map((level) => (
@@ -676,7 +695,7 @@ export function HomeTab() {
                       </button>
                     ))}
                   </div>
-                </Field>
+                </Field>}
               </FieldGroup>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setEditingContact(null)}>Cancelar</Button>

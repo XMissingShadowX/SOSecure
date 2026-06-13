@@ -10,6 +10,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import { cn } from '@/lib/utils'
 import { useAppStore } from '@/lib/store'
 import { useGeolocation } from '@/hooks/use-geolocation'
 import { createClient } from '@/lib/supabase/client'
@@ -24,7 +25,7 @@ import { MedicTab } from './tabs/medic-tab'
 import { BeforeTab } from './tabs/before-tab'
 import { DuringTab } from './tabs/during-tab'
 import { AfterTab } from './tabs/after-tab'
-import { Shield, Settings, LogOut, BellRing, WifiOff, Sun, Moon, UserCircle, Trash2, Lock, LockOpen, KeyRound, CheckCircle2, Delete, ShieldCheck, Volume2 } from 'lucide-react'
+import { Shield, Settings, LogOut, BellRing, WifiOff, Sun, Moon, UserCircle, Trash2, Lock, LockOpen, KeyRound, CheckCircle2, Delete, ShieldCheck, Volume2, Puzzle } from 'lucide-react'
 import { PinLock } from './pin-lock'
 import { hashPin } from '@/lib/pin'
 import { Button } from '@/components/ui/button'
@@ -57,7 +58,7 @@ import {
 import type { User } from '@supabase/supabase-js'
 
 export function AppShell() {
-  const { activeTab, setCurrentLocation, setLocationStatus, setNearbyIncidents, offlineQueue, isLiveSharing, voiceKeyword, sosActive, volumePresses, setVolumePresses, volumeWindow, setVolumeWindow } = useAppStore()
+  const { activeTab, setCurrentLocation, setLocationStatus, setNearbyIncidents, offlineQueue, isLiveSharing, voiceKeyword, sosActive, volumePresses, setVolumePresses, volumeWindow, setVolumeWindow, simpleMode, setSimpleMode } = useAppStore()
   const { coordinates, loading: locationLoading, error: locationError } = useGeolocation({ watch: true })
   const [user, setUser] = useState<User | null>(null)
   const liveBroadcastRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -575,6 +576,49 @@ export function AppShell() {
                 </DialogHeader>
 
                 <div className="space-y-6 pt-2 max-h-[70vh] overflow-y-auto pr-1">
+                  {/* Modo Simple */}
+                  <div>
+                    <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-primary/5">
+                      <div className="flex items-center gap-2">
+                        <Puzzle className="w-4 h-4 text-primary" />
+                        <div>
+                          <p className="text-sm font-medium">Modo Simple</p>
+                          <p className="text-xs text-muted-foreground">Interfaz más grande y fácil de usar</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSimpleMode(!simpleMode)}
+                        style={{
+                          position: 'relative',
+                          width: '44px',
+                          height: '24px',
+                          borderRadius: '9999px',
+                          border: 'none',
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                          backgroundColor: simpleMode
+                            ? (isDark ? 'oklch(0.75 0.15 180)' : 'oklch(0.55 0.15 180)')
+                            : (isDark ? 'oklch(0.35 0.02 260)' : 'oklch(0.78 0.01 260)'),
+                          transition: 'background-color 0.2s',
+                        }}
+                      >
+                        <span style={{
+                          position: 'absolute',
+                          top: '4px',
+                          left: '0',
+                          width: '16px',
+                          height: '16px',
+                          borderRadius: '9999px',
+                          backgroundColor: 'white',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                          transition: 'transform 0.2s',
+                          transform: simpleMode ? 'translateX(24px)' : 'translateX(4px)',
+                        }} />
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Tema */}
                   <div>
                     <p className="text-sm font-medium mb-3">Apariencia</p>
@@ -888,7 +932,14 @@ export function AppShell() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto">
+        {simpleMode && (
+          <div className="bg-warning/20 border-b border-warning/30 px-4 py-1.5 flex items-center justify-center gap-2">
+            <Puzzle className="w-3.5 h-3.5 text-warning" />
+            <span className="text-xs font-medium text-warning">Modo Simple activado</span>
+          </div>
+        )}
+
+        <main className={cn('flex-1 overflow-y-auto', simpleMode && 'text-lg')}>
           <div className="max-w-lg mx-auto px-4 py-4">
             {activeTab === 'home' && <HomeTab />}
             {activeTab === 'before' && <BeforeTab />}

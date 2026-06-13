@@ -94,6 +94,7 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
     showRoutes, setShowRoutes, selectedRoute, setSelectedRoute,
     routeOptions, setRouteOptions, routeInfo, setRouteInfo,
     currentLocation: coordinates,
+    simpleMode,
   } = useAppStore()
   const [destinationInput, setDestinationInput] = useState('')
   const [suggestions, setSuggestions] = useState<{ display_name: string; lat: string; lon: string }[]>([])
@@ -267,7 +268,7 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
   // también se muestran consejos de seguridad para los usuarios.
   return (
     <div className="flex flex-col gap-4">
-      {!showRoutes && (
+      {!showRoutes && !simpleMode && (
         <Card>
           <CardContent className="p-4 space-y-3">
             <h4 className="font-medium flex items-center gap-2">
@@ -493,7 +494,7 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
       {showRoutes && routeOptions.length > 0 && (
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-muted-foreground">Opciones de Ruta</h3>
-          {routeOptions.map((route, i) => {
+          {routeOptions.filter((_, i) => !simpleMode || i === 0).map((route, i) => {
             const isLocked = !isPremium && i > 0
             return (
               <div key={route.id} className={isLocked ? 'relative' : undefined}>
@@ -523,13 +524,21 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className={cn("text-2xl font-bold", getSafetyColor(route.safetyScore.risk_level))}>
-                          {route.safetyScore.score}
-                        </div>
-                        <p className="text-xs text-muted-foreground">Puntuación de Seguridad</p>
+                        {simpleMode ? (
+                          <div className="text-3xl">
+                            {route.safetyScore.risk_level === 'safe' ? '✅' : route.safetyScore.risk_level === 'caution' ? '⚠️' : '❌'}
+                          </div>
+                        ) : (
+                          <>
+                            <div className={cn("text-2xl font-bold", getSafetyColor(route.safetyScore.risk_level))}>
+                              {route.safetyScore.score}
+                            </div>
+                            <p className="text-xs text-muted-foreground">Puntuación de Seguridad</p>
+                          </>
+                        )}
                       </div>
                     </div>
-                    {route.incidentsOnRoute > 0 && (
+                    {route.incidentsOnRoute > 0 && !simpleMode && (
                       <div className="flex items-center gap-2 text-sm text-warning">
                         <AlertTriangle className="w-4 h-4" />
                         <span>{route.incidentsOnRoute} incidente{route.incidentsOnRoute > 1 ? 's' : ''} cerca de la ruta</span>

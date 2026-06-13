@@ -16,6 +16,7 @@
 // Button, Card, Textarea y ScrollArea. También se importa el tipo `ChatMessage` para definir la estructura de los 
 // mensajes del chat.
 import { useState, useRef, useEffect } from 'react'
+import { useAppStore } from '@/lib/store'
 import { Send, Bot, User, Sparkles, Heart, MessageCircle, Wind, AlertCircle, Smile } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -78,6 +79,7 @@ const INITIAL_MESSAGE: ChatMessage = {
 // una función para enviar mensajes.
 export function MedicTab() {
   const { isPremium, loading: premiumLoading } = usePremium()
+  const { simpleMode } = useAppStore()
   const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_MESSAGE])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -213,7 +215,7 @@ export function MedicTab() {
         {quickPrompts.map((prompt) => {
           const Icon = prompt.icon
           return (
-            <Button key={prompt.label} variant="outline" size="sm" onClick={() => sendMessage(prompt.prompt)} disabled={isLoading} className="flex-shrink-0">
+            <Button key={prompt.label} variant="outline" size={simpleMode ? 'default' : 'sm'} onClick={() => sendMessage(prompt.prompt)} disabled={isLoading} className="flex-shrink-0">
               <Icon className="w-4 h-4 mr-1.5" />{prompt.label}
             </Button>
           )
@@ -221,7 +223,7 @@ export function MedicTab() {
       </div>
 
       <form onSubmit={handleSubmit} className="flex gap-2">
-        <Textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder="¿Cómo te sientes? Estoy aquí para escucharte..." className="min-h-[44px] max-h-[120px] resize-none" rows={1}
+        <Textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder="¿Cómo te sientes? Estoy aquí para escucharte..." className={`${simpleMode ? 'min-h-[80px]' : 'min-h-[44px]'} max-h-[120px] resize-none`} rows={simpleMode ? 3 : 1}
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(e) } }} />
         <Button type="submit" size="icon" disabled={!input.trim() || isLoading} className="h-[44px] w-[44px] flex-shrink-0"><Send className="w-5 h-5" /></Button>
       </form>
