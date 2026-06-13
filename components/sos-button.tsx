@@ -658,9 +658,12 @@ export function SOSButton() {
   }
 
   return (
-    <div className={`fixed left-1/2 -translate-x-1/2 z-50 safe-area-bottom flex flex-col items-center gap-2 ${simpleMode ? 'bottom-24' : 'bottom-20'}`}>
+    <div className={cn(
+      "fixed left-1/2 -translate-x-1/2 z-50 safe-area-bottom flex flex-col items-center gap-2",
+      simpleMode ? "bottom-24" : "bottom-20"
+    )}>
       <div
-        className={`absolute -top-8 opacity-0 cursor-pointer ${simpleMode ? 'w-28 h-8' : 'w-20 h-8'}`}
+        className="absolute -top-8 w-20 h-8 opacity-0 cursor-pointer"
         onClick={handleSecretTap}
         aria-label="Activación alternativa SOS"
       />
@@ -672,21 +675,19 @@ export function SOSButton() {
         onTouchStart={handleHoldStart}
         onTouchEnd={handleHoldEnd}
         className={cn(
-          `relative rounded-full bg-destructive text-destructive-foreground`,
-          simpleMode ? "w-28 h-28" : "w-20 h-20",
-          "flex items-center justify-center",
+          "relative rounded-full bg-destructive text-destructive-foreground",
+          "flex items-center justify-center flex-shrink-0",
           "shadow-lg shadow-destructive/30",
           "transition-transform active:scale-95",
           isHolding && "sos-pulse"
         )}
+        style={simpleMode ? { width: '7rem', height: '7rem', minWidth: '7rem', minHeight: '7rem' } : { width: '5rem', height: '5rem', minWidth: '5rem', minHeight: '5rem' }}
         aria-label="Mantén presionado 2 segundos para activar SOS"
       >
         {isHolding && (
           <svg className="absolute inset-0 w-full h-full -rotate-90">
             <circle
-              cx={simpleMode ? 56 : 40}
-              cy={simpleMode ? 56 : 40}
-              r={simpleMode ? 50 : 36}
+              cx={simpleMode ? 56 : 40} cy={simpleMode ? 56 : 40} r={simpleMode ? 50 : 36}
               fill="none" stroke="currentColor" strokeWidth="4"
               strokeDasharray={`${2 * Math.PI * (simpleMode ? 50 : 36)}`}
               strokeDashoffset={`${2 * Math.PI * (simpleMode ? 50 : 36) * (1 - holdProgress / 100)}`}
@@ -701,7 +702,7 @@ export function SOSButton() {
       </button>
 
       <p
-        className={`whitespace-nowrap font-medium px-3 py-1 rounded-full -mt-1 ${simpleMode ? 'text-base' : 'text-sm'}`}
+        className="whitespace-nowrap text-sm font-medium px-3 py-1 rounded-full -mt-1"
         style={{ backgroundColor: 'rgba(220, 38, 38, 0.2)', color: '#991b1b' }}
       >
         {isHolding ? 'Mantén presionado...' : 'Presiona'}

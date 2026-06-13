@@ -67,11 +67,6 @@
 | 👨‍👩‍👧 Plan Familiar ($499/año) | Hasta 5 miembros con acceso Premium completo |
 | 📜 Historial de Alertas SOS (Premium) | Revisa alertas pasadas con filtros de 1 semana / 1 / 3 / 6 meses |
 
-### Accesibilidad
-| Funcionalidad | Descripción |
-|---|---|
-| 🧩 Modo Simple | Toggle en Ajustes que simplifica la UI para adultos mayores y niños: íconos y texto más grandes, navegación con barra más alta, oculta secciones avanzadas (rutas en antes-tab, historial, activación secreta, preguntas de incidente), muestra solo la acción principal en cada tab |
-
 ### General
 | Funcionalidad | Descripción |
 |---|---|
@@ -79,7 +74,12 @@
 | 🌙 Tema Claro / Oscuro | Soporte completo con detección automática y cambio manual |
 | 📶 Modo Offline | Reportes en cola local, sincronización automática al recuperar conexión |
 | 🔔 Notificaciones Push | Notificaciones nativas en navegador y Android |
-| 🛡️ Panel de Administración | Gestión de usuarios e incidentes en `/admin` (solo admins) |
+| 🛡️ Panel de Administración | Gestión de usuarios e incedentes en `/admin` (solo admins) |
+
+### Accesibilidad
+| Funcionalidad | Descripción |
+|---|---|
+| 🧩 Modo Simple | Toggle en Ajustes que simplifica toda la interfaz: textos más grandes, íconos más grandes, barra de navegación más alta, botón SOS más grande, y oculta secciones avanzadas en cada tab para que adultos mayores y niños puedan usar la app sin dificultad |
 
 ---
 
@@ -575,7 +575,6 @@ SOSecure/
 - **VolumeButtonPlugin** existe solo como `.java` — no crear versión `.kt` (causaría redeclaración en compilación).
 - **`sos_locations`** usa `.update()` para actualizar ubicación, no `.upsert()`, porque `alert_id` no tiene restricción `UNIQUE`.
 - **`usePremium()`** hace una llamada RPC al montar; mientras `loading === true` no se muestran banners de bloqueo para evitar flicker.
-- **`simpleMode`** es un campo booleano en el store de Zustand (persistido). Todos los tabs lo leen para adaptar su presentación: ocultan secciones avanzadas, agrandan íconos y texto. Se activa desde el toggle "Modo Simple" en Ajustes.
 - **Desarrollo en Android**: usar `localhost` con ADB port forward, no la IP de la PC (HTTP sobre IP no es "secure context" y `navigator.mediaDevices` queda `undefined`).
 
 ---

@@ -11,6 +11,7 @@
 
 'use client'
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { cn } from '@/lib/utils'
 import {
   MessageCircle, X, Send, MapPin, AlertTriangle, Phone,
   Bot, Loader2, Shield, ChevronLeft, Sparkles, UserCircle2, WifiOff, FileVideo, FileAudio, Video, Radio, Camera
@@ -342,7 +343,7 @@ Nunca te presentes como "Claude".`
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export function EmergencyChat() {
-  const { contacts, currentLocation, sosActive, sosAlert } = useAppStore()
+  const { contacts, currentLocation, sosActive, sosAlert, simpleMode } = useAppStore()
   const supabase = createClient()
 
   const [open, setOpen] = useState(false)
@@ -675,10 +676,14 @@ export function EmergencyChat() {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-28 right-4 z-50 w-14 h-14 rounded-full bg-primary shadow-lg flex items-center justify-center active:scale-95 transition-transform"
+        className={cn(
+          "fixed bottom-28 right-4 z-50 rounded-full bg-primary shadow-lg flex items-center justify-center active:scale-95 transition-transform",
+          simpleMode ? "w-18 h-18" : "w-14 h-14"
+        )}
+        style={simpleMode ? { width: '4.5rem', height: '4.5rem' } : undefined}
         aria-label="Abrir chat"
       >
-        <MessageCircle className="w-6 h-6 text-primary-foreground" />
+        <MessageCircle className={simpleMode ? "w-8 h-8 text-primary-foreground" : "w-6 h-6 text-primary-foreground"} />
         {unread > 0 && (
           <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-white text-xs flex items-center justify-center font-bold">
             {unread}
@@ -740,26 +745,26 @@ export function EmergencyChat() {
                 <button
                   key={item.id}
                   onClick={() => openChat(item.id)}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl bg-muted/40 hover:bg-muted/80 active:scale-[0.98] transition-all text-left"
+                  className={cn("w-full flex items-center gap-3 rounded-xl bg-muted/40 hover:bg-muted/80 active:scale-[0.98] transition-all text-left", simpleMode ? "p-4" : "p-3")}
                 >
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${(item as any).isLive ? 'bg-destructive/20 ring-2 ring-destructive animate-pulse' : (item as any).isSosRec ? 'bg-destructive/20' : 'bg-primary/20'}`}>
+                  <div className={cn("rounded-full flex items-center justify-center flex-shrink-0", simpleMode ? "w-14 h-14" : "w-10 h-10", (item as any).isLive ? 'bg-destructive/20 ring-2 ring-destructive animate-pulse' : (item as any).isSosRec ? 'bg-destructive/20' : 'bg-primary/20')}>
                     {item.isAI
-                      ? <Shield className="w-5 h-5 text-primary" />
+                      ? <Shield className={simpleMode ? "w-7 h-7 text-primary" : "w-5 h-5 text-primary"} />
                       : (item as any).isLive
-                        ? <Camera className="w-5 h-5 text-destructive" />
+                        ? <Camera className={simpleMode ? "w-7 h-7 text-destructive" : "w-5 h-5 text-destructive"} />
                         : (item as any).isSosRec
-                          ? <Video className="w-5 h-5 text-destructive" />
-                          : <span className="text-primary font-bold text-sm">{item.name.charAt(0).toUpperCase()}</span>
+                          ? <Video className={simpleMode ? "w-7 h-7 text-destructive" : "w-5 h-5 text-destructive"} />
+                          : <span className={cn("text-primary font-bold", simpleMode ? "text-lg" : "text-sm")}>{item.name.charAt(0).toUpperCase()}</span>
                     }
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <p className="text-sm font-medium truncate">{item.name}</p>
+                      <p className={cn("font-medium truncate", simpleMode ? "text-base" : "text-sm")}>{item.name}</p>
                       {item.isAI && <Badge variant="outline" className="text-xs border-primary/40 text-primary">Asistente</Badge>}
                       {!item.isAI && (item as any).resolving && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
                       {!item.isAI && (item as any).hasAccount && <Badge variant="outline" className="text-xs text-green-600 border-green-500/40">En SOSecure</Badge>}
                     </div>
-                    <p className="text-xs text-muted-foreground truncate mt-0.5">
+                    <p className={cn("text-muted-foreground truncate mt-0.5", simpleMode ? "text-sm" : "text-xs")}>
                       {lastMsg ? lastMsg.text.slice(0, 50) + (lastMsg.text.length > 50 ? '…' : '') : item.subtitle}
                     </p>
                   </div>
@@ -793,7 +798,7 @@ export function EmergencyChat() {
                       {msg.type === 'ai' ? <Bot className="w-3 h-3 text-primary" /> : <UserCircle2 className="w-3 h-3 text-primary" />}
                     </div>
                   )}
-                  <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm break-words ${
+                  <div className={cn(`max-w-[80%] rounded-2xl break-words`, simpleMode ? 'px-4 py-3 text-base' : 'px-3 py-2 text-sm',
                     msg.loading ? 'bg-muted text-muted-foreground'
                     : msg.type === 'sos' ? 'bg-destructive text-white'
                     : msg.type === 'location' ? 'bg-primary/20 text-foreground'
@@ -801,7 +806,7 @@ export function EmergencyChat() {
                     : (msg.type === 'ai' && !msg.isMe) ? 'bg-muted text-foreground'
                     : msg.isMe ? 'bg-primary text-primary-foreground'
                     : 'bg-muted text-foreground'
-                  }`}>
+                  )}>
                     {msg.loading ? (
                       <div className="flex items-center gap-2 py-0.5">
                         <Loader2 className="w-3 h-3 animate-spin" />
@@ -827,17 +832,17 @@ export function EmergencyChat() {
 
             {/* Acciones rápidas — ocultas en vista de transmisión en vivo */}
             {!isLiveItem && (
-            <div className="flex gap-2 px-3 pt-2 flex-shrink-0 flex-wrap">
+            <div className={cn("flex gap-2 px-3 pt-2 flex-shrink-0 flex-wrap", simpleMode && "pt-3 gap-3")}>
               <button
                 onClick={() => handleSend('location')}
                 disabled={sending || (isAIActive && aiLoading)}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-colors disabled:opacity-50"
+                className={cn("flex items-center gap-1 rounded-full bg-primary/10 text-primary font-medium hover:bg-primary/20 transition-colors disabled:opacity-50", simpleMode ? "px-4 py-2.5 text-sm" : "px-3 py-1.5 text-xs")}
               >
-                <MapPin className="w-3 h-3" /> Compartir ubicación
+                <MapPin className={simpleMode ? "w-4 h-4" : "w-3 h-3"} /> Compartir ubicación
               </button>
               {!isAIActive && activeContact?.phone && (
-                <a href={`tel:${activeContact.phone}`} className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-green-500/10 text-green-600 text-xs font-medium hover:bg-green-500/20 transition-colors">
-                  <Phone className="w-3 h-3" /> Llamar
+                <a href={`tel:${activeContact.phone}`} className={cn("flex items-center gap-1 rounded-full bg-green-500/10 text-green-600 font-medium hover:bg-green-500/20 transition-colors", simpleMode ? "px-4 py-2.5 text-sm" : "px-3 py-1.5 text-xs")}>
+                  <Phone className={simpleMode ? "w-4 h-4" : "w-3 h-3"} /> Llamar
                 </a>
               )}
               {!isAIActive && activeHasAccount === false && activeContact?.phone && (
@@ -845,9 +850,9 @@ export function EmergencyChat() {
                 href={`https://wa.me/${activeContact.phone.replace(/\D/g, '')}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-green-600/10 text-green-700 text-xs font-medium hover:bg-green-600/20 transition-colors"
+                className={cn("flex items-center gap-1 rounded-full bg-green-600/10 text-green-700 font-medium hover:bg-green-600/20 transition-colors", simpleMode ? "px-4 py-2.5 text-sm" : "px-3 py-1.5 text-xs")}
               >
-                <Phone className="w-3 h-3" /> WhatsApp
+                <Phone className={simpleMode ? "w-4 h-4" : "w-3 h-3"} /> WhatsApp
               </a>
           )}
             </div>
@@ -855,7 +860,7 @@ export function EmergencyChat() {
 
             {/* Input — oculto en vista de transmisión en vivo */}
             {!isLiveItem && (
-            <div className="flex items-center gap-2 p-3 border-t border-border flex-shrink-0">
+            <div className={cn("flex items-center gap-2 border-t border-border flex-shrink-0", simpleMode ? "p-4" : "p-3")}>
               <input
                 ref={inputRef}
                 type="text"
@@ -868,17 +873,17 @@ export function EmergencyChat() {
                   : 'Escribe un mensaje…'
                 }
                 disabled={sending || (isAIActive && aiLoading) || (!isAIActive && activeHasAccount === false)}
-                className="flex-1 bg-muted rounded-full px-4 py-2 text-sm outline-none disabled:opacity-50"
+                className={cn("flex-1 bg-muted rounded-full px-4 outline-none disabled:opacity-50", simpleMode ? "py-3 text-base" : "py-2 text-sm")}
               />
               <Button
                 size="icon"
                 onClick={() => handleSend('text')}
                 disabled={!input.trim() || sending || (isAIActive && aiLoading) || (!isAIActive && activeHasAccount === false)}
-                className="rounded-full w-9 h-9 flex-shrink-0"
+                className={cn("rounded-full flex-shrink-0", simpleMode ? "w-12 h-12" : "w-9 h-9")}
               >
                 {(sending || (isAIActive && aiLoading))
-                  ? <Loader2 className="w-4 h-4 animate-spin" />
-                  : <Send className="w-4 h-4" />
+                  ? <Loader2 className={simpleMode ? "w-5 h-5 animate-spin" : "w-4 h-4 animate-spin"} />
+                  : <Send className={simpleMode ? "w-5 h-5" : "w-4 h-4"} />
                 }
               </Button>
             </div>

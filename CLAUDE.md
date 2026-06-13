@@ -337,15 +337,9 @@ npm run cap:android  # Luego Build > Generate Signed APK en Android Studio
 - Los fallbacks a WhatsApp fueron eliminados de `lib/recordings.ts` y `components/emergency-chat.tsx`.
 
 ### Modo Simple (accesibilidad)
-- `simpleMode: boolean` en el store Zustand, **persistido** en localStorage.
-- Se activa con un toggle en el dialog de Ajustes (`app-shell.tsx`).
-- Todos los tabs leen `simpleMode` del store y adaptan su UI mediante renderizado condicional — **no se duplican componentes**.
-- Efectos en cada tab:
-  - **`bottom-navigation.tsx`**: íconos `w-7 h-7`, texto `text-xs font-semibold`, barra `h-20`
-  - **`home-tab.tsx`**: oculta tips de seguridad, coordenadas GPS (muestra "Ubicación activa ✓"), badge de prioridad, campos email/relationship/importancia en formularios de contacto
-  - **`before-tab.tsx`**: oculta sección de rutas, mapa, tracking en vivo y palabra clave de voz; temporizador solo muestra botones 15/30/60 min
-  - **`during-tab.tsx`**: oculta preguntas yes/no/unsure del incidente, sección de activación secreta e historial de ubicación; post-grabación muestra solo "Enviar a contactos"; countdown de video con texto más grande
-  - **`after-tab.tsx`**: oculta historial SOS, grabaciones y zonas de peligro; botón "Llegué bien" con `h-14`
-  - **`routes-tab.tsx`**: oculta tips de seguridad, muestra solo la ruta más segura (índice 0), reemplaza score numérico con emoji ✅/⚠️/❌, oculta conteo de incidentes
-  - **`medic-tab.tsx`**: botones de acceso rápido más grandes, textarea `min-h-[80px]`
-  - **`app-shell.tsx`**: `<main>` con clase `text-lg` cuando activo; banner amarillo bajo el header
+- Un solo campo `simpleMode: boolean` en el store (persistido). Toggle en el dialog de Ajustes (`app-shell.tsx`).
+- **No se duplican componentes** — renderizado condicional con `{!simpleMode && ...}` en cada tab.
+- Efectos por tab: `home-tab` oculta tips, coordenadas GPS, badge de prioridad y campos email/relationship; `before-tab` oculta rutas, tracking en vivo y palabra clave de voz, simplifica preset de temporizador a 3 opciones; `during-tab` oculta preguntas de incidente, métodos secretos e historial de ubicación; `after-tab` oculta historial SOS, grabaciones y zonas de peligro; `routes-tab` muestra solo la ruta más segura con emoji en lugar de score numérico; `medic-tab` agranda textarea y botones rápidos.
+- `bottom-navigation.tsx` agranda íconos y barra (`h-20` vs `h-16`) en simpleMode.
+- `sos-button.tsx` agranda el botón a `w-28 h-28` (vs `w-20 h-20`) y ajusta SVG circle `cx/cy/r` y posición `bottom-24` (vs `bottom-20`) para la barra más alta.
+- `app-shell.tsx` muestra banner amarillo cuando está activo y agrega clase `text-lg` al `<main>` para escalar tipografía base.
