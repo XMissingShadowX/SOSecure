@@ -22,6 +22,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { usePremium } from '@/hooks/use-premium'
+import { UpgradeBanner } from '@/components/upgrade-banner'
 import type { ChatMessage } from '@/lib/types'
 
 // Definir un array de mensajes predefinidos con iconos, etiquetas y prompts relacionados con temas comunes de 
@@ -75,6 +77,7 @@ const INITIAL_MESSAGE: ChatMessage = {
 // El componente maneja el estado de los mensajes del chat, la entrada del usuario y el estado de carga. Proporciona 
 // una función para enviar mensajes.
 export function MedicTab() {
+  const { isPremium, loading: premiumLoading } = usePremium()
   const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_MESSAGE])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -148,6 +151,17 @@ export function MedicTab() {
   // mensajes predefinidos, y un formulario para que el usuario ingrese sus propios mensajes. El área de mensajes se 
   // desplaza automáticamente hacia el final cada vez que se actualiza la lista de mensajes, y el botón de enviar se 
   // desactiva si la entrada está vacía o si se está cargando una respuesta del asistente.
+  if (!premiumLoading && !isPremium) {
+    return (
+      <div className="flex flex-col h-[calc(100vh-8rem)] pb-36 items-center justify-center p-4">
+        <UpgradeBanner
+          title="Chat de Apoyo Psicológico"
+          description="El acompañante de bienestar con IA está disponible solo en planes Premium y Familiar."
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] pb-36">
       <Card className="mb-4 border-primary/30 bg-primary/5">

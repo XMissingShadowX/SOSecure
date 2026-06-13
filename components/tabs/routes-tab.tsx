@@ -15,12 +15,15 @@
 // seguridad e información de rutas.
 import { useState, useEffect} from 'react'
 import dynamic from 'next/dynamic'
-import { Navigation, MapPin, AlertTriangle, Clock, Shield, RotateCcw } from 'lucide-react'
+import { Navigation, MapPin, AlertTriangle, Clock, Shield, RotateCcw, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/lib/store'
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { usePremium } from '@/hooks/use-premium'
+import { UpgradeBanner } from '@/components/upgrade-banner'
 import type { Coordinates, SafetyScore } from '@/lib/types'
 import type { RouteInfo } from '@/components/route-map'
 
@@ -85,6 +88,7 @@ export function calculateSafetyScore(
 // funciones para buscar destinos utilizando la API de Photon, seleccionar rutas, y mostrar información relevante sobre la 
 // seguridad de cada ruta. También muestra consejos de seguridad para los usuarios al planear sus rutas.
 export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
+  const { isPremium } = usePremium()
   const {
     nearbyIncidents, routeOrigin, routeDestination, setRouteOrigin, setRouteDestination, frequentPlaces,
     showRoutes, setShowRoutes, selectedRoute, setSelectedRoute,
@@ -94,6 +98,7 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
   const [destinationInput, setDestinationInput] = useState('')
   const [suggestions, setSuggestions] = useState<{ display_name: string; lat: string; lon: string }[]>([])
   const [searching, setSearching] = useState(false)
+  const [searchLimitReached, setSearchLimitReached] = useState(false)
 
   // Custom origin state
   const [originInput, setOriginInput] = useState('')
@@ -118,12 +123,25 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
   // Photon para buscar el destino ingresado, y si se encuentra una coincidencia, establece el destino de la ruta con las 
   // coordenadas del resultado y muestra las opciones de ruta. Si no se encuentra el destino o si ocurre un error durante 
   // la búsqueda, se muestra una alerta al usuario.
+  // Verifica el límite diario para free y registra la búsqueda. Devuelve true si se puede continuar.
+  const checkAndRecordSearch = async (): Promise<boolean> => {
+    if (isPremium) return true
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return true
+    const { data: count } = await supabase.rpc('count_route_searches_today', { p_user_id: user.id })
+    if ((count ?? 0) >= 1) {
+      setSearchLimitReached(true)
+      return false
+    }
+    await supabase.rpc('insert_route_search', { p_user_id: user.id })
+    return true
+  }
+
   const handleSearch = async () => {
     if (!destinationInput || !routeOrigin) return
-    // Realizar una solicitud a la API de Photon para buscar el destino ingresado por el usuario. La función codifica el
-    // input del destino para asegurarse de que sea seguro para usar en una URL, y limita los resultados a 1 para obtener la 
-    // coincidencia más relevante. Si se encuentra una coincidencia, se extraen las coordenadas del resultado y se establece 
-    // el destino de la ruta. Si no se encuentra el destino o si ocurre un error durante la búsqueda, se muestra una alerta al usuario.
+    if (!await checkAndRecordSearch()) return
+
     try {
       const res = await fetch(
         `https://photon.komoot.io/api/?q=${encodeURIComponent(destinationInput)}&limit=1`,
@@ -149,12 +167,12 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
   // automáticamente la ruta más segura. Esto proporciona una forma rápida y conveniente para que los usuarios seleccionen destinos 
   // comunes sin tener que escribir manualmente la dirección.
   const handleQuickSelect = async (location: typeof frequentPlaces[0]) => {
+    if (!location.coordinates) return
+    if (!await checkAndRecordSearch()) return
     setDestinationInput(location.label)
-    if (location.coordinates) {
-      setRouteDestination(location.coordinates)
-      setShowRoutes(true)
-      setSelectedRoute('safest')
-    }
+    setRouteDestination(location.coordinates)
+    setShowRoutes(true)
+    setSelectedRoute('safest')
   }
 
   // Función para reiniciar la planificación de la ruta. Esta función limpia el input del destino, restablece el destino 
@@ -168,6 +186,7 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
     setSelectedRoute(null)
     setRouteInfo({})
     setSuggestions([])
+    setSearchLimitReached(false)
     // Reset origin back to GPS
     if (coordinates) setRouteOrigin(coordinates)
     setCustomOriginLabel(null)
@@ -377,7 +396,8 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
                     <button
                       key={i}
                       className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted-foreground border-b border-border last:border-0"
-                      onClick={() => {
+                      onClick={async () => {
+                        if (!await checkAndRecordSearch()) { setSuggestions([]); return }
                         setDestinationInput(s.display_name)
                         setRouteDestination({ latitude: parseFloat(s.lat), longitude: parseFloat(s.lon) })
                         setShowRoutes(true)
@@ -408,8 +428,16 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
             </p>
           )}
 
+          {searchLimitReached && (
+            <UpgradeBanner
+              title="Límite de búsquedas alcanzado"
+              description="El plan gratuito permite 1 búsqueda de ruta por día. Actualiza para búsquedas ilimitadas."
+              compact
+            />
+          )}
+
           <div className="flex gap-2">
-            {showRoutes ? (
+            {showRoutes || searchLimitReached ? (
               <Button variant="outline" onClick={resetRoute} className="flex-1">
                 <RotateCcw className="w-4 h-4 mr-2" />
                 Reiniciar
@@ -465,54 +493,67 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
       {showRoutes && routeOptions.length > 0 && (
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-muted-foreground">Opciones de Ruta</h3>
-          {routeOptions.map((route) => (
-            <Card
-              key={route.id}
-              className={cn(
-                "cursor-pointer transition-all border-2",
-                selectedRoute === route.id
-                  ? getSafetyBg(route.safetyScore.risk_level)
-                  : "border-transparent hover:border-border"
-              )}
-              onClick={() => setSelectedRoute(route.id)}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <h4 className="font-semibold flex items-center gap-2">
-                      {route.name}
-                      {route.id === 'safest' && <Shield className="w-4 h-4 text-safe" />}
-                    </h4>
-                    <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
-                      <span>{routeInfo[route.id]?.distance || route.distance}</span>
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {routeInfo[route.id]?.duration || route.duration}
-                      </span>
+          {routeOptions.map((route, i) => {
+            const isLocked = !isPremium && i > 0
+            return (
+              <div key={route.id} className={isLocked ? 'relative' : undefined}>
+                <Card
+                  className={cn(
+                    "transition-all border-2",
+                    isLocked ? "opacity-60 pointer-events-none cursor-default" : "cursor-pointer",
+                    !isLocked && selectedRoute === route.id
+                      ? getSafetyBg(route.safetyScore.risk_level)
+                      : "border-transparent hover:border-border"
+                  )}
+                  onClick={() => !isLocked && setSelectedRoute(route.id)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <h4 className="font-semibold flex items-center gap-2">
+                          {route.name}
+                          {route.id === 'safest' && <Shield className="w-4 h-4 text-safe" />}
+                        </h4>
+                        <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
+                          <span>{routeInfo[route.id]?.distance || route.distance}</span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {routeInfo[route.id]?.duration || route.duration}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className={cn("text-2xl font-bold", getSafetyColor(route.safetyScore.risk_level))}>
+                          {route.safetyScore.score}
+                        </div>
+                        <p className="text-xs text-muted-foreground">Puntuación de Seguridad</p>
+                      </div>
+                    </div>
+                    {route.incidentsOnRoute > 0 && (
+                      <div className="flex items-center gap-2 text-sm text-warning">
+                        <AlertTriangle className="w-4 h-4" />
+                        <span>{route.incidentsOnRoute} incidente{route.incidentsOnRoute > 1 ? 's' : ''} cerca de la ruta</span>
+                      </div>
+                    )}
+                    {route.safetyScore.risk_level === 'safe' && route.incidentsOnRoute === 0 && (
+                      <div className="flex items-center gap-2 text-sm text-safe">
+                        <Shield className="w-4 h-4" />
+                        <span>Sin incidentes reportados en esta ruta</span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+                {isLocked && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-background/70 rounded-lg">
+                    <div className="flex items-center gap-2 bg-card border border-primary/30 rounded-lg px-3 py-2">
+                      <Lock className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-medium">Plan Premium</span>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className={cn("text-2xl font-bold", getSafetyColor(route.safetyScore.risk_level))}>
-                      {route.safetyScore.score}
-                    </div>
-                    <p className="text-xs text-muted-foreground">Puntuación de Seguridad</p>
-                  </div>
-                </div>
-                {route.incidentsOnRoute > 0 && (
-                  <div className="flex items-center gap-2 text-sm text-warning">
-                    <AlertTriangle className="w-4 h-4" />
-                    <span>{route.incidentsOnRoute} incidente{route.incidentsOnRoute > 1 ? 's' : ''} cerca de la ruta</span>
-                  </div>
                 )}
-                {route.safetyScore.risk_level === 'safe' && route.incidentsOnRoute === 0 && (
-                  <div className="flex items-center gap-2 text-sm text-safe">
-                    <Shield className="w-4 h-4" />
-                    <span>Sin incidentes reportados en esta ruta</span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+              </div>
+            )
+          })}
         </div>
       )}
 

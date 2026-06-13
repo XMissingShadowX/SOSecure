@@ -1,13 +1,30 @@
 ﻿'use client'
 
 import { useState, useEffect } from 'react'
-import { CheckCircle, MapPin, AlertTriangle, Home, Mic, Video, Download, Trash2, Loader2 } from 'lucide-react'
+import { CheckCircle, MapPin, AlertTriangle, Home, Mic, Video, Download, Trash2, Loader2, ShieldAlert } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { sendAlarmNotification } from '@/lib/notifications'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { usePremium } from '@/hooks/use-premium'
+import { UpgradeBanner } from '@/components/upgrade-banner'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+
+interface SosAlertItem {
+  id: string
+  created_at: string
+  latitude: number | null
+  longitude: number | null
+  status: string
+}
 
 interface StoredRecording {
   id: string
@@ -20,6 +37,7 @@ interface StoredRecording {
 }
 
 export function AfterTab() {
+  const { isPremium } = usePremium()
   const { nearbyIncidents, contacts } = useAppStore()
   const [dangerZones, setDangerZones] = useState<{ lat: number; lng: number; count: number }[]>([])
   const [notifiedZoneCount, setNotifiedZoneCount] = useState(-1)
@@ -29,6 +47,9 @@ export function AfterTab() {
   const [recordings, setRecordings] = useState<StoredRecording[]>([])
   const [loadingRecordings, setLoadingRecordings] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [sosHistory, setSosHistory] = useState<SosAlertItem[]>([])
+  const [sosHistoryFilter, setSosHistoryFilter] = useState<'7d' | '1m' | '3m' | '6m'>('1m')
+  const [loadingSosHistory, setLoadingSosHistory] = useState(false)
 
   useEffect(() => {
     const high = nearbyIncidents.filter(i => i.severity === 'high')
@@ -44,6 +65,28 @@ export function AfterTab() {
       setNotifiedZoneCount(zones.length)
     }
   }, [nearbyIncidents])
+
+  useEffect(() => {
+    if (!isPremium) return
+    async function fetchSosHistory() {
+      setLoadingSosHistory(true)
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setLoadingSosHistory(false); return }
+      const filterMap = { '7d': 7, '1m': 30, '3m': 90, '6m': 180 }
+      const days = filterMap[sosHistoryFilter]
+      const since = new Date(Date.now() - days * 86400000).toISOString()
+      const { data } = await supabase
+        .from('sos_alerts')
+        .select('id, created_at, latitude, longitude, status')
+        .eq('user_id', user.id)
+        .gte('created_at', since)
+        .order('created_at', { ascending: false })
+      setSosHistory(data ?? [])
+      setLoadingSosHistory(false)
+    }
+    fetchSosHistory()
+  }, [isPremium, sosHistoryFilter])
 
   useEffect(() => {
     async function fetchRecordings() {
@@ -199,6 +242,69 @@ export function AfterTab() {
             <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setArrivedSent(false)}>
               Enviar de nuevo
             </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Historial de Alertas SOS */}
+      <Card>
+        <CardHeader className="pb-0">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ShieldAlert className="w-5 h-5 text-destructive" />
+            Historial de Alertas SOS
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 pt-3">
+          {!isPremium ? (
+            <UpgradeBanner
+              title="Historial de Alertas SOS"
+              description="Accede a tus alertas pasadas con ubicación y grabaciones adjuntas."
+              compact
+            />
+          ) : (
+            <>
+              <Select value={sosHistoryFilter} onValueChange={(v) => setSosHistoryFilter(v as typeof sosHistoryFilter)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7d">Última semana</SelectItem>
+                  <SelectItem value="1m">Último mes</SelectItem>
+                  <SelectItem value="3m">Últimos 3 meses</SelectItem>
+                  <SelectItem value="6m">Últimos 6 meses</SelectItem>
+                </SelectContent>
+              </Select>
+              {loadingSosHistory ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : sosHistory.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">
+                  No hay alertas SOS en el período seleccionado.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {sosHistory.map(alert => (
+                    <div key={alert.id} className="flex items-center gap-3 p-3 rounded-lg bg-destructive/5 border border-destructive/20">
+                      <ShieldAlert className="w-4 h-4 text-destructive shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium">
+                          {new Date(alert.created_at).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })}
+                        </p>
+                        {alert.latitude && alert.longitude && (
+                          <p className="text-xs text-muted-foreground font-mono">
+                            {alert.latitude.toFixed(4)}, {alert.longitude.toFixed(4)}
+                          </p>
+                        )}
+                      </div>
+                      <Badge variant={alert.status === 'active' ? 'destructive' : 'secondary'} className="text-xs shrink-0">
+                        {alert.status === 'active' ? 'Activa' : 'Resuelta'}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

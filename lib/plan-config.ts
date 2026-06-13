@@ -62,7 +62,7 @@ export const PREMIUM_PLAN = {
 export type PremiumPlanConfig = typeof PREMIUM_PLAN
 
 // Límite de contactos del plan gratuito (para comparar en la UI).
-export const FREE_MAX_CONTACTS = 3
+export const FREE_MAX_CONTACTS = 2
 
 /** Formatea centavos a moneda local (es-MX). */
 export function formatAmount(cents: number, currency = FAMILY_PLAN.currency): string {

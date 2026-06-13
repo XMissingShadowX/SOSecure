@@ -38,9 +38,9 @@ import {
 import { FieldGroup, Field, FieldLabel } from '@/components/ui/field'
 import { Badge } from '@/components/ui/badge'
 import type { EmergencyContact, FrequentPlace } from '@/lib/types'
-
-// Definición de la cantidad máxima de contactos de emergencia que un usuario puede agregar.
-const MAX_CONTACTS = 10
+import { usePremium } from '@/hooks/use-premium'
+import { UpgradeBanner } from '@/components/upgrade-banner'
+import { FREE_MAX_CONTACTS, PREMIUM_PLAN } from '@/lib/plan-config'
 
 // Niveles de importancia para los contactos de emergencia, cada uno con un valor, etiqueta y color asociado 
 // para la interfaz de usuario.
@@ -70,8 +70,8 @@ const placeIcons: Record<string, React.ElementType> = {
 // contactos de emergencia, así como agregar y eliminar lugares frecuentes. También muestra un banner de estado 
 // que indica si hay alertas cercanas basadas en la ubicación del usuario.
 export function HomeTab() {
-  // Se utilizan varios hooks para manejar la geolocalización del usuario, el estado global de la aplicación, y 
-  // el estado local del componente.
+  const { isPremium } = usePremium()
+  const MAX_CONTACTS = isPremium ? PREMIUM_PLAN.features.maxContacts : FREE_MAX_CONTACTS
   const { currentLocation: coordinates, locationLoading, locationError, contacts, setContacts, nearbyIncidents, frequentPlaces, addFrequentPlace, removeFrequentPlace } = useAppStore()
   // Estados locales para manejar la visibilidad de los diálogos de agregar contacto y lugar, el contacto que se 
   // está editando, los datos del nuevo contacto y lugar que se están agregando, las sugerencias de lugares basadas 
@@ -540,6 +540,14 @@ export function HomeTab() {
                 </div>
               ))}
             </div>
+          )}
+
+          {contacts.length >= MAX_CONTACTS && !isPremium && (
+            <UpgradeBanner
+              title="Límite de contactos alcanzado"
+              description={`El plan gratuito permite hasta ${FREE_MAX_CONTACTS} contactos. Actualiza para agregar hasta 10.`}
+              compact
+            />
           )}
 
           {contacts.length < MAX_CONTACTS && (

@@ -7,6 +7,7 @@ import { RoutesTab, calculateSafetyScore } from './routes-tab'
 import { MapTab } from './map-tab'
 import { useAppStore } from '@/lib/store'
 import { useTracking } from '@/hooks/use-tracking'
+import { usePremium } from '@/hooks/use-premium'
 import { useIncomingTracking } from '@/hooks/use-incoming-tracking'
 import { useLiveLocation } from '@/hooks/use-live-location'
 import { useContactUserIds } from '@/hooks/use-contact-user-ids'
@@ -188,6 +189,7 @@ function TrackingMap({ members, focusUserId }: { members: TrackingMember[], focu
 }
 
 export function BeforeTab() {
+  const { isPremium } = usePremium()
   const {
     contacts, securityTimerActive, securityTimerEnd, setSecurityTimer, setSosActive,
     showRoutes, selectedRoute, routeOrigin, routeDestination, nearbyIncidents,
@@ -488,8 +490,8 @@ export function BeforeTab() {
         </CardContent>
       </Card>
 
-      {/* Seguimiento en Vivo — modelo Life360 */}
-      <Card>
+      {/* Seguimiento en Vivo — modelo Life360, solo premium */}
+      {isPremium && <Card>
         <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <Users className="w-5 h-5 text-primary" />
@@ -610,7 +612,7 @@ export function BeforeTab() {
             </>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
       {/* Palabra Clave de Voz */}
       <Card>

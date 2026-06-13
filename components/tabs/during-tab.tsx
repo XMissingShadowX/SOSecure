@@ -14,6 +14,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Mic, MicOff, Video, VideoOff, AlertTriangle, WifiOff, Wifi, Radio, Save, Send, Upload, CheckCircle, MessageCircle, Plus, CirclePlus } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
+import { usePremium } from '@/hooks/use-premium'
 import { sendAlarmNotification, playAlarmSound } from '@/lib/notifications'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -157,9 +158,12 @@ function useStreetNames(locationHistory: { coordinates: { latitude: number; long
 // Componente principal para la pestaña "Durante" de la aplicación SOSecure, que maneja el estado y la lógica 
 // para el modo de emergencia activo, la grabación de audio y video, la conexión a internet, y la interacción 
 // con los contactos de emergencia.
+const VIDEO_FREE_LIMIT_MS = 30_000
+
 export function DuringTab() {
+  const { isPremium } = usePremium()
   const { sosActive, setSosActive, contacts, locationHistory, voiceKeyword, currentLocation: coordinates, sosStream } = useAppStore()
-    const [isOnline, setIsOnline] = useState(true)
+  const [isOnline, setIsOnline] = useState(true)
   const [isRecordingAudio, setIsRecordingAudio] = useState(false)
   const [isRecordingVideo, setIsRecordingVideo] = useState(false)
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null)
@@ -178,6 +182,9 @@ export function DuringTab() {
   const tapTimerRef = useRef<NodeJS.Timeout | null>(null)
   const [tapCountDisplay, setTapCountDisplay] = useState(0)
   const [recordingError, setRecordingError] = useState<string | null>(null)
+  const videoLimitRef = useRef<NodeJS.Timeout | null>(null)
+  const videoCountdownRef = useRef<NodeJS.Timeout | null>(null)
+  const [videoSecondsLeft, setVideoSecondsLeft] = useState<number | null>(null)
 
   // Estado para el formulario de reporte de incidentes
   const [incidentType, setIncidentType] = useState<IncidentType>('theft-assault-violence')
@@ -441,11 +448,14 @@ export function DuringTab() {
     // para reflejar que no se está grabando. Los datos de video grabados se procesarán en el evento 'onstop' del MediaRecorder, 
     // por lo que no se hace nada adicional aquí.
     if (isRecordingVideo) {
+      if (videoLimitRef.current) { clearTimeout(videoLimitRef.current); videoLimitRef.current = null }
+      if (videoCountdownRef.current) { clearInterval(videoCountdownRef.current); videoCountdownRef.current = null }
+      setVideoSecondsLeft(null)
       videoRecorderRef.current?.stop()
       videoStream?.getTracks().forEach(t => t.stop())
       setVideoStream(null)
       setIsRecordingVideo(false)
-    } 
+    }
     // Si no se está grabando video, se intenta acceder a la cámara para iniciar una nueva grabación. Si el acceso es exitoso,
     // se configura el MediaRecorder para manejar los datos de video y se actualiza el estado para reflejar que la grabación ha comenzado.
     else {
@@ -516,6 +526,27 @@ export function DuringTab() {
         }
         recorder.start(100)
         videoRecorderRef.current = recorder
+
+        if (!isPremium) {
+          setVideoSecondsLeft(30)
+          videoCountdownRef.current = setInterval(() => {
+            setVideoSecondsLeft(prev => {
+              if (prev === null || prev <= 1) {
+                if (videoCountdownRef.current) { clearInterval(videoCountdownRef.current); videoCountdownRef.current = null }
+                return null
+              }
+              return prev - 1
+            })
+          }, 1000)
+          videoLimitRef.current = setTimeout(() => {
+            recorder.stop()
+            stream.getTracks().forEach(t => t.stop())
+            setVideoStream(null)
+            setIsRecordingVideo(false)
+            if (videoCountdownRef.current) { clearInterval(videoCountdownRef.current); videoCountdownRef.current = null }
+            setVideoSecondsLeft(null)
+          }, VIDEO_FREE_LIMIT_MS)
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Error desconocido'
         setRecordingError(`Cámara: ${msg}`)
@@ -720,6 +751,11 @@ export function DuringTab() {
             {isRecordingVideo && (
               <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 bg-destructive rounded text-xs text-white font-bold">
                 <div className="w-2 h-2 rounded-full bg-white animate-pulse" /> REC
+              </div>
+            )}
+            {videoSecondsLeft !== null && (
+              <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded font-mono">
+                {videoSecondsLeft}s restantes (free)
               </div>
             )}
           </div>
