@@ -17,6 +17,8 @@ import {
   Bot, Loader2, Shield, ChevronLeft, Sparkles, UserCircle2, WifiOff, FileVideo, FileAudio, Video, Radio, Camera
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
+import { usePremium } from '@/hooks/use-premium'
+import { UpgradeBanner } from '@/components/upgrade-banner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/lib/supabase/client'
@@ -344,6 +346,7 @@ Nunca te presentes como "Claude".`
 
 export function EmergencyChat() {
   const { contacts, currentLocation, sosActive, sosAlert, simpleMode } = useAppStore()
+  const { isPremium } = usePremium()
   const supabase = createClient()
 
   const [open, setOpen] = useState(false)
@@ -778,6 +781,16 @@ export function EmergencyChat() {
         {activeId && (
           <>
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {/* SOSecure AI bloqueado para usuarios free */}
+              {isAIActive && !isPremium && (
+                <div className="flex items-center justify-center h-full py-8">
+                  <UpgradeBanner
+                    title="SOSecure AI"
+                    description="El asistente de seguridad con IA está disponible solo en planes Premium y Familiar."
+                  />
+                </div>
+              )}
+
               {/* Vista de transmisión en vivo */}
               {isLiveItem && sosAlert && (
                 <LiveStreamViewer alertId={sosAlert.id} />
@@ -872,13 +885,13 @@ export function EmergencyChat() {
                   : activeHasAccount === false ? 'Este contacto no tiene cuenta en SOSecure'
                   : 'Escribe un mensaje…'
                 }
-                disabled={sending || (isAIActive && aiLoading) || (!isAIActive && activeHasAccount === false)}
+                disabled={sending || (isAIActive && aiLoading) || (!isAIActive && activeHasAccount === false) || (isAIActive && !isPremium)}
                 className={cn("flex-1 bg-muted rounded-full px-4 outline-none disabled:opacity-50", simpleMode ? "py-3 text-base" : "py-2 text-sm")}
               />
               <Button
                 size="icon"
                 onClick={() => handleSend('text')}
-                disabled={!input.trim() || sending || (isAIActive && aiLoading) || (!isAIActive && activeHasAccount === false)}
+                disabled={!input.trim() || sending || (isAIActive && aiLoading) || (!isAIActive && activeHasAccount === false) || (isAIActive && !isPremium)}
                 className={cn("rounded-full flex-shrink-0", simpleMode ? "w-12 h-12" : "w-9 h-9")}
               >
                 {(sending || (isAIActive && aiLoading))
