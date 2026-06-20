@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Shield, Delete, AlertCircle, Mail } from 'lucide-react'
+import { ShieldCheck, Delete, AlertCircle, Mail } from 'lucide-react'
 import { verifyPin } from '@/lib/pin'
 import { createClient } from '@/lib/supabase/client'
 import { useTranslation } from '@/lib/i18n'
@@ -76,7 +76,7 @@ export function PinLock({ userId, pinHash, onUnlock, onForgotPin }: PinLockProps
         {/* Logo */}
         <div className="flex flex-col items-center gap-2">
           <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center">
-            <Shield className="w-9 h-9 text-primary" />
+            <ShieldCheck className="w-9 h-9 text-primary" />
           </div>
           <h1 className="text-xl font-bold">{t('pin_title')}</h1>
           <p className="text-sm text-muted-foreground">{t('pin_enter')}</p>

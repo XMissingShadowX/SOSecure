@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Shield, Mail, ArrowLeft, RefreshCw } from 'lucide-react'
+import { ShieldCheck, Mail, ArrowLeft, RefreshCw } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { useState, useEffect, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -40,7 +40,7 @@ function SignUpSuccessContent() {
       <div className="w-full max-w-sm space-y-6">
         <div className="flex flex-col items-center gap-2 mb-8">
           <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center">
-            <Shield className="w-10 h-10 text-primary" />
+            <ShieldCheck className="w-10 h-10 text-primary" />
           </div>
           <h1 className="text-2xl font-bold">SOSecure</h1>
         </div>

@@ -12,7 +12,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { AppShell } from '@/components/app-shell'
-import { Shield } from 'lucide-react'
+import { ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import { useTranslation } from '@/lib/i18n'
 
@@ -48,7 +48,7 @@ export default function HomePage() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center">
-            <Shield className="w-10 h-10 text-primary animate-pulse" />
+            <ShieldCheck className="w-10 h-10 text-primary animate-pulse" />
           </div>
           <p className="text-muted-foreground text-sm">Loading SOSecure...</p>
         </div>
@@ -64,7 +64,7 @@ export default function HomePage() {
         <div className="w-full max-w-sm space-y-6 text-center">
           <div className="flex flex-col items-center gap-2 mb-8">
             <div className="w-20 h-20 rounded-3xl bg-primary/20 flex items-center justify-center">
-              <Shield className="w-12 h-12 text-primary" />
+              <ShieldCheck className="w-12 h-12 text-primary" />
             </div>
             <h1 className="text-3xl font-bold">SOSecure</h1>
             <p className="text-muted-foreground">{t('app_tagline')}</p>

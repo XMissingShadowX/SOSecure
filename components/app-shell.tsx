@@ -500,7 +500,7 @@ export function AppShell() {
       return (
         <div className="fixed inset-0 z-[99999] bg-background flex flex-col items-center justify-center p-6 text-center gap-4">
           <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center">
-            <Shield className="w-9 h-9 text-primary" />
+            <ShieldCheck className="w-9 h-9 text-primary" />
           </div>
           <h2 className="text-lg font-bold">{t('settings_checkEmail')}</h2>
           <p className="text-sm text-muted-foreground max-w-xs">
