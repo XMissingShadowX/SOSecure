@@ -22,6 +22,24 @@ import { PREMIUM_PLAN } from '@/lib/plan-config'
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://sosecure.site'
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY
 const MP_ACCESS_TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN
+const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID
+const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET
+const PAYPAL_BASE = process.env.PAYPAL_MODE === 'live'
+  ? 'https://api-m.paypal.com'
+  : 'https://api-m.sandbox.paypal.com'
+
+async function getPayPalToken(): Promise<string> {
+  const res = await fetch(`${PAYPAL_BASE}/v1/oauth2/token`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString('base64')}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: 'grant_type=client_credentials',
+  })
+  const data = await res.json()
+  return data.access_token
+}
 
 /** Crea la fila de suscripción si no existe y devuelve su id. */
 async function ensureSubRow(supabase: any, userId: string) {
@@ -56,7 +74,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    const { action } = (await req.json().catch(() => ({}))) as { action?: string }
+    const body = (await req.json().catch(() => ({}))) as { action?: string; token?: string }
+    const { action, token } = body
 
     const sub = await ensureSubRow(supabase, user.id)
     if (!sub) {
@@ -90,6 +109,40 @@ export async function POST(req: NextRequest) {
         status: 'active',
         period_end: end.toISOString(),
       })
+    }
+
+    // ── Acción: capturar orden PayPal (llamada desde la página success) ──
+    if (action === 'capture-paypal') {
+      if (!token) return NextResponse.json({ error: 'Falta token de PayPal' }, { status: 400 })
+
+      const accessToken = await getPayPalToken()
+      const res = await fetch(`${PAYPAL_BASE}/v2/checkout/orders/${token}/capture`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      })
+      const capture = await res.json()
+      if (capture.status === 'COMPLETED') {
+        // Activar directamente (el webhook puede llegar tarde)
+        const now = new Date()
+        const end = new Date(now)
+        end.setMonth(end.getMonth() + 1)
+        await supabase.from('premium_subscriptions')
+          .update({
+            status: 'active',
+            provider: 'paypal',
+            provider_ref: capture.id,
+            amount_cents: PREMIUM_PLAN.amountCents,
+            currency: PREMIUM_PLAN.currency,
+            current_period_start: now.toISOString(),
+            current_period_end: end.toISOString(),
+          })
+          .eq('user_id', user.id)
+        return NextResponse.json({ success: true, period_end: end.toISOString() })
+      }
+      return NextResponse.json({ error: 'La captura no se completó', detail: capture }, { status: 502 })
     }
 
     // ── Acción por defecto: crear sesión en pasarela alojada ────────────
@@ -130,7 +183,47 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ url, provider: 'mercadopago' })
     }
 
-    // 2) Stripe Checkout
+    // 2) PayPal Orders
+    if (PAYPAL_CLIENT_ID && PAYPAL_CLIENT_SECRET) {
+      const token = await getPayPalToken()
+      const res = await fetch(`${PAYPAL_BASE}/v2/checkout/orders`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'PayPal-Request-Id': `${sub.id}-${Date.now()}`,
+        },
+        body: JSON.stringify({
+          intent: 'CAPTURE',
+          purchase_units: [{
+            reference_id: sub.id,
+            custom_id: sub.id,
+            description: `${PREMIUM_PLAN.name} — SOSecure`,
+            amount: {
+              currency_code: PREMIUM_PLAN.currency,
+              value: (PREMIUM_PLAN.amountCents / 100).toFixed(2),
+            },
+          }],
+          application_context: {
+            return_url: successUrl,
+            cancel_url: cancelUrl,
+            brand_name: 'SOSecure',
+            user_action: 'PAY_NOW',
+          },
+        }),
+      })
+      const order = await res.json()
+      const approveLink = order.links?.find((l: { rel: string; href: string }) => l.rel === 'approve')?.href
+      if (!approveLink) {
+        return NextResponse.json({ error: 'PayPal no devolvió URL de aprobación', detail: order }, { status: 502 })
+      }
+      await supabase.from('premium_subscriptions')
+        .update({ provider: 'paypal', provider_ref: order.id })
+        .eq('id', sub.id)
+      return NextResponse.json({ url: approveLink, provider: 'paypal' })
+    }
+
+    // 3) Stripe Checkout
     if (STRIPE_SECRET_KEY) {
       const params = new URLSearchParams()
       params.append('mode', 'payment')
@@ -163,7 +256,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ url: data.url, provider: 'stripe' })
     }
 
-    // 3) Sin pasarela configurada → usar formulario demo de la misma página
+    // 4) Sin pasarela configurada → usar formulario demo de la misma página
     return NextResponse.json({
       url: `${BASE_URL}/plan-premium/pago/?demo=1`,
       provider: 'demo',

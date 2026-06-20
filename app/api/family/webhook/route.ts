@@ -6,13 +6,15 @@
   Soporta:
    - Stripe:        evento checkout.session.completed
    - Mercado Pago:  notificación de payment (topic=payment)
+   - PayPal:        evento PAYMENT.CAPTURE.COMPLETED
 
   Configura la URL de este webhook en el panel del proveedor:
    - Stripe:        https://sosecure.site/api/family/webhook
    - Mercado Pago:  misma URL (se manda como notification_url al crear la preferencia)
+   - PayPal:        https://sosecure.site/api/family/webhook  (en Developer Dashboard → Webhooks)
 
   Nota sobre seguridad: en producción verifica la firma del webhook
-  (Stripe-Signature / x-signature de Mercado Pago). Ver docs/PLAN_FAMILIAR.md.
+  (Stripe-Signature / x-signature de Mercado Pago / PayPal-Transmission-Sig).
 */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -80,13 +82,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true })
     }
 
+    // ── PayPal ─────────────────────────────────────────────
+    if (body?.event_type === 'PAYMENT.CAPTURE.COMPLETED') {
+      const resource = body?.resource
+      // custom_id lo pusimos en la orden al crearla
+      const groupId = resource?.custom_id
+        ?? resource?.purchase_units?.[0]?.custom_id
+      if (groupId) {
+        await activateGroup(groupId, 'paypal', resource?.id)
+      }
+      return NextResponse.json({ received: true })
+    }
+
     return NextResponse.json({ received: true, ignored: true })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }
 
-// Mercado Pago a veces hace GET de validación
+// Mercado Pago y PayPal a veces hacen GET de validación
 export async function GET() {
   return NextResponse.json({ ok: true })
 }

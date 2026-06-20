@@ -21,10 +21,12 @@ import { createClient } from '@/lib/supabase/client'
 import { PREMIUM_PLAN, formatAmount } from '@/lib/plan-config'
 import { getSubscription, ensureSubscription } from '@/lib/premium'
 import { Shield } from 'lucide-react'
+import { useTranslation } from '@/lib/i18n'
 
 type View = 'loading' | 'auth' | 'checkout' | 'success'
 
 export default function PagoPlanPremiumPage() {
+  const { t } = useTranslation()
   const [view, setView] = useState<View>('loading')
   const [demoOpen, setDemoOpen] = useState(false)
   const [processing, setProcessing] = useState(false)
@@ -48,6 +50,23 @@ export default function PagoPlanPremiumPage() {
 
       // ¿Regresó del proveedor? Verificar si ya quedó activo.
       if (statusParam === 'success') {
+        // PayPal regresa con ?token=ORDER_ID — hay que capturar el pago
+        const paypalToken = params.get('token')
+        if (paypalToken) {
+          const captureRes = await fetch('/api/premium/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'capture-paypal', token: paypalToken }),
+          })
+          const captureData = await captureRes.json()
+          if (captureData.success) {
+            setPeriodEnd(captureData.period_end ?? null)
+            setView('success')
+            return
+          }
+        }
+
+        // Para Stripe / Mercado Pago: esperar que llegue el webhook
         let active = sub?.status === 'active'
         for (let i = 0; i < 5 && !active; i++) {
           await new Promise(r => setTimeout(r, 1500))
@@ -119,11 +138,14 @@ export default function PagoPlanPremiumPage() {
       <style>{CSS}</style>
 
       <header className="pf-top">
-        <div className="pf-brand">
-          <Shield className="w-6 h-6 text-primary" />
-          <span className="pf-brand-name">SOSecure</span>
+        <div style={{display:'flex',alignItems:'center',gap:'16px'}}>
+          <a href="/" className="pf-back-btn">← Volver</a>
+          <div className="pf-brand">
+            <Shield className="w-6 h-6 text-primary" />
+            <span className="pf-brand-name">SOSecure</span>
+          </div>
         </div>
-        <span className="pf-secure">🔒 Pago cifrado</span>
+        <span className="pf-secure">{t('pay_encrypted')}</span>
       </header>
 
       {view === 'loading' && (
@@ -133,10 +155,10 @@ export default function PagoPlanPremiumPage() {
       {view === 'auth' && (
         <main className="pf-main pf-center">
           <div className="pf-card pf-narrow">
-            <h1 className="pf-h1">Inicia sesión para continuar</h1>
-            <p className="pf-sub">Necesitas tu cuenta de SOSecure para activar el plan premium.</p>
-            <a className="pf-btn pf-btn-primary" href="/auth/login/">Iniciar sesión</a>
-            <a className="pf-btn pf-btn-ghost" href="/auth/sign-up/">Crear cuenta</a>
+            <h1 className="pf-h1">{t('pay_signInTitle')}</h1>
+            <p className="pf-sub">{t('pay_signInDescPremium')}</p>
+            <a className="pf-btn pf-btn-primary" href="/auth/login/">{t('pay_signIn')}</a>
+            <a className="pf-btn pf-btn-ghost" href="/auth/sign-up/">{t('pay_createAccount')}</a>
           </div>
         </main>
       )}
@@ -145,70 +167,67 @@ export default function PagoPlanPremiumPage() {
         <main className="pf-main pf-grid">
           {/* Resumen del plan */}
           <section className="pf-card">
-            <span className="pf-eyebrow">★ Premium · Individual</span>
-            <h1 className="pf-h1">{PREMIUM_PLAN.name}</h1>
-            <p className="pf-tagline">{PREMIUM_PLAN.tagline}</p>
+            <span className="pf-eyebrow">{t('plan_premiumEyebrow')}</span>
+            <h1 className="pf-h1">{t('plan_premiumNameLabel')}</h1>
+            <p className="pf-tagline">{t('plan_premiumTagline')}</p>
 
             <div className="pf-price">
               <span className="pf-amount">{formatAmount(PREMIUM_PLAN.amountCents)}</span>
-              <span className="pf-per">/ {PREMIUM_PLAN.period}</span>
+              <span className="pf-per">/ {t('plan_premiumPeriod')}</span>
             </div>
 
             <ul className="pf-benefits">
-              {PREMIUM_PLAN.benefits.map((b, i) => (
-                <li key={i}><span className="pf-check">✓</span>{b}</li>
+              {([1,2,3,4] as const).map(n => (
+                <li key={n}><span className="pf-check">✓</span>{t(`plan_premiumBenefit${n}`)}</li>
               ))}
             </ul>
 
             <div className="pf-badge-row">
-              <span className="pf-badge">★ Asistente</span>
-              <span className="pf-badge">◐ Modo discreto</span>
-              <span className="pf-badge">👥 10 contactos</span>
+              <span className="pf-badge">{t('plan_premiumBadge1')}</span>
+              <span className="pf-badge">{t('plan_premiumBadge2')}</span>
+              <span className="pf-badge">{t('plan_premiumBadge3')}</span>
             </div>
           </section>
 
           {/* Método de pago */}
           <section className="pf-card">
-            <h2 className="pf-h2">Método de pago</h2>
+            <h2 className="pf-h2">{t('pay_payMethod')}</h2>
 
             {!demoOpen && (
               <>
                 <button className="pf-btn pf-btn-primary" onClick={payWithProvider} disabled={processing}>
-                  {processing ? 'Redirigiendo…' : `Pagar ${formatAmount(PREMIUM_PLAN.amountCents)}`}
+                  {processing ? t('pay_redirecting') : t('pay_pay').replace('{amount}', formatAmount(PREMIUM_PLAN.amountCents))}
                 </button>
-                <p className="pf-methods">Tarjeta · OXXO · SPEI · transferencia</p>
-                <p className="pf-redirect-note">
-                  Te llevaremos a una página segura para completar el pago y
-                  regresarás aquí automáticamente.
-                </p>
+                <p className="pf-methods">{t('pay_methods')}</p>
+                <p className="pf-redirect-note">{t('pay_redirectNote')}</p>
                 <button className="pf-link" onClick={() => setDemoOpen(true)}>
-                  Usar formulario de demostración
+                  {t('pay_demoLink')}
                 </button>
               </>
             )}
 
             {demoOpen && (
               <div className="pf-form">
-                <div className="pf-demo-flag">Modo demostración — no se realiza ningún cargo real</div>
-                <label className="pf-label">Nombre en la tarjeta</label>
+                <div className="pf-demo-flag">{t('pay_demoFlag')}</div>
+                <label className="pf-label">{t('pay_cardName')}</label>
                 <input className="pf-input" value={card.name}
                   onChange={e => setCard({ ...card, name: e.target.value })}
-                  placeholder="Como aparece en la tarjeta" />
+                  placeholder={t('pay_cardNamePlaceholder')} />
 
-                <label className="pf-label">Número de tarjeta</label>
+                <label className="pf-label">{t('pay_cardNumber')}</label>
                 <input className="pf-input" value={card.number} inputMode="numeric"
                   onChange={e => setCard({ ...card, number: formatCard(e.target.value) })}
                   placeholder="4242 4242 4242 4242" maxLength={19} />
 
                 <div className="pf-row">
                   <div className="pf-col">
-                    <label className="pf-label">Vencimiento</label>
+                    <label className="pf-label">{t('pay_cardExpiry')}</label>
                     <input className="pf-input" value={card.exp} inputMode="numeric"
                       onChange={e => setCard({ ...card, exp: formatExp(e.target.value) })}
                       placeholder="MM/AA" maxLength={5} />
                   </div>
                   <div className="pf-col">
-                    <label className="pf-label">CVC</label>
+                    <label className="pf-label">{t('pay_cardCvc')}</label>
                     <input className="pf-input" value={card.cvc} inputMode="numeric"
                       onChange={e => setCard({ ...card, cvc: e.target.value.replace(/\D/g, '').slice(0, 4) })}
                       placeholder="123" maxLength={4} />
@@ -216,14 +235,14 @@ export default function PagoPlanPremiumPage() {
                 </div>
 
                 <button className="pf-btn pf-btn-primary" onClick={payDemo} disabled={processing}>
-                  {processing ? 'Procesando…' : `Pagar ${formatAmount(PREMIUM_PLAN.amountCents)}`}
+                  {processing ? t('pay_processing') : t('pay_pay').replace('{amount}', formatAmount(PREMIUM_PLAN.amountCents))}
                 </button>
-                <button className="pf-link" onClick={() => setDemoOpen(false)}>Volver</button>
+                <button className="pf-link" onClick={() => setDemoOpen(false)}>{t('pay_back')}</button>
               </div>
             )}
 
             {error && <p className="pf-error">{error}</p>}
-            <p className="pf-trust">🔒 Tus datos viajan cifrados. SOSecure no almacena tu tarjeta.</p>
+            <p className="pf-trust">{t('pay_trust')}</p>
           </section>
         </main>
       )}
@@ -232,12 +251,12 @@ export default function PagoPlanPremiumPage() {
         <main className="pf-main pf-center">
           <div className="pf-card pf-narrow pf-success">
             <div className="pf-success-icon">✓</div>
-            <h1 className="pf-h1">¡Premium activado!</h1>
+            <h1 className="pf-h1">{t('plan_premiumActivated')}</h1>
             <p className="pf-sub">
-              Ya tienes el asistente con IA, el modo discreto y hasta {PREMIUM_PLAN.features.maxContacts} contactos de emergencia.
-              {periodEnd && <> Tu plan es válido hasta el <strong>{formatDate(periodEnd)}</strong>.</>}
+              {t('plan_premiumSuccess').replace('{n}', String(PREMIUM_PLAN.features.maxContacts))}
+              {periodEnd && <> {t('pay_validUntil').replace('{date}', formatDate(periodEnd))}</>}
             </p>
-            <a className="pf-btn pf-btn-primary" href="/">Volver a SOSecure</a>
+            <a className="pf-btn pf-btn-primary" href="/">{t('pay_returnToApp')}</a>
           </div>
         </main>
       )}
@@ -259,6 +278,8 @@ function formatDate(iso: string) {
 const CSS = `
 .pf-root{min-height:100vh;background:radial-gradient(1200px 600px at 80% -10%,#0b3b37 0%,#071513 45%,#05100f 100%);color:#e6f2f0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;}
 .pf-top{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;max-width:1040px;margin:0 auto;}
+.pf-back-btn{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:600;color:#5eead4;background:rgba(45,212,191,.1);border:1px solid rgba(94,234,212,.25);padding:7px 14px;border-radius:999px;text-decoration:none;transition:background .15s;}
+.pf-back-btn:hover{background:rgba(45,212,191,.2);}
 .pf-brand{display:flex;align-items:center;gap:9px;}
 .pf-shield{font-size:22px;}
 .pf-brand-name{font-weight:800;font-size:19px;letter-spacing:-.01em;}
