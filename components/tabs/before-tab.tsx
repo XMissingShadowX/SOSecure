@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/dialog'
 import type { RouteInfo } from '@/components/route-map'
 import type { TrackingMember } from '@/lib/types'
+import { useTranslation } from '@/lib/i18n'
 
 const RouteMap = dynamic(
   () => import('@/components/route-map').then(mod => mod.RouteMap),
@@ -38,7 +39,7 @@ const RouteMap = dynamic(
       <div className="h-full w-full flex items-center justify-center bg-muted rounded-lg">
         <div className="flex items-center gap-2 text-muted-foreground">
           <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          <span>Cargando mapa...</span>
+          <span>Loading map...</span>
         </div>
       </div>
     ),
@@ -189,6 +190,7 @@ function TrackingMap({ members, focusUserId }: { members: TrackingMember[], focu
 }
 
 export function BeforeTab() {
+  const { t } = useTranslation()
   const { isPremium } = usePremium()
   const {
     contacts, securityTimerActive, securityTimerEnd, setSecurityTimer, setSosActive,
@@ -282,8 +284,8 @@ export function BeforeTab() {
         <CardContent className="flex items-center justify-center gap-3 py-2 px-3">
           <TriangleAlert className="w-5 h-5 shrink-0 text-primary" />
           <div className="text-center">
-            <p className="font-semibold text-base">Modo ANTES</p>
-            <p className="text-sm text-muted-foreground">Prepárate antes de salir</p>
+            <p className="font-semibold text-base">{t('before_title')}</p>
+            <p className="text-sm text-muted-foreground">{t('before_subtitle')}</p>
           </div>
         </CardContent>
       </Card>
@@ -337,7 +339,7 @@ export function BeforeTab() {
                 >
                   <span className="flex items-center gap-2">
                     <Navigation className="w-5 h-5 text-primary" />
-                    Planear Ruta Segura
+                    {t('before_safeRoute')}
                   </span>
                   {routesExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
                 </button>
@@ -357,7 +359,7 @@ export function BeforeTab() {
                 >
                   <span className="flex items-center gap-2">
                     <Map className="w-5 h-5 text-primary" />
-                    {showRoutes && routeDestination ? 'Mapa de Ruta + Incidentes' : 'Mapa de Incidentes'}
+                    {showRoutes && routeDestination ? t('before_mapBoth') : t('before_mapIncidents')}
                   </span>
                   {mapExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
                 </button>
@@ -373,7 +375,7 @@ export function BeforeTab() {
         <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <Timer className="w-5 h-5 text-primary" />
-            Temporizador de Seguridad
+            {t('before_timer')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -383,39 +385,39 @@ export function BeforeTab() {
                 <div className={`text-5xl font-mono font-bold ${countdown < 5 * 60 * 1000 ? 'text-destructive' : 'text-safe'}`}>
                   {formatCountdown(countdown)}
                 </div>
-                <p className="text-sm text-muted-foreground mt-1">Tiempo restante para llegar</p>
+                <p className="text-sm text-muted-foreground mt-1">{t('before_timerTime')}</p>
               </div>
               <div className={`p-3 rounded-lg ${countdown < 5 * 60 * 1000 ? 'bg-destructive/10' : 'bg-safe/10'}`}>
                 <p className="text-xs text-center text-muted-foreground">
-                  Si el tiempo expira sin confirmación, se activará una alerta automática
+                  {t('before_timerAlert')}
                 </p>
               </div>
               <Button className="w-full" variant="outline" onClick={cancelTimer}>
-                ✅ Llegué con seguridad
+                {t('before_timerArrived')}
               </Button>
             </div>
           ) : (
             <>
               <p className="text-sm text-muted-foreground">
-                Activa un temporizador. Si no confirmas tu llegada, se alertará a tus contactos automáticamente.
+                {t('before_timerHint')}
               </p>
               <Dialog open={showTimerDialog} onOpenChange={setShowTimerDialog}>
                 <DialogTrigger asChild>
                   <Button className="w-full">
                     <Clock className="w-4 h-4 mr-2" />
-                    Iniciar Temporizador
+                    {t('before_timerBtn')}
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Configurar Temporizador de Seguridad</DialogTitle>
+                    <DialogTitle>{t('before_timerSetup')}</DialogTitle>
                     <DialogDescription>
-                      ¿Cuántos minutos tienes para llegar a tu destino?
+                      {t('before_timerQuestion')}
                     </DialogDescription>
                   </DialogHeader>
                   <FieldGroup>
                     <Field>
-                      <FieldLabel>Minutos</FieldLabel>
+                      <FieldLabel>{t('before_timerMinutes')}</FieldLabel>
                       <Input
                         type="number"
                         min="1"
@@ -435,8 +437,8 @@ export function BeforeTab() {
                     </div>
                   </FieldGroup>
                   <DialogFooter>
-                    <Button variant="outline" onClick={() => setShowTimerDialog(false)}>Cancelar</Button>
-                    <Button onClick={startTimer}>Iniciar</Button>
+                    <Button variant="outline" onClick={() => setShowTimerDialog(false)}>{t('cancel')}</Button>
+                    <Button onClick={startTimer}>{t('before_timerStart')}</Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
@@ -450,42 +452,47 @@ export function BeforeTab() {
         <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <MapPinCheckInside className="w-5 h-5 text-safe" />
-            Zonas Seguras Cercanas
+            {t('before_safeZones')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Locales donde puedes refugiarte en caso de emergencia:
+            {t('before_safeZonesDesc')}
           </p>
           {coordinates ? (
             <div className="grid grid-cols-2 gap-2">
               {[
-                { label: '💊 Farmacia', query: 'farmacia' },
-                { label: '👮 Policía', query: 'ministerio+publico' },
-                { label: '🏥 Hospital', query: 'hospital' },
-                { label: '🏪 Tienda 24h', query: 'tienda+24+horas' },
+                { emoji: '💊', labelKey: 'before_sz_pharmacy' as const, query: 'farmacia' },
+                { emoji: '👮', labelKey: 'before_sz_police' as const, query: 'ministerio+publico' },
+                { emoji: '🏥', labelKey: 'before_sz_hospital' as const, query: 'hospital' },
+                { emoji: '🏪', labelKey: 'before_sz_store' as const, query: 'tienda+24+horas' },
               ].map((z) => (
                 <button
                   key={z.query}
                   onClick={() => window.open(`https://www.google.com/maps/search/${z.query}/@${coordinates.latitude},${coordinates.longitude},15z`, '_blank')}
                   className="p-3 bg-muted/50 rounded-lg flex items-center gap-2 hover:bg-muted transition-colors text-left w-full"
                 >
-                  <span className="text-lg">{z.label.split(' ')[0]}</span>
+                  <span className="text-lg">{z.emoji}</span>
                   <div>
-                    <p className="text-xs font-medium text-foreground">{z.label.split(' ').slice(1).join(' ')}</p>
-                    <p className="text-xs text-muted-foreground">Ver en mapa</p>
+                    <p className="text-xs font-medium text-foreground">{t(z.labelKey).split(' ').slice(1).join(' ')}</p>
+                    <p className="text-xs text-muted-foreground">{t('see_map')}</p>
                   </div>
                 </button>
               ))}
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-2">
-              {SAFE_ZONE_TYPES.map((z) => (
+              {[
+                { emoji: '💊', labelKey: 'before_sz_pharmacy' as const, type: 'pharmacy' },
+                { emoji: '👮', labelKey: 'before_sz_police' as const, type: 'police' },
+                { emoji: '🏥', labelKey: 'before_sz_hospital' as const, type: 'hospital' },
+                { emoji: '🏪', labelKey: 'before_sz_store' as const, type: 'store' },
+              ].map((z) => (
                 <div key={z.type} className="p-3 bg-muted/50 rounded-lg flex items-center gap-2">
-                  <span className="text-lg">{z.label.split(' ')[0]}</span>
+                  <span className="text-lg">{z.emoji}</span>
                   <div>
-                    <p className="text-xs font-medium">{z.label.split(' ').slice(1).join(' ')}</p>
-                    <p className="text-xs text-muted-foreground">Activa ubicación</p>
+                    <p className="text-xs font-medium">{t(z.labelKey).split(' ').slice(1).join(' ')}</p>
+                    <p className="text-xs text-muted-foreground">{t('activate_location')}</p>
                   </div>
                 </div>
               ))}
@@ -499,11 +506,11 @@ export function BeforeTab() {
         <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <Users className="w-5 h-5 text-primary" />
-            Ubicaciones en Vivo
+            {t('before_liveLocations')}
             {isSharingMyLocation && (
               <span className="ml-auto flex items-center gap-1 text-xs font-normal text-green-600">
                 <Radio className="w-3 h-3 animate-pulse" />
-                Compartiendo
+                {t('before_sharing')}
               </span>
             )}
           </CardTitle>
@@ -512,7 +519,7 @@ export function BeforeTab() {
           {contacts.length === 0 ? (
             <div className="text-center py-4">
               <Users className="w-10 h-10 mx-auto text-muted-foreground/40 mb-2" />
-              <p className="text-sm text-muted-foreground">Agrega contactos con cuenta SOSecure para ver sus ubicaciones</p>
+              <p className="text-sm text-muted-foreground">{t('before_addContactsHint')}</p>
             </div>
           ) : (
             <>
@@ -529,10 +536,10 @@ export function BeforeTab() {
                   : <UserX className="w-5 h-5 text-muted-foreground flex-shrink-0" />}
                 <div className="text-left flex-1">
                   <p className={`text-sm font-medium ${isSharingMyLocation ? 'text-green-700 dark:text-green-400' : ''}`}>
-                    {isSharingMyLocation ? 'Compartiendo mi ubicación' : 'Compartir mi ubicación'}
+                    {isSharingMyLocation ? t('before_shareMyLocation') : t('before_shareMyLocation')}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {isSharingMyLocation ? 'Tus contactos SOSecure pueden verte · Toca para detener' : 'Tus contactos no pueden verte ahora'}
+                    {isSharingMyLocation ? t('before_sharingActive') : t('before_sharingInactive')}
                   </p>
                 </div>
                 <div className={`w-10 h-6 rounded-full transition-colors flex items-center px-0.5
@@ -545,7 +552,7 @@ export function BeforeTab() {
               <div className="space-y-2">
                 {contactUserIds.length === 0 ? (
                   <p className="text-xs text-muted-foreground text-center py-1">
-                    Ningún contacto tiene cuenta SOSecure aún
+                    {t('before_noContactsSOSecure')}
                   </p>
                 ) : (
                   contactUserIds.map(uid => {
@@ -567,7 +574,7 @@ export function BeforeTab() {
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {live ? formatRelativeTime(live.updated_at) : 'No está compartiendo'}
+                            {live ? formatRelativeTime(live.updated_at) : t('before_notSharing')}
                           </p>
                         </div>
                         <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
@@ -611,7 +618,7 @@ export function BeforeTab() {
               })()}
 
               <p className="text-xs text-muted-foreground text-center">
-                Solo contactos con cuenta SOSecure · Actualiza cada 30s
+                {t('before_contactsSOSecureOnly')}
               </p>
             </>
           )}
@@ -623,24 +630,24 @@ export function BeforeTab() {
         <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <Mic className="w-5 h-5 text-primary" />
-            Palabra Clave de Voz
+            {t('before_voiceKeyword')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Di esta palabra en voz alta para activar el SOS automáticamente (solo funciona cuando el SOS no está activo).
+            {t('before_voiceKeywordDesc')}
           </p>
           <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
             <div>
-              <p className="text-xs text-muted-foreground mb-0.5">Palabra actual</p>
-              <p className="font-semibold text-sm">{voiceKeyword || 'No configurada'}</p>
+              <p className="text-xs text-muted-foreground mb-0.5">{t('before_voiceKeywordCurrent')}</p>
+              <p className="font-semibold text-sm">{voiceKeyword || t('before_voiceKeywordNotSet')}</p>
             </div>
             {sosActive ? (
-              <span className="text-xs text-muted-foreground">SOS activo</span>
+              <span className="text-xs text-muted-foreground">{t('before_voiceKeywordSosActive')}</span>
             ) : (
               <span className="flex items-center gap-1 text-xs text-green-600">
                 <Mic className="w-3 h-3 animate-pulse" />
-                Escuchando
+                {t('before_voiceKeywordListening')}
               </span>
             )}
           </div>
@@ -652,28 +659,28 @@ export function BeforeTab() {
               setKeywordDraft(voiceKeyword)
               setShowKeywordDialog(true)
             }}>
-              Cambiar palabra clave
+              {t('before_voiceKeywordChange')}
             </Button>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Configurar Palabra Clave de Voz</DialogTitle>
+                <DialogTitle>{t('before_voiceKeywordSetup')}</DialogTitle>
                 <DialogDescription>
-                  Elige una palabra única que activa el SOS cuando la dices en voz alta.
+                  {t('before_voiceKeywordHint')}
                 </DialogDescription>
               </DialogHeader>
               <FieldGroup>
                 <Field>
-                  <FieldLabel>Palabra clave</FieldLabel>
+                  <FieldLabel>{t('before_voiceKeyword')}</FieldLabel>
                   <Input
                     value={keywordDraft}
                     onChange={(e) => setKeywordDraft(e.target.value)}
-                    placeholder="ej. socorro"
+                    placeholder={t('before_voiceKeywordPlaceholder')}
                     autoFocus
                   />
                 </Field>
               </FieldGroup>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setShowKeywordDialog(false)}>Cancelar</Button>
+                <Button variant="outline" onClick={() => setShowKeywordDialog(false)}>{t('cancel')}</Button>
                 <Button
                   disabled={!keywordDraft.trim()}
                   onClick={() => {
@@ -681,7 +688,7 @@ export function BeforeTab() {
                     setShowKeywordDialog(false)
                   }}
                 >
-                  Guardar
+                  {t('save')}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -694,12 +701,12 @@ export function BeforeTab() {
         <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <CircleAlert className="w-5 h-5 text-warning" />
-            Contactos listos para alertar
+            {t('before_contactsReady')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {contacts.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Agrega contactos desde la pestaña Inicio</p>
+            <p className="text-sm text-muted-foreground">{t('before_contactsNone')}</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {contacts.map((c) => (

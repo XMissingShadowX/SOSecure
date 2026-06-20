@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/lib/supabase/client'
 import { liveChannelName } from '@/lib/live-stream'
 import type { LiveFramePayload, LiveStatusPayload, VideoChunkPayload } from '@/lib/live-stream'
+import { useTranslation } from '@/lib/i18n'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -100,6 +101,7 @@ const LIVE_EDGE_CATCHUP = 0.2   // segundos de retraso antes de acelerar playbac
 const BUFFER_KEEP_S     = 3     // segundos de buffer a conservar
 
 function LiveStreamViewer({ alertId }: { alertId: string }) {
+  const { t } = useTranslation()
   const videoRef     = useRef<HTMLVideoElement>(null)
   const msRef        = useRef<MediaSource | null>(null)
   const sbRef        = useRef<SourceBuffer | null>(null)
@@ -268,8 +270,8 @@ function LiveStreamViewer({ alertId }: { alertId: string }) {
           <Radio className="w-8 h-8 text-destructive animate-pulse" />
         </div>
         <div className="text-center">
-          <p className="text-sm font-medium text-foreground">Esperando transmisión…</p>
-          <p className="text-xs mt-1">El video aparecerá en cuanto la cámara comience a enviar.</p>
+          <p className="text-sm font-medium text-foreground">{t('chat_waiting')}</p>
+          <p className="text-xs mt-1">{t('chat_waitingDesc')}</p>
         </div>
       </div>
     )
@@ -280,7 +282,7 @@ function LiveStreamViewer({ alertId }: { alertId: string }) {
       <div className="relative rounded-xl overflow-hidden bg-black">
         <div className={`absolute top-2 left-2 z-10 flex items-center gap-1 text-white text-xs px-2 py-0.5 rounded-full font-semibold ${isLive ? 'bg-destructive' : 'bg-black/60'}`}>
           <span className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-white animate-pulse' : 'bg-gray-400'}`} />
-          {isLive ? 'EN VIVO' : 'Transmisión terminada'}
+          {isLive ? t('chat_live') : t('chat_ended')}
         </div>
 
         {/* Video real (MediaSource) */}
@@ -345,6 +347,7 @@ Nunca te presentes como "Claude".`
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export function EmergencyChat() {
+  const { t } = useTranslation()
   const { contacts, currentLocation, sosActive, sosAlert, simpleMode } = useAppStore()
   const { isPremium } = usePremium()
   const supabase = createClient()
@@ -548,7 +551,7 @@ export function EmergencyChat() {
           id: 'ai-welcome',
           contactId: AI_ID,
           contactName: 'SOSecure AI',
-          text: '¡Hola! Soy SOSecure AI, tu asistente de seguridad. ¿En qué puedo ayudarte hoy? 🛡️',
+          text: t('chat_welcome'),
           timestamp: Date.now(),
           isMe: false,
           type: 'ai',
@@ -654,9 +657,9 @@ export function EmergencyChat() {
   const isLiveItem = activeId === LIVE_ID
 
   const allItems = [
-    { id: AI_ID, name: 'SOSecure AI', subtitle: 'Consejos de seguridad y emergencias', isAI: true },
-    ...(sosActive && sosAlert ? [{ id: LIVE_ID, name: '🔴 Transmisión en vivo', subtitle: 'Video de cámara en tiempo real — SOS activo', isAI: false, isLive: true, alertId: sosAlert.id }] : []),
-    ...(hasLocalRecs ? [{ id: SOS_REC_ID, name: 'Mis grabaciones SOS', subtitle: 'Grabaciones automáticas de emergencia', isAI: false, isSosRec: true }] : []),
+    { id: AI_ID, name: t('chat_ai'), subtitle: t('chat_tips'), isAI: true },
+    ...(sosActive && sosAlert ? [{ id: LIVE_ID, name: t('chat_sosLive'), subtitle: t('chat_sosLiveDesc'), isAI: false, isLive: true, alertId: sosAlert.id }] : []),
+    ...(hasLocalRecs ? [{ id: SOS_REC_ID, name: t('chat_myRecordings'), subtitle: t('chat_recordingsDesc'), isAI: false, isSosRec: true }] : []),
     ...primaryContacts.map(c => {
       const email = (c as any).email as string | undefined
       const uuid = email ? resolvedIds[email] : undefined
@@ -684,7 +687,7 @@ export function EmergencyChat() {
           simpleMode ? "w-18 h-18" : "w-14 h-14"
         )}
         style={simpleMode ? { width: '4.5rem', height: '4.5rem' } : undefined}
-        aria-label="Abrir chat"
+        aria-label={t('chat_open')}
       >
         <MessageCircle className={simpleMode ? "w-8 h-8 text-primary-foreground" : "w-6 h-6 text-primary-foreground"} />
         {unread > 0 && (
@@ -705,7 +708,7 @@ export function EmergencyChat() {
           <div className="flex items-center gap-2 min-w-0">
             {activeId ? (
               <button onClick={() => setActiveId(null)} className="flex items-center gap-1 text-xs text-muted-foreground px-2 py-1 rounded hover:bg-muted flex-shrink-0">
-                <ChevronLeft className="w-4 h-4" /> Volver
+                <ChevronLeft className="w-4 h-4" /> {t('chat_back')}
               </button>
             ) : isAIActive ? (
               <Sparkles className="w-5 h-5 text-primary flex-shrink-0" />
@@ -719,15 +722,15 @@ export function EmergencyChat() {
               <MessageCircle className="w-5 h-5 text-primary flex-shrink-0" />
             )}
             <span className="font-semibold text-sm truncate">
-              {isAIActive ? 'SOSecure AI' : isLiveItem ? 'Transmisión en vivo' : activeContact ? activeContact.name : 'Chat'}
+              {isAIActive ? t('chat_ai') : isLiveItem ? t('chat_sosLive') : activeContact ? activeContact.name : t('chat_chat')}
             </span>
             {isAIActive && <Badge variant="outline" className="text-xs border-primary/40 text-primary flex-shrink-0">IA</Badge>}
-            {isLiveItem && <Badge variant="destructive" className="text-xs animate-pulse flex-shrink-0 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-white" />EN VIVO</Badge>}
+            {isLiveItem && <Badge variant="destructive" className="text-xs animate-pulse flex-shrink-0 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-white" />{t('chat_live')}</Badge>}
             {activeContact && !isAIActive && !isLiveItem && (
               activeHasAccount === false
-                ? <Badge variant="outline" className="text-xs text-muted-foreground flex-shrink-0"><WifiOff className="w-2.5 h-2.5 mr-1 inline" />Sin cuenta</Badge>
+                ? <Badge variant="outline" className="text-xs text-muted-foreground flex-shrink-0"><WifiOff className="w-2.5 h-2.5 mr-1 inline" />{t('chat_noAccountLabel')}</Badge>
                 : activeHasAccount
-                  ? <Badge variant="outline" className="text-xs text-green-600 border-green-500/40 flex-shrink-0">En SOSecure</Badge>
+                  ? <Badge variant="outline" className="text-xs text-green-600 border-green-500/40 flex-shrink-0">{t('chat_inSOSecure')}</Badge>
                   : <Badge variant="outline" className="text-xs flex-shrink-0">…</Badge>
             )}
             {sosActive && !isLiveItem && <Badge variant="destructive" className="text-xs animate-pulse flex-shrink-0">SOS</Badge>}
@@ -763,9 +766,9 @@ export function EmergencyChat() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <p className={cn("font-medium truncate", simpleMode ? "text-base" : "text-sm")}>{item.name}</p>
-                      {item.isAI && <Badge variant="outline" className="text-xs border-primary/40 text-primary">Asistente</Badge>}
+                      {item.isAI && <Badge variant="outline" className="text-xs border-primary/40 text-primary">{t('chat_assistant')}</Badge>}
                       {!item.isAI && (item as any).resolving && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
-                      {!item.isAI && (item as any).hasAccount && <Badge variant="outline" className="text-xs text-green-600 border-green-500/40">En SOSecure</Badge>}
+                      {!item.isAI && (item as any).hasAccount && <Badge variant="outline" className="text-xs text-green-600 border-green-500/40">{t('chat_inSOSecure')}</Badge>}
                     </div>
                     <p className={cn("text-muted-foreground truncate mt-0.5", simpleMode ? "text-sm" : "text-xs")}>
                       {lastMsg ? lastMsg.text.slice(0, 50) + (lastMsg.text.length > 50 ? '…' : '') : item.subtitle}
@@ -823,7 +826,7 @@ export function EmergencyChat() {
                     {msg.loading ? (
                       <div className="flex items-center gap-2 py-0.5">
                         <Loader2 className="w-3 h-3 animate-spin" />
-                        <span className="text-xs">Escribiendo…</span>
+                        <span className="text-xs">{t('chat_writing')}</span>
                       </div>
                     ) : msg.type === 'media' ? (
                       <MediaMessage text={msg.text} isMe={msg.isMe} timestamp={msg.timestamp} />
@@ -851,11 +854,11 @@ export function EmergencyChat() {
                 disabled={sending || (isAIActive && aiLoading)}
                 className={cn("flex items-center gap-1 rounded-full bg-primary/10 text-primary font-medium hover:bg-primary/20 transition-colors disabled:opacity-50", simpleMode ? "px-4 py-2.5 text-sm" : "px-3 py-1.5 text-xs")}
               >
-                <MapPin className={simpleMode ? "w-4 h-4" : "w-3 h-3"} /> Compartir ubicación
+                <MapPin className={simpleMode ? "w-4 h-4" : "w-3 h-3"} /> {t('chat_shareLocation')}
               </button>
               {!isAIActive && activeContact?.phone && (
                 <a href={`tel:${activeContact.phone}`} className={cn("flex items-center gap-1 rounded-full bg-green-500/10 text-green-600 font-medium hover:bg-green-500/20 transition-colors", simpleMode ? "px-4 py-2.5 text-sm" : "px-3 py-1.5 text-xs")}>
-                  <Phone className={simpleMode ? "w-4 h-4" : "w-3 h-3"} /> Llamar
+                  <Phone className={simpleMode ? "w-4 h-4" : "w-3 h-3"} /> {t('chat_call')}
                 </a>
               )}
               {!isAIActive && activeHasAccount === false && activeContact?.phone && (
@@ -865,7 +868,7 @@ export function EmergencyChat() {
                 rel="noopener noreferrer"
                 className={cn("flex items-center gap-1 rounded-full bg-green-600/10 text-green-700 font-medium hover:bg-green-600/20 transition-colors", simpleMode ? "px-4 py-2.5 text-sm" : "px-3 py-1.5 text-xs")}
               >
-                <Phone className={simpleMode ? "w-4 h-4" : "w-3 h-3"} /> WhatsApp
+                <Phone className={simpleMode ? "w-4 h-4" : "w-3 h-3"} /> {t('chat_whatsapp')}
               </a>
           )}
             </div>
@@ -881,9 +884,9 @@ export function EmergencyChat() {
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend('text') } }}
                 placeholder={
-                  isAIActive ? 'Pregunta algo a SOSecure AI…'
-                  : activeHasAccount === false ? 'Este contacto no tiene cuenta en SOSecure'
-                  : 'Escribe un mensaje…'
+                  isAIActive ? t('chat_aiPlaceholder')
+                  : activeHasAccount === false ? t('chat_noAccount')
+                  : t('chat_placeholder')
                 }
                 disabled={sending || (isAIActive && aiLoading) || (!isAIActive && activeHasAccount === false) || (isAIActive && !isPremium)}
                 className={cn("flex-1 bg-muted rounded-full px-4 outline-none disabled:opacity-50", simpleMode ? "py-3 text-base" : "py-2 text-sm")}

@@ -17,6 +17,7 @@
 // mensajes del chat.
 import { useState, useRef, useEffect } from 'react'
 import { useAppStore } from '@/lib/store'
+import { useTranslation } from '@/lib/i18n'
 import { Send, Bot, User, Sparkles, Heart, MessageCircle, Wind, AlertCircle, Smile } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -26,17 +27,6 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { usePremium } from '@/hooks/use-premium'
 import { UpgradeBanner } from '@/components/upgrade-banner'
 import type { ChatMessage } from '@/lib/types'
-
-// Definir un array de mensajes predefinidos con iconos, etiquetas y prompts relacionados con temas comunes de 
-// bienestar psicológico, como la ansiedad, la respiración, la necesidad de hablar y técnicas para manejar el estrés. 
-// Estos mensajes se muestran como botones de acceso rápido que el usuario puede hacer clic para enviar el prompt 
-// correspondiente al chat.
-const quickPrompts = [
-  { icon: Heart, label: 'Ansiedad', prompt: 'Estoy sintiendo mucha ansiedad y no puedo calmarme, ¿qué puedo hacer?' },
-  { icon: Wind, label: 'Respiración', prompt: '¿Puedes guiarme en un ejercicio de respiración para calmarme?' },
-  { icon: MessageCircle, label: 'Hablar', prompt: 'Necesito hablar con alguien, me siento muy solo/a' },
-  { icon: Smile, label: 'Técnicas', prompt: '¿Cuáles son técnicas rápidas para manejar el estrés?' },
-]
 
 // Definir un objeto `offlineResponses` que contiene respuestas predefinidas para diferentes temas relacionados 
 // con el bienestar psicológico. Cada clave del objeto corresponde a un tema (ansiedad, respiración, crisis, estrés) 
@@ -64,23 +54,26 @@ function getOfflineResponse(prompt: string): string | null {
   return null
 }
 
-// Definir un mensaje inicial que se muestra en el chat cuando el usuario abre la pestaña por primera vez. Este mensaje es
-// del asistente y proporciona una introducción a los servicios que ofrece, así como recursos de emergencia en caso de 
-// crisis emocional. El mensaje se formatea con saltos de línea y negritas para resaltar la información importante.
-const INITIAL_MESSAGE: ChatMessage = {
-  id: 'initial',
-  role: 'assistant',
-  content: `¡Hola! Soy tu Acompañante de Bienestar Psicológico 💙\n\nEstoy aquí para escucharte y apoyarte con:\n\n• **Manejo de ansiedad y estrés** — técnicas y respiración\n• **Apoyo emocional** — un espacio seguro para hablar\n• **Recursos de crisis** — si necesitas ayuda urgente\n• **Bienestar mental** — hábitos y técnicas de autocuidado\n\n⚠️ Si estás en una emergencia emocional o en riesgo, llama al **SAPTEL: 55 5259-8121** (24 horas).\n\n¿Cómo te sientes hoy?`,
-  timestamp: new Date(),
-}
-
-// Definir el componente `MedicTab`, que es la interfaz de chat para el acompañante de bienestar psicológico. 
-// El componente maneja el estado de los mensajes del chat, la entrada del usuario y el estado de carga. Proporciona 
-// una función para enviar mensajes.
 export function MedicTab() {
   const { isPremium, loading: premiumLoading } = usePremium()
   const { simpleMode } = useAppStore()
-  const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_MESSAGE])
+  const { t } = useTranslation()
+
+  const quickPrompts = [
+    { icon: Heart, label: t('medic_anxiety'), prompt: t('medic_anxietyMsg') },
+    { icon: Wind, label: t('medic_breathing'), prompt: t('medic_breathingMsg') },
+    { icon: MessageCircle, label: t('medic_talk'), prompt: t('medic_talkMsg') },
+    { icon: Smile, label: t('medic_techniques'), prompt: t('medic_techniquesMsg') },
+  ]
+
+  const INITIAL_MSG: ChatMessage = {
+    id: 'initial',
+    role: 'assistant',
+    content: t('medic_welcome'),
+    timestamp: new Date(),
+  }
+
+  const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_MSG])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -170,10 +163,10 @@ export function MedicTab() {
         <CardContent className="flex items-center justify-center gap-3 py-2 px-3">
           <AlertCircle className="w-5 h-5 text-primary shrink-0" />
           <div className="text-center">
-            <p className="text-base font-semibold">¿Crisis emocional?</p>
+            <p className="text-base font-semibold">{t('medic_crisis')}</p>
             <p className="text-sm text-muted-foreground">
-              <a href="tel:5552598121" className="text-primary underline font-bold">SAPTEL: 55 5259-8121</a>
-              {' · '}24 horas · gratis
+              <a href="tel:5552598121" className="text-primary underline font-bold">{t('medic_saptel')}</a>
+              {' · '}{t('medic_saptelHours')}
             </p>
           </div>
         </CardContent>
@@ -203,7 +196,7 @@ export function MedicTab() {
             <div className="flex gap-3 justify-start">
               <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0"><Bot className="w-5 h-5 text-primary" /></div>
               <div className="bg-card border border-border rounded-2xl rounded-bl-md px-4 py-3">
-                <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-primary animate-pulse" /><span className="text-sm text-muted-foreground">Escribiendo...</span></div>
+                <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-primary animate-pulse" /><span className="text-sm text-muted-foreground">{t('medic_writing')}</span></div>
               </div>
             </div>
           )}
@@ -223,7 +216,7 @@ export function MedicTab() {
       </div>
 
       <form onSubmit={handleSubmit} className="flex gap-2">
-        <Textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder="¿Cómo te sientes? Estoy aquí para escucharte..." className={`${simpleMode ? 'min-h-[80px]' : 'min-h-[44px]'} max-h-[120px] resize-none`} rows={simpleMode ? 3 : 1}
+        <Textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder={t('medic_placeholder')} className={`${simpleMode ? 'min-h-[80px]' : 'min-h-[44px]'} max-h-[120px] resize-none`} rows={simpleMode ? 3 : 1}
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(e) } }} />
         <Button type="submit" size="icon" disabled={!input.trim() || isLoading} className="h-[44px] w-[44px] flex-shrink-0"><Send className="w-5 h-5" /></Button>
       </form>

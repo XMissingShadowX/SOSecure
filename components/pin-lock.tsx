@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Shield, Delete, AlertCircle, Mail } from 'lucide-react'
 import { verifyPin } from '@/lib/pin'
 import { createClient } from '@/lib/supabase/client'
+import { useTranslation } from '@/lib/i18n'
 
 interface PinLockProps {
   userId: string
@@ -66,6 +67,7 @@ export function PinLock({ userId, pinHash, onUnlock, onForgotPin }: PinLockProps
 
   const remaining = MAX_ATTEMPTS - attempts
   const keys = ['1','2','3','4','5','6','7','8','9','','0','del']
+  const { t } = useTranslation()
 
   return (
     <div className="fixed inset-0 z-[99999] bg-background flex flex-col items-center justify-center p-6 select-none">
@@ -76,8 +78,8 @@ export function PinLock({ userId, pinHash, onUnlock, onForgotPin }: PinLockProps
           <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center">
             <Shield className="w-9 h-9 text-primary" />
           </div>
-          <h1 className="text-xl font-bold">SOSecure</h1>
-          <p className="text-sm text-muted-foreground">Ingresa tu PIN de seguridad</p>
+          <h1 className="text-xl font-bold">{t('pin_title')}</h1>
+          <p className="text-sm text-muted-foreground">{t('pin_enter')}</p>
         </div>
 
         {/* Dots */}
@@ -98,7 +100,7 @@ export function PinLock({ userId, pinHash, onUnlock, onForgotPin }: PinLockProps
         {error && attempts < MAX_ATTEMPTS && (
           <div className="flex items-center gap-2 text-destructive text-sm -mt-4">
             <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            <span>PIN incorrecto — {remaining} {remaining === 1 ? 'intento' : 'intentos'} restante{remaining !== 1 ? 's' : ''}</span>
+            <span>{t('pin_incorrect').replace('{n}', String(remaining)).replace('{s}', remaining !== 1 ? 's' : '')}</span>
           </div>
         )}
 
@@ -133,7 +135,7 @@ export function PinLock({ userId, pinHash, onUnlock, onForgotPin }: PinLockProps
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors mt-2"
         >
           <Mail className="w-4 h-4" />
-          ¿Olvidaste tu PIN?
+          {t('pin_forgot')}
         </button>
       </div>
 

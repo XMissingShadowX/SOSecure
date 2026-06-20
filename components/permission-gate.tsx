@@ -15,6 +15,7 @@ import { Shield, MapPin, Bell, Camera, Mic, CheckCircle, AlertCircle } from 'luc
 import { usePermissions } from '@/hooks/use-permissions'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { useTranslation } from '@/lib/i18n'
 
 interface PermissionGateProps {
   children: React.ReactNode
@@ -33,6 +34,7 @@ const optionalPermissionItems = [
 ] as const
 
 export function PermissionGate({ children }: PermissionGateProps) {
+  const { t } = useTranslation()
   const { permissions, allGranted, requestAll } = usePermissions()
   const [requesting, setRequesting] = useState(false)
   const [dismissed, setDismissed] = useState(false)
@@ -81,7 +83,7 @@ export function PermissionGate({ children }: PermissionGateProps) {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <p className="font-medium text-sm">{item.label}</p>
-                      <span className="text-xs text-destructive font-medium">Requerido</span>
+                      <span className="text-xs text-destructive font-medium">{t('perm_required')}</span>
                     </div>
                     <p className="text-xs text-muted-foreground">{item.desc}</p>
                   </div>
@@ -97,7 +99,7 @@ export function PermissionGate({ children }: PermissionGateProps) {
 
         {/* Permisos opcionales — solo informativos, sin botón propio */}
         <div className="rounded-lg bg-muted/50 p-3 space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Se pedirán cuando los necesites</p>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t('perm_later')}</p>
           {optionalPermissionItems.map((item) => {
             const Icon = item.icon
             return (

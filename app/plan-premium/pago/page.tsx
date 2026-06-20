@@ -84,7 +84,7 @@ export default function PagoPlanPremiumPage() {
       if (demoParam === '1') setDemoOpen(true)
       setView('checkout')
     }
-    init().catch(() => { setError('No se pudo cargar el plan'); setView('checkout') })
+    init().catch(() => { setError(t('pay_errorLoad')); setView('checkout') })
   }, [])
 
   const payWithProvider = async () => {
@@ -102,16 +102,16 @@ export default function PagoPlanPremiumPage() {
         return
       }
       if (data.url) { window.location.href = data.url; return }
-      setError(data.error ?? 'No se pudo iniciar el pago')
+      setError(data.error ?? t('pay_errorStart'))
     } catch {
-      setError('Error de conexión')
+      setError(t('family_connectionError'))
     }
     setProcessing(false)
   }
 
   const payDemo = async () => {
     if (!card.name || card.number.replace(/\s/g, '').length < 12 || !card.exp || card.cvc.length < 3) {
-      setError('Completa los datos de la tarjeta'); return
+      setError(t('pay_completeCard')); return
     }
     setProcessing(true); setError(null)
     try {
@@ -125,10 +125,10 @@ export default function PagoPlanPremiumPage() {
         setPeriodEnd(data.period_end ?? null)
         setView('success')
       } else {
-        setError(data.error ?? 'No se pudo procesar el pago')
+        setError(data.error ?? t('pay_errorProcess'))
       }
     } catch {
-      setError('Error de conexión')
+      setError(t('family_connectionError'))
     }
     setProcessing(false)
   }

@@ -37,6 +37,7 @@ import {
 import { FieldGroup, Field, FieldLabel } from '@/components/ui/field'
 import { Badge } from '@/components/ui/badge'
 import type { Incident, IncidentType, IncidentSeverity } from '@/lib/types'
+import { useTranslation } from '@/lib/i18n'
 
 // Carga dinámica del componente de mapa para evitar problemas con la renderización del lado del servidor, 
 // mostrando un indicador de carga mientras se carga el mapa. El componente de mapa se importa desde 
@@ -49,7 +50,7 @@ const IncidentMap = dynamic(
       <div className="h-full w-full flex items-center justify-center bg-muted rounded-lg">
         <div className="flex items-center gap-2 text-muted-foreground">
           <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          <span>Cargando mapa...</span>
+          <span>Loading map...</span>
         </div>
       </div>
     )
@@ -59,48 +60,8 @@ const IncidentMap = dynamic(
 // Definición de los tipos de incidentes y niveles de severidad disponibles para los reportes, que se utilizan 
 // tanto en el formulario de reporte como en los filtros para mostrar u ocultar ciertos incidentes en el mapa y 
 // la lista de incidentes recientes.
-const incidentTypes: { value: IncidentType | 'all'; label: string }[] = [
-  { value: 'all', label: 'Todos los tipos' },
-  { value: 'theft-assault-violence', label: 'Robo/Asalto/violencia' },
-  { value: 'harassment-suspicious', label: 'Acoso/Actividad Sospechosa' },
-  { value: 'accident', label: 'Accidente' },
-  { value: 'SOS', label: 'Alerta SOS' },
-]
+// Estos arrays se construyen dentro del componente para acceder a t() — ver MapTab
 
-// Estos mismos tipos se definen nuevamente para el formulario de reporte, sin la opción "all", ya que no es 
-// relevante en ese contexto.
-const incidentTypesForm: { value: IncidentType; label: string }[] = [
-  { value: 'theft-assault-violence', label: 'Robo/Asalto/violencia' },
-  { value: 'harassment-suspicious', label: 'Acoso/Actividad Sospechosa' },
-  { value: 'accident', label: 'Accidente' },
-  { value: 'SOS', label: 'Alerta SOS' },
-]
-
-// Definición de los niveles de severidad para los incidentes, con etiquetas y clases de color asociadas para su
-// visualización en el formulario de reporte y en la leyenda del mapa.
-const severityLevels: { value: IncidentSeverity; label: string; color: string }[] = [
-  { value: 'high', label: 'Alto', color: 'bg-destructive text-destructive-foreground' },
-  { value: 'medium', label: 'Medio', color: 'bg-warning text-warning-foreground' },
-  { value: 'low', label: 'Bajo', color: 'bg-primary text-primary-foreground' },
-]
-
-const incidentQuestions: Partial<Record<IncidentType, string[]>> = {
-  'theft-assault-violence': [
-    '¿Hubo uso de arma o amenaza con arma?',
-    '¿Hubo violencia física contra alguna persona?',
-    '¿La víctima resultó herida?',
-  ],
-  'harassment-suspicious': [
-    '¿La persona sospechosa está siguiendo o persiguiendo a alguien?',
-    '¿Hubo amenazas directas o comportamiento agresivo?',
-    '¿Existe riesgo inmediato para una persona vulnerable (menor, adulto mayor, etc.)?',
-  ],
-  'accident': [
-    '¿Hay personas lesionadas?',
-    '¿Hay riesgo de incendio, explosión o fuga de combustible?',
-    '¿El accidente bloquea completamente la circulación o pone en peligro a otros?',
-  ],
-}
 
 function calculateSeverity(answers: string[]): IncidentSeverity {
   const score = answers.reduce((sum, a) => sum + (a === 'si' ? 1 : a === 'no_se' ? 0.5 : 0), 0)
@@ -113,6 +74,41 @@ function calculateSeverity(answers: string[]): IncidentSeverity {
 // de nuevos incidentes, la edición y eliminación de incidentes propios, la aplicación de filtros, y la sincronización 
 // de reportes cuando el usuario está offline.
 export function MapTab({ embedded = false, customMap }: { embedded?: boolean; customMap?: React.ReactNode }) {
+  const { t } = useTranslation()
+
+  const incidentTypes: { value: IncidentType | 'all'; label: string }[] = [
+    { value: 'all', label: t('map_allTypes') },
+    { value: 'theft-assault-violence', label: t('during_incidentTheft') },
+    { value: 'harassment-suspicious', label: t('during_incidentHarassment') },
+    { value: 'accident', label: t('during_incidentAccident') },
+    { value: 'SOS', label: t('during_incidentSOS') },
+  ]
+
+  const incidentTypesForm: { value: IncidentType; label: string }[] = [
+    { value: 'theft-assault-violence', label: t('during_incidentTheft') },
+    { value: 'harassment-suspicious', label: t('during_incidentHarassment') },
+    { value: 'accident', label: t('during_incidentAccident') },
+    { value: 'SOS', label: t('during_incidentSOS') },
+  ]
+
+  const severityLabels: Record<IncidentSeverity, string> = {
+    high: t('map_sevHigh'),
+    medium: t('map_sevMedium'),
+    low: t('map_sevLow'),
+  }
+
+  const incidentQuestions: Partial<Record<IncidentType, string[]>> = {
+    'theft-assault-violence': [t('during_q_weapon'), t('during_q_violence'), t('during_q_injured')],
+    'harassment-suspicious': [t('during_q_following'), t('during_q_threats'), t('during_q_vulnerable')],
+    'accident': [t('during_q_injuredAcc'), t('during_q_fire'), t('during_q_blocked')],
+  }
+
+  const severityLevels: { value: IncidentSeverity; label: string; color: string }[] = [
+    { value: 'high', label: severityLabels.high, color: 'bg-destructive text-destructive-foreground' },
+    { value: 'medium', label: severityLabels.medium, color: 'bg-warning text-warning-foreground' },
+    { value: 'low', label: severityLabels.low, color: 'bg-primary text-primary-foreground' },
+  ]
+
   const [mapTheme, setMapTheme] = useState(() => {
     if (typeof window === 'undefined') return 'dark'
     return document.documentElement.className === 'dark' ? 'dark' : 'light'
@@ -390,8 +386,8 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
       {!isOnline && (
         <div className="flex-none px-3 py-2 bg-warning/20 text-warning rounded-lg text-sm flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-          Sin internet — los reportes se guardan localmente y se enviarán al reconectarte.
-          {offlineQueue.length > 0 && <Badge variant="secondary">{offlineQueue.length} pendientes</Badge>}
+          {t('map_offline')}
+          {offlineQueue.length > 0 && <Badge variant="secondary">{t('map_pending').replace('{n}', String(offlineQueue.length))}</Badge>}
         </div>
       )}
 
@@ -401,7 +397,7 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
           <div className="h-full w-full flex items-center justify-center bg-muted rounded-lg">
             <div className="flex items-center gap-2 text-muted-foreground">
               <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              <span>Cargando incidentes...</span>
+              <span>{t('map_loadingIncidents')}</span>
             </div>
           </div>
         ) : (
@@ -426,7 +422,7 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
             className="shadow-lg bg-card text-foreground border border-border hover:bg-muted"
             onClick={() => setLocateTrigger(t => t + 1)}
             disabled={!coordinates}
-            title="Ir a mi ubicación"
+            title={t('map_goToLocation')}
           >
             <LocateFixed className="w-4 h-4" />
           </Button>
@@ -436,7 +432,7 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
             className="shadow-lg bg-card text-foreground border border-border hover:bg-muted"
             onClick={handleRefresh}
             disabled={refreshing}
-            title="Recargar incidentes"
+            title={t('map_reload')}
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>
@@ -444,12 +440,12 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
 
         {/* Leyenda — flotante abajo izquierda */}
         <div className="absolute bottom-3 left-3 z-[1000] bg-card/95 backdrop-blur-sm rounded-lg p-3 shadow-lg">
-          <p className="text-xs font-medium mb-2">Severidad</p>
+          <p className="text-xs font-medium mb-2">{t('map_severity')}</p>
           <div className="flex flex-col gap-1.5">
-            <div className="flex items-center gap-2 text-xs"><span className="w-3 h-3 rounded-full bg-destructive" /><span>Alta ({incidentCounts.high})</span></div>
-            <div className="flex items-center gap-2 text-xs"><span className="w-3 h-3 rounded-full bg-warning" /><span>Media ({incidentCounts.medium})</span></div>
-            <div className="flex items-center gap-2 text-xs"><span className="w-3 h-3 rounded-full bg-primary" /><span>Baja ({incidentCounts.low})</span></div>
-            <div className="flex items-center gap-2 text-xs"><ShieldCheck className="w-3 h-3 text-safe" /><span>Zona segura</span></div>
+            <div className="flex items-center gap-2 text-xs"><span className="w-3 h-3 rounded-full bg-destructive" /><span>{t('map_high').replace('{n}', String(incidentCounts.high))}</span></div>
+            <div className="flex items-center gap-2 text-xs"><span className="w-3 h-3 rounded-full bg-warning" /><span>{t('map_medium').replace('{n}', String(incidentCounts.medium))}</span></div>
+            <div className="flex items-center gap-2 text-xs"><span className="w-3 h-3 rounded-full bg-primary" /><span>{t('map_low').replace('{n}', String(incidentCounts.low))}</span></div>
+            <div className="flex items-center gap-2 text-xs"><ShieldCheck className="w-3 h-3 text-safe" /><span>{t('map_safeZone')}</span></div>
           </div>
         </div>
 
@@ -466,23 +462,23 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
             <DialogTrigger asChild>
               <Button size="sm" className="shadow-lg">
                 <Plus className="w-4 h-4 mr-1" />
-                Reportar
+                {t('map_report')}
               </Button>
             </DialogTrigger>
             <DialogContent className="z-[2000]">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <AlertTriangle className="w-5 h-5 text-warning" />
-                  Reportar un Incidente
+                  {t('map_reportTitle')}
                 </DialogTitle>
                 <DialogDescription>
-                  Ayuda a mantener segura tu comunidad reportando incidentes en tu zona.
-                  {!isOnline && ' (Sin internet — se guardará localmente)'}
+                  {t('map_reportDesc')}
+                  {!isOnline && ` (${t('map_offlineNote')})`}
                 </DialogDescription>
               </DialogHeader>
               <FieldGroup>
                 <Field>
-                  <FieldLabel>Tipo de Incidente</FieldLabel>
+                  <FieldLabel>{t('map_incidentType')}</FieldLabel>
                   <Select value={newIncident.incident_type} onValueChange={(v) => {
                     setNewIncident({ ...newIncident, incident_type: v as IncidentType })
                     setQuestionAnswers(['', '', ''])
@@ -512,19 +508,19 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
                               : 'bg-muted text-muted-foreground hover:bg-muted/80'
                           }`}
                         >
-                          {opt === 'si' ? 'Sí' : opt === 'no' ? 'No' : 'No sé'}
+                          {opt === 'si' ? t('yes') : opt === 'no' ? t('no') : t('map_dontKnow')}
                         </button>
                       ))}
                     </div>
                   </Field>
                 ))}
                 <Field>
-                  <FieldLabel>Detalles (Opcional)</FieldLabel>
-                  <Textarea placeholder="Detalles adicionales..." rows={3} value={newIncident.description} onChange={(e) => setNewIncident({ ...newIncident, description: e.target.value })} />
+                  <FieldLabel>{t('during_details')}</FieldLabel>
+                  <Textarea placeholder={t('during_detailsPlaceholder')} rows={3} value={newIncident.description} onChange={(e) => setNewIncident({ ...newIncident, description: e.target.value })} />
                 </Field>
                 {coordinates && (
                   <div className="p-3 bg-muted rounded-lg">
-                    <p className="text-xs text-muted-foreground mb-1">Se registrará tu ubicación actual:</p>
+                    <p className="text-xs text-muted-foreground mb-1">{t('map_locationWill')}</p>
                     <p className="font-mono text-sm">{coordinates.latitude.toFixed(6)}, {coordinates.longitude.toFixed(6)}</p>
                   </div>
                 )}
@@ -533,9 +529,9 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
                 <p className="text-sm text-destructive px-1">{reportError}</p>
               )}
               <DialogFooter>
-                <Button variant="outline" onClick={() => setShowReportDialog(false)}>Cancelar</Button>
+                <Button variant="outline" onClick={() => setShowReportDialog(false)}>{t('cancel')}</Button>
                 <Button onClick={reportIncident} disabled={!coordinates || ((incidentQuestions[newIncident.incident_type]?.length ?? 0) > 0 && questionAnswers.some(a => a === ''))}>
-                  {isOnline ? 'Enviar Reporte' : 'Guardar Localmente'}
+                  {isOnline ? t('map_submitReport') : t('map_saveLocal')}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -548,19 +544,19 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
         <Select value={filterSeverity} onValueChange={(v) => setFilterSeverity(v as IncidentSeverity | 'all')}>
           <SelectTrigger className="flex-1">
             <Filter className="w-4 h-4 mr-1" />
-            <SelectValue placeholder="Severidad" />
+            <SelectValue placeholder={t('map_severityLabel')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Severidad</SelectItem>
-            <SelectItem value="high">Solo Alto</SelectItem>
-            <SelectItem value="medium">Solo Medio</SelectItem>
-            <SelectItem value="low">Solo Bajo</SelectItem>
+            <SelectItem value="all">{t('map_severity')}</SelectItem>
+            <SelectItem value="high">{t('map_filterOnlyHigh')}</SelectItem>
+            <SelectItem value="medium">{t('map_filterOnlyMedium')}</SelectItem>
+            <SelectItem value="low">{t('map_filterOnlyLow')}</SelectItem>
           </SelectContent>
         </Select>
 
         <Select value={filterType} onValueChange={(v) => setFilterType(v as IncidentType | 'all')}>
           <SelectTrigger className="flex-1">
-            <SelectValue placeholder="Tipo" />
+            <SelectValue placeholder={t('map_filterType')} />
           </SelectTrigger>
           <SelectContent>
             {incidentTypes.map(t => (
@@ -571,13 +567,13 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
 
         <Select value={filterTime} onValueChange={(v) => setFilterTime(v as 'all' | '1d' | '7d' | '30d' | 'all')}>
           <SelectTrigger className="flex-1">
-            <SelectValue placeholder="Tiempo" />
+            <SelectValue placeholder={t('map_filterTime')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Cualquier fecha</SelectItem>
-            <SelectItem value="1d">Último día</SelectItem>
-            <SelectItem value="7d">Última semana</SelectItem>
-            <SelectItem value="30d">Último mes</SelectItem>
+            <SelectItem value="all">{t('map_filterAny')}</SelectItem>
+            <SelectItem value="1d">{t('map_filterDay')}</SelectItem>
+            <SelectItem value="7d">{t('map_filterWeek')}</SelectItem>
+            <SelectItem value="30d">{t('map_filterMonth')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -586,13 +582,13 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
       <Card className="flex-none">
         <CardHeader className="pb-0">
           <CardTitle className="text-sm flex items-center justify-between">
-            Incidentes Recientes
+            {t('map_recentIncidents')}
             <Badge variant="secondary" className="!text-black dark:!text-white">{filteredIncidents.length}</Badge>
           </CardTitle>
         </CardHeader>
         <CardContent className="max-h-[130px] overflow-y-auto space-y-2 pb-3">
           {filteredIncidents.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">Sin incidentes reportados cerca</p>
+            <p className="text-sm text-muted-foreground text-center py-4">{t('map_noIncidents')}</p>
           ) : (
             filteredIncidents.slice(0, 5).map((incident) => (
               <div key={incident.id} className="flex items-center gap-3 p-2 bg-muted/50 rounded-lg">
@@ -626,17 +622,17 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="w-5 h-5" />
-              Editar Incidente
+              {t('map_editIncident')}
             </DialogTitle>
           </DialogHeader>
           {editingIncident && (
             <FieldGroup>
               <Field>
-                <FieldLabel>Título</FieldLabel>
+                <FieldLabel>{t('map_incidentTitle')}</FieldLabel>
                 <Input value={editingIncident.title} onChange={(e) => setEditingIncident({ ...editingIncident, title: e.target.value })} />
               </Field>
               <Field>
-                <FieldLabel>Tipo de Incidente</FieldLabel>
+                <FieldLabel>{t('map_incidentType')}</FieldLabel>
                 <Select value={editingIncident.incident_type} onValueChange={(v) => setEditingIncident({ ...editingIncident, incident_type: v as IncidentType })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -645,7 +641,7 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
                 </Select>
               </Field>
               <Field>
-                <FieldLabel>Severidad</FieldLabel>
+                <FieldLabel>{t('map_severityLabel')}</FieldLabel>
                 <div className="flex gap-2">
                   {severityLevels.map((level) => (
                     <button key={level.value} type="button"
@@ -658,14 +654,14 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
                 </div>
               </Field>
               <Field>
-                <FieldLabel>Detalles</FieldLabel>
+                <FieldLabel>{t('map_incidentDetails')}</FieldLabel>
                 <Textarea rows={3} value={editingIncident.description || ''} onChange={(e) => setEditingIncident({ ...editingIncident, description: e.target.value })} />
               </Field>
             </FieldGroup>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditDialog(false)}>Cancelar</Button>
-            <Button onClick={saveEdit}>Guardar Cambios</Button>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)}>{t('cancel')}</Button>
+            <Button onClick={saveEdit}>{t('map_saveChanges')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

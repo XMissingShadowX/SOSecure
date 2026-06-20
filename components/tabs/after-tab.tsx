@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { useTranslation } from '@/lib/i18n'
 
 interface SosAlertItem {
   id: string
@@ -37,6 +38,7 @@ interface StoredRecording {
 }
 
 export function AfterTab() {
+  const { t } = useTranslation()
   const { isPremium } = usePremium()
   const { nearbyIncidents, contacts, simpleMode } = useAppStore()
   const [dangerZones, setDangerZones] = useState<{ lat: number; lng: number; count: number }[]>([])
@@ -189,8 +191,8 @@ export function AfterTab() {
         <CardContent className="flex items-center justify-center gap-3 py-2 px-3">
           <CheckCircle className="w-5 h-5 shrink-0 text-safe" />
           <div className="text-center">
-            <p className="font-semibold text-base">Modo DESPUÉS</p>
-            <p className="text-sm text-muted-foreground">Seguimiento y protección post-incidente</p>
+            <p className="font-semibold text-base">{t('after_title')}</p>
+            <p className="text-sm text-muted-foreground">{t('after_subtitle')}</p>
           </div>
         </CardContent>
       </Card>
@@ -200,14 +202,14 @@ export function AfterTab() {
         <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <Home className="w-5 h-5 text-safe" />
-            Notificar llegada
+            {t('after_arrivedTitle')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Avisa a tus contactos que llegaste bien. Si tienen SOSecure, recibirán el mensaje en la app; de lo contrario se enviará por WhatsApp.
+            {t('after_arrivedDesc')}
           </p>
-          {simpleMode && <p className="text-base text-muted-foreground">Avisa a tus contactos que llegaste bien.</p>}
+          {simpleMode && <p className="text-base text-muted-foreground">{t('after_arrivedDesc')}</p>}
           {arrivedSent && arrivedResult ? (
             <div className="space-y-2">
               {arrivedResult.internal > 0 && (
@@ -230,18 +232,18 @@ export function AfterTab() {
               onClick={handleArrivedWell}
             >
               {sendingArrived ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Enviando...</>
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{t('after_arrivedSending')}</>
               ) : (
-                <>✅ Llegué bien</>
+                <>{t('after_arrivedBtn')}</>
               )}
             </Button>
           )}
           {contacts.length === 0 && (
-            <p className="text-xs text-destructive">Agrega contactos de emergencia en la pestaña Inicio.</p>
+            <p className="text-xs text-destructive">{t('after_noContacts')}</p>
           )}
           {arrivedSent && (
             <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setArrivedSent(false)}>
-              Enviar de nuevo
+              {t('after_sendAgain')}
             </Button>
           )}
         </CardContent>
@@ -252,14 +254,14 @@ export function AfterTab() {
         <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <ShieldAlert className="w-5 h-5 text-destructive" />
-            Historial de Alertas SOS
+            {t('after_sosHistory')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 pt-3">
           {!isPremium ? (
             <UpgradeBanner
-              title="Historial de Alertas SOS"
-              description="Accede a tus alertas pasadas con ubicación y grabaciones adjuntas."
+              title={t('after_sosHistory')}
+              description={t('after_sosHistoryDesc')}
               compact
             />
           ) : (
@@ -269,10 +271,10 @@ export function AfterTab() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="7d">Última semana</SelectItem>
-                  <SelectItem value="1m">Último mes</SelectItem>
-                  <SelectItem value="3m">Últimos 3 meses</SelectItem>
-                  <SelectItem value="6m">Últimos 6 meses</SelectItem>
+                  <SelectItem value="7d">{t('after_period_week')}</SelectItem>
+                  <SelectItem value="1m">{t('after_period_month')}</SelectItem>
+                  <SelectItem value="3m">{t('after_period_3months')}</SelectItem>
+                  <SelectItem value="6m">{t('after_period_6months')}</SelectItem>
                 </SelectContent>
               </Select>
               {loadingSosHistory ? (
@@ -281,7 +283,7 @@ export function AfterTab() {
                 </div>
               ) : sosHistory.length === 0 ? (
                 <p className="text-xs text-muted-foreground text-center py-4">
-                  No hay alertas SOS en el período seleccionado.
+                  {t('after_noAlerts')}
                 </p>
               ) : (
                 <div className="space-y-2">
@@ -299,7 +301,7 @@ export function AfterTab() {
                         )}
                       </div>
                       <Badge variant={alert.status === 'active' ? 'destructive' : 'secondary'} className="text-xs shrink-0">
-                        {alert.status === 'active' ? 'Activa' : 'Resuelta'}
+                        {alert.status === 'active' ? t('after_active') : t('after_resolved')}
                       </Badge>
                     </div>
                   ))}
@@ -315,7 +317,7 @@ export function AfterTab() {
         <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <Video className="w-5 h-5 text-primary" />
-            Mis grabaciones
+            {t('after_recordings')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -325,7 +327,7 @@ export function AfterTab() {
             </div>
           ) : recordings.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-4">
-              No tienes grabaciones almacenadas.
+              {t('after_noRecordings')}
             </p>
           ) : (
             <div className="space-y-2">
@@ -336,7 +338,7 @@ export function AfterTab() {
                     : <Mic className="w-4 h-4 text-primary shrink-0" />
                   }
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium capitalize">{rec.recording_type}</p>
+                    <p className="text-xs font-medium capitalize">{rec.recording_type === 'audio' ? t('after_audio') : t('after_video')}</p>
                     <p className="text-xs text-muted-foreground">
                       {new Date(rec.created_at).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })}
                       {rec.duration_ms > 0 && ` · ${formatDuration(rec.duration_ms)}`}
@@ -379,7 +381,7 @@ export function AfterTab() {
           <CardHeader className="pb-0">
             <CardTitle className="flex items-center gap-2 text-base text-warning">
               <AlertTriangle className="w-5 h-5" />
-              Alertas de Zona Peligrosa
+              {t('after_dangerZones')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -387,10 +389,10 @@ export function AfterTab() {
               <div key={i} className="flex items-center gap-3 p-3 bg-warning/10 rounded-lg">
                 <MapPin className="w-4 h-4 text-warning" />
                 <div>
-                  <p className="text-sm font-medium">{zone.count} incidente{zone.count > 1 ? 's' : ''} reportado{zone.count > 1 ? 's' : ''}</p>
+                  <p className="text-sm font-medium">{t('after_incidents').replace('{n}', String(zone.count)).replace('{s}', zone.count > 1 ? 's' : '')}</p>
                   <p className="text-xs text-muted-foreground font-mono">{zone.lat.toFixed(4)}, {zone.lng.toFixed(4)}</p>
                 </div>
-                <Badge variant="destructive" className="ml-auto">Evitar</Badge>
+                <Badge variant="destructive" className="ml-auto">{t('after_avoid')}</Badge>
               </div>
             ))}
           </CardContent>

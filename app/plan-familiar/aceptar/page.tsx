@@ -9,24 +9,29 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useTranslation } from '@/lib/i18n'
 
 type State = 'loading' | 'joined' | 'need_auth' | 'error'
 
 export default function AceptarInvitacionPage() {
+  const { t } = useTranslation()
+  const [mounted, setMounted] = useState(false)
   const [state, setState] = useState<State>('loading')
   const [message, setMessage] = useState('')
   const [groupName, setGroupName] = useState('Plan Familiar')
 
+  useEffect(() => { setMounted(true) }, [])
+
   useEffect(() => {
+    if (!mounted) return
     const run = async () => {
       const token = new URLSearchParams(window.location.search).get('token')
-      if (!token) { setState('error'); setMessage('Enlace de invitación inválido.'); return }
+      if (!token) { setState('error'); setMessage(t('family_inviteInvalidLink')); return }
 
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) {
-        // Guardar para completar tras iniciar sesión
         localStorage.setItem('sosecure-pending-invite', token)
         setState('need_auth')
         return
@@ -43,11 +48,13 @@ export default function AceptarInvitacionPage() {
         setState('joined')
       } else {
         setState('error')
-        setMessage(data.error ?? 'No se pudo aceptar la invitación.')
+        setMessage(data.error ?? t('family_inviteAcceptError'))
       }
     }
-    run().catch(() => { setState('error'); setMessage('Ocurrió un error.') })
-  }, [])
+    run().catch(() => { setState('error'); setMessage(t('family_inviteGenericError')) })
+  }, [mounted, t])
+
+  if (!mounted) return null
 
   return (
     <div className="pf-root">
@@ -62,28 +69,28 @@ export default function AceptarInvitacionPage() {
           {state === 'joined' && (
             <>
               <div className="pf-icon pf-ok">✓</div>
-              <h1 className="pf-h1">¡Bienvenido a {groupName}!</h1>
-              <p className="pf-sub">Ya formas parte del plan familiar. Tienes acceso completo a SOSecure sin costo.</p>
-              <a className="pf-btn" href="/">Abrir SOSecure</a>
+              <h1 className="pf-h1">{t('family_joinWelcome').replace('{group}', groupName)}</h1>
+              <p className="pf-sub">{t('family_joinSub')}</p>
+              <a className="pf-btn" href="/">{t('family_openApp')}</a>
             </>
           )}
 
           {state === 'need_auth' && (
             <>
               <div className="pf-icon">👋</div>
-              <h1 className="pf-h1">Te invitaron a un plan familiar</h1>
-              <p className="pf-sub">Inicia sesión o crea tu cuenta para unirte. Completaremos tu invitación automáticamente.</p>
-              <a className="pf-btn" href="/auth/login/">Iniciar sesión</a>
-              <a className="pf-btn pf-ghost" href="/auth/sign-up/">Crear cuenta</a>
+              <h1 className="pf-h1">{t('family_needAuthTitle')}</h1>
+              <p className="pf-sub">{t('family_needAuthSub')}</p>
+              <a className="pf-btn" href="/auth/login/">{t('auth_loginBtn')}</a>
+              <a className="pf-btn pf-ghost" href="/auth/sign-up/">{t('auth_signUpFree')}</a>
             </>
           )}
 
           {state === 'error' && (
             <>
               <div className="pf-icon pf-err">!</div>
-              <h1 className="pf-h1">No se pudo unir</h1>
+              <h1 className="pf-h1">{t('family_cantJoinTitle')}</h1>
               <p className="pf-sub">{message}</p>
-              <a className="pf-btn" href="/">Ir a SOSecure</a>
+              <a className="pf-btn" href="/">{t('family_goToApp')}</a>
             </>
           )}
         </div>

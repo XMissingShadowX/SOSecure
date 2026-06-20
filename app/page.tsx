@@ -14,10 +14,11 @@ import { createClient } from '@/lib/supabase/client'
 import { AppShell } from '@/components/app-shell'
 import { Shield } from 'lucide-react'
 import Link from 'next/link'
+import { useTranslation } from '@/lib/i18n'
 
 // Este componente maneja la lógica de autenticación y renderiza la interfaz principal o la pantalla de bienvenida según el estado de autenticación del usuario
 export default function HomePage() {
-  // Estados para manejar el estado de carga y autenticación del usuario
+  const { t } = useTranslation()
   const [loading, setLoading] = useState(true)
   const [authenticated, setAuthenticated] = useState(false)
 
@@ -66,20 +67,20 @@ export default function HomePage() {
               <Shield className="w-12 h-12 text-primary" />
             </div>
             <h1 className="text-3xl font-bold">SOSecure</h1>
-            <p className="text-muted-foreground">Tu compañero de seguridad personal</p>
+            <p className="text-muted-foreground">{t('app_tagline')}</p>
           </div>
           <div className="flex flex-col gap-3">
             <Link
               href="/auth/login"
               className="flex items-center justify-center h-11 rounded-lg bg-primary text-primary-foreground font-semibold text-sm"
             >
-              Iniciar Sesión
+              {t('app_signIn')}
             </Link>
             <Link
               href="/auth/sign-up"
               className="flex items-center justify-center h-11 rounded-lg border border-border text-foreground font-semibold text-sm"
             >
-              Crear Cuenta
+              {t('app_createAccount')}
             </Link>
           </div>
         </div>

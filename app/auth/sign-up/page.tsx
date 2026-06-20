@@ -1,33 +1,23 @@
-/*
-  Este archivo define la página de registro para la aplicación SOSecure. Permite a los usuarios crear una cuenta proporcionando su nombre completo, correo electrónico y contraseña. Utiliza Supabase para manejar la autenticación y Next.js para la navegación. El diseño se basa en componentes de UI personalizados para una experiencia de usuario consistente y atractiva.
-
-  Requisitos:
-  - El formulario debe incluir campos para nombre completo, correo electrónico y contraseña.
-  - La contraseña debe tener una opción para mostrar u ocultar el texto ingresado.
-  - Al enviar el formulario, se debe crear una cuenta en Supabase y manejar cualquier error que pueda ocurrir durante el proceso de registro.
-  - Si el registro es exitoso, el usuario debe ser redirigido a la página principal o a la página de inicio de sesión según la configuración de confirmación de correo electrónico en Supabase.
-
-  Nota: Asegúrate de configurar correctamente las URL de redirección en tu proyecto de Supabase
-  para que apunten a esta página después del registro.
-*/
-
 'use client'
 
-// Importar hooks de React, componentes de UI y la función para crear un cliente de Supabase
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Shield, Mail, Lock, Eye, EyeOff, User, Phone, AlertCircle } from 'lucide-react'
+import { Shield, Mail, Lock, Eye, EyeOff, User, Phone, AlertCircle, Languages } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { FieldGroup, Field, FieldLabel } from '@/components/ui/field'
 import { InputGroup, InputGroupInput, InputGroupAddon } from '@/components/ui/input-group'
+import { useTranslation, LANG_LABELS, type Lang } from '@/lib/i18n'
+import { useAppStore } from '@/lib/store'
 
-// Este componente maneja la lógica de registro y renderiza el formulario de creación de cuenta
 export default function SignUpPage() {
-  // Estados para manejar el nombre completo, correo electrónico, contraseña, visibilidad de la contraseña, errores y estado de carga
   const router = useRouter()
+  const { language, setLanguage } = useAppStore()
+  const { t } = useTranslation()
+  const [mounted, setMounted] = useState(false)
+
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -38,47 +28,47 @@ export default function SignUpPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  // Función para manejar el envío del formulario de registro
+  useEffect(() => {
+    setMounted(true)
+    // Auto-detect browser language on first load (only maps es/en; indigenous require manual selection)
+    const stored = useAppStore.getState().language
+    if (stored === 'es') {
+      const browserCode = navigator.language.split('-')[0]
+      if (browserCode === 'en') setLanguage('en')
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!mounted) return null
+
   const handleSignUp = async (e: React.FormEvent) => {
-    // Prevenir el comportamiento por defecto del formulario y restablecer errores y estado de carga
     e.preventDefault()
     setError(null)
     if (!acceptedTerms || !acceptedPrivacy) {
-      setError('Debes aceptar los Términos y Condiciones y el Aviso de Privacidad para continuar.')
+      setError(t('auth_mustAccept'))
       return
     }
     setLoading(true)
 
-    // Crear una instancia de Supabase para interactuar con la autenticación
     const supabase = createClient()
-    // Intentar registrar al usuario con el nombre completo, correo electrónico y contraseña proporcionados
     const { data, error } = await supabase.auth.signUp({
-      // Enviar el nombre completo como parte de los datos adicionales del usuario para que se almacene en el perfil
       email,
       password,
       options: {
         emailRedirectTo: undefined,
-        data: {
-          full_name: fullName,
-          phone,
-        },
+        data: { full_name: fullName, phone },
       },
     })
 
-    // Si hay un error durante el registro, mostrar el mensaje de error y detener la carga
     if (error) {
       setError(error.message)
       setLoading(false)
     } else if (data.session) {
-      // Session exists → auto-logged in, go directly to app
       router.push('/')
     } else {
-      // Email confirmation required — show "check your inbox" page
       router.push(`/auth/sign-up-success?email=${encodeURIComponent(email)}`)
     }
   }
 
-  // Renderizar el formulario de registro con campos para nombre completo, correo electrónico y contraseña, y mostrar mensajes de error según corresponda
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-sm space-y-6">
@@ -88,13 +78,34 @@ export default function SignUpPage() {
             <Shield className="w-10 h-10 text-primary" />
           </div>
           <h1 className="text-2xl font-bold">SOSecure</h1>
-          <p className="text-sm text-muted-foreground">Tu acompañante de seguridad personal</p>
+          <p className="text-sm text-muted-foreground">{t('auth_tagline')}</p>
+        </div>
+
+        {/* Language selector */}
+        <div className="flex items-center gap-2">
+          <Languages className="w-4 h-4 text-muted-foreground shrink-0" />
+          <div className="flex flex-wrap gap-1 flex-1">
+            {(Object.entries(LANG_LABELS) as [Lang, string][]).map(([code, label]) => (
+              <button
+                key={code}
+                type="button"
+                onClick={() => setLanguage(code)}
+                className={`text-xs px-2 py-1 rounded-full border transition-colors ${
+                  language === code
+                    ? 'bg-primary text-primary-foreground border-primary font-medium'
+                    : 'border-border text-muted-foreground hover:border-primary hover:text-primary'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <Card>
           <CardHeader className="space-y-1">
-            <CardTitle className="text-xl">Crear cuenta</CardTitle>
-            <CardDescription>Comienza a usar SOSecure gratis</CardDescription>
+            <CardTitle className="text-xl">{t('auth_createAccount')}</CardTitle>
+            <CardDescription>{t('auth_createDesc')}</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSignUp}>
@@ -105,16 +116,14 @@ export default function SignUpPage() {
                     <span>{error}</span>
                   </div>
                 )}
-                
+
                 <Field>
-                  <FieldLabel>Nombre completo</FieldLabel>
+                  <FieldLabel>{t('auth_fullName')}</FieldLabel>
                   <InputGroup>
-                    <InputGroupAddon>
-                      <User className="w-4 h-4" />
-                    </InputGroupAddon>
+                    <InputGroupAddon><User className="w-4 h-4" /></InputGroupAddon>
                     <InputGroupInput
                       type="text"
-                      placeholder="Tu nombre"
+                      placeholder={t('auth_namePlaceholder')}
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       required
@@ -123,11 +132,9 @@ export default function SignUpPage() {
                 </Field>
 
                 <Field>
-                  <FieldLabel>Número de teléfono</FieldLabel>
+                  <FieldLabel>{t('auth_phone')}</FieldLabel>
                   <InputGroup>
-                    <InputGroupAddon>
-                      <Phone className="w-4 h-4" />
-                    </InputGroupAddon>
+                    <InputGroupAddon><Phone className="w-4 h-4" /></InputGroupAddon>
                     <InputGroupInput
                       type="tel"
                       placeholder="+52 000 000 0000"
@@ -139,14 +146,12 @@ export default function SignUpPage() {
                 </Field>
 
                 <Field>
-                  <FieldLabel>Correo electrónico</FieldLabel>
+                  <FieldLabel>{t('auth_email')}</FieldLabel>
                   <InputGroup>
-                    <InputGroupAddon>
-                      <Mail className="w-4 h-4" />
-                    </InputGroupAddon>
+                    <InputGroupAddon><Mail className="w-4 h-4" /></InputGroupAddon>
                     <InputGroupInput
                       type="email"
-                      placeholder="tu@ejemplo.com"
+                      placeholder={t('auth_emailPlaceholder')}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -155,29 +160,25 @@ export default function SignUpPage() {
                 </Field>
 
                 <Field>
-                  <FieldLabel>Contraseña</FieldLabel>
+                  <FieldLabel>{t('auth_password')}</FieldLabel>
                   <InputGroup>
-                    <InputGroupAddon>
-                      <Lock className="w-4 h-4" />
-                    </InputGroupAddon>
+                    <InputGroupAddon><Lock className="w-4 h-4" /></InputGroupAddon>
                     <InputGroupInput
                       type={showPassword ? 'text' : 'password'}
-                      placeholder="Crea una contraseña"
+                      placeholder={t('auth_passwordPlaceholder')}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       minLength={6}
                     />
-                    <InputGroupAddon 
+                    <InputGroupAddon
                       className="cursor-pointer"
                       onClick={() => setShowPassword(!showPassword)}
                     >
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </InputGroupAddon>
                   </InputGroup>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Mínimo 6 caracteres
-                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">{t('auth_passwordMin')}</p>
                 </Field>
 
                 <div className="space-y-3 pt-1">
@@ -189,11 +190,11 @@ export default function SignUpPage() {
                       className="mt-0.5 w-4 h-4 rounded border-input accent-primary flex-shrink-0"
                     />
                     <span className="text-xs text-muted-foreground leading-snug">
-                      He leído y acepto los{' '}
+                      {t('auth_termsText').split('{terms}')[0]}
                       <Link href="/terminos" target="_blank" className="text-primary hover:underline font-medium">
-                        Términos y Condiciones
+                        {t('auth_terms')}
                       </Link>
-                      {' '}de uso de SOSecure.
+                      {t('auth_termsText').split('{terms}')[1]}
                     </span>
                   </label>
 
@@ -205,17 +206,17 @@ export default function SignUpPage() {
                       className="mt-0.5 w-4 h-4 rounded border-input accent-primary flex-shrink-0"
                     />
                     <span className="text-xs text-muted-foreground leading-snug">
-                      He leído y acepto el{' '}
+                      {t('auth_privacyText').split('{privacy}')[0]}
                       <Link href="/privacidad" target="_blank" className="text-primary hover:underline font-medium">
-                        Aviso de Privacidad
+                        {t('auth_privacy')}
                       </Link>
-                      {' '}y autorizo el tratamiento de mis datos personales.
+                      {t('auth_privacyText').split('{privacy}')[1]}
                     </span>
                   </label>
                 </div>
 
                 <Button type="submit" className="w-full" disabled={loading || !acceptedTerms || !acceptedPrivacy}>
-                  {loading ? 'Creando cuenta...' : 'Crear Cuenta'}
+                  {loading ? t('auth_creating') : t('auth_createBtn')}
                 </Button>
               </FieldGroup>
             </form>
@@ -223,9 +224,9 @@ export default function SignUpPage() {
         </Card>
 
         <p className="text-center text-sm text-muted-foreground">
-          ¿Ya tienes cuenta?{' '}
+          {t('auth_haveAccount')}{' '}
           <Link href="/auth/login" className="text-primary hover:underline">
-            Inicia sesión
+            {t('auth_signIn')}
           </Link>
         </p>
       </div>

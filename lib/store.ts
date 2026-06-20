@@ -12,6 +12,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { TabId, Coordinates, Incident, EmergencyContact, SOSAlert, FrequentPlace, LocationHistory, RouteOption } from './types'
+import type { Lang } from './i18n'
 
 // Definir la interfaz `AppState` que describe la estructura del estado global de la aplicación, incluyendo propiedades 
 // y funciones para manejar la navegación, la ubicación, los incidentes, los contactos, las alertas SOS, las rutas, 
@@ -101,6 +102,10 @@ interface AppState {
   // Modo Simple (accesibilidad para adultos mayores y niños)
   simpleMode: boolean
   setSimpleMode: (value: boolean) => void
+
+  // Idioma de la app
+  language: Lang
+  setLanguage: (lang: Lang) => void
 }
 
 // Crear el estado global de la aplicación utilizando Zustand y persistirlo en el almacenamiento local del navegador con 
@@ -199,6 +204,10 @@ export const useAppStore = create<AppState>()(
       simpleMode: false,
       setSimpleMode: (value) => set({ simpleMode: value }),
 
+      // Idioma
+      language: 'es',
+      setLanguage: (lang) => set({ language: lang }),
+
       // Cola sin conexión
       offlineQueue: [],
       addToOfflineQueue: (incident) => {
@@ -227,6 +236,7 @@ export const useAppStore = create<AppState>()(
         volumePresses: state.volumePresses,
         volumeWindow: state.volumeWindow,
         simpleMode: state.simpleMode,
+        language: state.language,
       }),
     }
   )
