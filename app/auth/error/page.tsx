@@ -11,7 +11,7 @@
 'use client'
 
 // Importar iconos, componentes de UI y la función para crear un cliente de Supabase
-import { Shield, AlertCircle } from 'lucide-react'
+import { ShieldCheck, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -25,7 +25,7 @@ export default function AuthErrorPage() {
         {/* Logo */}
         <div className="flex flex-col items-center gap-2 mb-8">
           <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center">
-            <Shield className="w-10 h-10 text-primary" />
+            <ShieldCheck className="w-10 h-10 text-primary" />
           </div>
           <h1 className="text-2xl font-bold">SOSecure</h1>
         </div>

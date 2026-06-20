@@ -20,7 +20,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { FAMILY_PLAN, formatAmount } from '@/lib/plan-config'
 import { ensureOwnedGroup, getOwnedGroup, listMembers, type FamilyMember } from '@/lib/family'
-import { Shield } from 'lucide-react'
+import { ShieldCheck } from 'lucide-react'
 import { useTranslation } from '@/lib/i18n'
 
 type View = 'loading' | 'auth' | 'checkout' | 'success'
@@ -146,7 +146,7 @@ export default function PagoPlanFamiliarPage() {
         <div style={{display:'flex',alignItems:'center',gap:'16px'}}>
           <a href="/" className="pf-back-btn">← Volver</a>
           <div className="pf-brand">
-            <Shield className="w-6 h-6 text-primary" />
+            <ShieldCheck className="w-6 h-6 text-primary" />
             <span className="pf-brand-name">SOSecure</span>
           </div>
         </div>

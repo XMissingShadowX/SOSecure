@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Shield, Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react'
+import { ShieldCheck, Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -72,7 +72,7 @@ function ResetPasswordContent() {
       <div className="w-full max-w-sm space-y-6">
         <div className="flex flex-col items-center gap-2 mb-8">
           <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center">
-            <Shield className="w-10 h-10 text-primary" />
+            <ShieldCheck className="w-10 h-10 text-primary" />
           </div>
           <h1 className="text-2xl font-bold">SOSecure</h1>
           <p className="text-sm text-muted-foreground">{t('app_tagline')}</p>

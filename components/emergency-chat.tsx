@@ -14,7 +14,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import {
   MessageCircle, X, Send, MapPin, AlertTriangle, Phone,
-  Bot, Loader2, Shield, ChevronLeft, Sparkles, UserCircle2, WifiOff, FileVideo, FileAudio, Video, Radio, Camera
+  Bot, Loader2, ShieldCheck, ChevronLeft, Sparkles, UserCircle2, WifiOff, FileVideo, FileAudio, Video, Radio, Camera
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { usePremium } from '@/hooks/use-premium'
@@ -755,7 +755,7 @@ export function EmergencyChat() {
                 >
                   <div className={cn("rounded-full flex items-center justify-center flex-shrink-0", simpleMode ? "w-14 h-14" : "w-10 h-10", (item as any).isLive ? 'bg-destructive/20 ring-2 ring-destructive animate-pulse' : (item as any).isSosRec ? 'bg-destructive/20' : 'bg-primary/20')}>
                     {item.isAI
-                      ? <Shield className={simpleMode ? "w-7 h-7 text-primary" : "w-5 h-5 text-primary"} />
+                      ? <ShieldCheck className={simpleMode ? "w-7 h-7 text-primary" : "w-5 h-5 text-primary"} />
                       : (item as any).isLive
                         ? <Camera className={simpleMode ? "w-7 h-7 text-destructive" : "w-5 h-5 text-destructive"} />
                         : (item as any).isSosRec
