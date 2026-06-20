@@ -21,10 +21,12 @@ import { createClient } from '@/lib/supabase/client'
 import { FAMILY_PLAN, formatAmount } from '@/lib/plan-config'
 import { ensureOwnedGroup, getOwnedGroup, listMembers, type FamilyMember } from '@/lib/family'
 import { Shield } from 'lucide-react'
+import { useTranslation } from '@/lib/i18n'
 
 type View = 'loading' | 'auth' | 'checkout' | 'success'
 
 export default function PagoPlanFamiliarPage() {
+  const { t } = useTranslation()
   const [view, setView] = useState<View>('loading')
   const [members, setMembers] = useState<FamilyMember[]>([])
   const [demoOpen, setDemoOpen] = useState(false)
@@ -50,6 +52,23 @@ export default function PagoPlanFamiliarPage() {
 
       // ¿Regresó del proveedor? Verificar si ya quedó activo.
       if (statusParam === 'success') {
+        // PayPal regresa con ?token=ORDER_ID — hay que capturar el pago
+        const paypalToken = params.get('token')
+        if (paypalToken) {
+          const captureRes = await fetch('/api/family/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'capture-paypal', token: paypalToken }),
+          })
+          const captureData = await captureRes.json()
+          if (captureData.success) {
+            setPeriodEnd(captureData.period_end ?? null)
+            setView('success')
+            return
+          }
+        }
+
+        // Para Stripe / Mercado Pago: esperar que llegue el webhook
         let active = group?.status === 'active'
         for (let i = 0; i < 5 && !active; i++) {
           await new Promise(r => setTimeout(r, 1500))
@@ -124,11 +143,14 @@ export default function PagoPlanFamiliarPage() {
       <style>{CSS}</style>
 
       <header className="pf-top">
-        <div className="pf-brand">
-          <Shield className="w-6 h-6 text-primary" />
-          <span className="pf-brand-name">SOSecure</span>
+        <div style={{display:'flex',alignItems:'center',gap:'16px'}}>
+          <a href="/" className="pf-back-btn">← Volver</a>
+          <div className="pf-brand">
+            <Shield className="w-6 h-6 text-primary" />
+            <span className="pf-brand-name">SOSecure</span>
+          </div>
         </div>
-        <span className="pf-secure">🔒 Pago cifrado</span>
+        <span className="pf-secure">{t('pay_encrypted')}</span>
       </header>
 
       {view === 'loading' && (
@@ -138,10 +160,10 @@ export default function PagoPlanFamiliarPage() {
       {view === 'auth' && (
         <main className="pf-main pf-center">
           <div className="pf-card pf-narrow">
-            <h1 className="pf-h1">Inicia sesión para continuar</h1>
-            <p className="pf-sub">Necesitas tu cuenta de SOSecure para contratar el plan familiar.</p>
-            <a className="pf-btn pf-btn-primary" href="/auth/login/">Iniciar sesión</a>
-            <a className="pf-btn pf-btn-ghost" href="/auth/sign-up/">Crear cuenta</a>
+            <h1 className="pf-h1">{t('pay_signInTitle')}</h1>
+            <p className="pf-sub">{t('pay_signInDescFamiliar')}</p>
+            <a className="pf-btn pf-btn-primary" href="/auth/login/">{t('pay_signIn')}</a>
+            <a className="pf-btn pf-btn-ghost" href="/auth/sign-up/">{t('pay_createAccount')}</a>
           </div>
         </main>
       )}
@@ -150,23 +172,23 @@ export default function PagoPlanFamiliarPage() {
         <main className="pf-main pf-grid">
           {/* Resumen del plan */}
           <section className="pf-card">
-            <span className="pf-eyebrow">Suscripción anual</span>
-            <h1 className="pf-h1">{FAMILY_PLAN.name}</h1>
-            <p className="pf-tagline">{FAMILY_PLAN.tagline}</p>
+            <span className="pf-eyebrow">{t('plan_familiarEyebrow')}</span>
+            <h1 className="pf-h1">{t('plan_familiarNameLabel')}</h1>
+            <p className="pf-tagline">{t('plan_familiarTagline')}</p>
 
             <div className="pf-price">
               <span className="pf-amount">{formatAmount(FAMILY_PLAN.amountCents)}</span>
-              <span className="pf-per">/ {FAMILY_PLAN.period}</span>
+              <span className="pf-per">/ {t('plan_familiarPeriod')}</span>
             </div>
 
             <ul className="pf-benefits">
-              {FAMILY_PLAN.benefits.map((b, i) => (
-                <li key={i}><span className="pf-check">✓</span>{b}</li>
+              {([1, 2, 3, 4] as const).map(n => (
+                <li key={n}><span className="pf-check">✓</span>{t(`plan_familiarBenefit${n}`)}</li>
               ))}
             </ul>
 
             {/* Firma visual: los 5 cupos de la familia */}
-            <div className="pf-slots-label">Tu familia protegida ({usedSlots}/{FAMILY_PLAN.maxMembers})</div>
+            <div className="pf-slots-label">{t('plan_familiarSlots').replace('{used}', String(usedSlots)).replace('{max}', String(FAMILY_PLAN.maxMembers))}</div>
             <div className="pf-slots">
               {Array.from({ length: FAMILY_PLAN.maxMembers }).map((_, i) => {
                 const m = members[i]
@@ -176,59 +198,56 @@ export default function PagoPlanFamiliarPage() {
                       ? <span className="pf-slot-initial">{(m.name || m.email || '?').charAt(0).toUpperCase()}</span>
                       : <span className="pf-slot-plus">+</span>}
                     <span className="pf-slot-tag">
-                      {m ? (m.role === 'owner' ? 'Titular' : (m.name || 'Miembro')) : 'Cupo libre'}
+                      {m ? (m.role === 'owner' ? t('plan_familiarOwner') : (m.name || t('plan_familiarMember'))) : t('plan_familiarFreeSlot')}
                     </span>
                   </div>
                 )
               })}
             </div>
             {freeSlots > 0 && (
-              <p className="pf-hint">Podrás invitar a {freeSlots} {freeSlots === 1 ? 'persona más' : 'personas más'} desde Ajustes.</p>
+              <p className="pf-hint">{t('plan_familiarInviteHint').replace('{n}', String(freeSlots)).replace('{person}', freeSlots === 1 ? t('plan_familiarPerson1') : t('plan_familiarPersonN'))}</p>
             )}
           </section>
 
           {/* Método de pago */}
           <section className="pf-card">
-            <h2 className="pf-h2">Método de pago</h2>
+            <h2 className="pf-h2">{t('pay_payMethod')}</h2>
 
             {!demoOpen && (
               <>
                 <button className="pf-btn pf-btn-primary" onClick={payWithProvider} disabled={processing}>
-                  {processing ? 'Redirigiendo…' : `Pagar ${formatAmount(FAMILY_PLAN.amountCents)}`}
+                  {processing ? t('pay_redirecting') : t('pay_pay').replace('{amount}', formatAmount(FAMILY_PLAN.amountCents))}
                 </button>
-                <p className="pf-methods">Tarjeta · OXXO · SPEI · transferencia</p>
-                <p className="pf-redirect-note">
-                  Te llevaremos a una página segura para completar el pago y
-                  regresarás aquí automáticamente.
-                </p>
+                <p className="pf-methods">{t('pay_methods')}</p>
+                <p className="pf-redirect-note">{t('pay_redirectNote')}</p>
                 <button className="pf-link" onClick={() => setDemoOpen(true)}>
-                  Usar formulario de demostración
+                  {t('pay_demoLink')}
                 </button>
               </>
             )}
 
             {demoOpen && (
               <div className="pf-form">
-                <div className="pf-demo-flag">Modo demostración — no se realiza ningún cargo real</div>
-                <label className="pf-label">Nombre en la tarjeta</label>
+                <div className="pf-demo-flag">{t('pay_demoFlag')}</div>
+                <label className="pf-label">{t('pay_cardName')}</label>
                 <input className="pf-input" value={card.name}
                   onChange={e => setCard({ ...card, name: e.target.value })}
-                  placeholder="Como aparece en la tarjeta" />
+                  placeholder={t('pay_cardNamePlaceholder')} />
 
-                <label className="pf-label">Número de tarjeta</label>
+                <label className="pf-label">{t('pay_cardNumber')}</label>
                 <input className="pf-input" value={card.number} inputMode="numeric"
                   onChange={e => setCard({ ...card, number: formatCard(e.target.value) })}
                   placeholder="4242 4242 4242 4242" maxLength={19} />
 
                 <div className="pf-row">
                   <div className="pf-col">
-                    <label className="pf-label">Vencimiento</label>
+                    <label className="pf-label">{t('pay_cardExpiry')}</label>
                     <input className="pf-input" value={card.exp} inputMode="numeric"
                       onChange={e => setCard({ ...card, exp: formatExp(e.target.value) })}
                       placeholder="MM/AA" maxLength={5} />
                   </div>
                   <div className="pf-col">
-                    <label className="pf-label">CVC</label>
+                    <label className="pf-label">{t('pay_cardCvc')}</label>
                     <input className="pf-input" value={card.cvc} inputMode="numeric"
                       onChange={e => setCard({ ...card, cvc: e.target.value.replace(/\D/g, '').slice(0, 4) })}
                       placeholder="123" maxLength={4} />
@@ -236,14 +255,14 @@ export default function PagoPlanFamiliarPage() {
                 </div>
 
                 <button className="pf-btn pf-btn-primary" onClick={payDemo} disabled={processing}>
-                  {processing ? 'Procesando…' : `Pagar ${formatAmount(FAMILY_PLAN.amountCents)}`}
+                  {processing ? t('pay_processing') : t('pay_pay').replace('{amount}', formatAmount(FAMILY_PLAN.amountCents))}
                 </button>
-                <button className="pf-link" onClick={() => setDemoOpen(false)}>Volver</button>
+                <button className="pf-link" onClick={() => setDemoOpen(false)}>{t('pay_back')}</button>
               </div>
             )}
 
             {error && <p className="pf-error">{error}</p>}
-            <p className="pf-trust">🔒 Tus datos viajan cifrados. SOSecure no almacena tu tarjeta.</p>
+            <p className="pf-trust">{t('pay_trust')}</p>
           </section>
         </main>
       )}
@@ -252,13 +271,13 @@ export default function PagoPlanFamiliarPage() {
         <main className="pf-main pf-center">
           <div className="pf-card pf-narrow pf-success">
             <div className="pf-success-icon">✓</div>
-            <h1 className="pf-h1">¡Plan familiar activado!</h1>
+            <h1 className="pf-h1">{t('plan_familiarActivated')}</h1>
             <p className="pf-sub">
-              Ya puedes proteger hasta {FAMILY_PLAN.maxMembers} personas.
-              {periodEnd && <> Tu plan es válido hasta el <strong>{formatDate(periodEnd)}</strong>.</>}
+              {t('plan_familiarSuccess').replace('{n}', String(FAMILY_PLAN.maxMembers))}
+              {periodEnd && <> {t('pay_validUntil').replace('{date}', formatDate(periodEnd))}</>}
             </p>
-            <p className="pf-sub">Invita a tu familia desde <strong>Ajustes → Plan Familiar</strong>.</p>
-            <a className="pf-btn pf-btn-primary" href="/">Volver a SOSecure</a>
+            <p className="pf-sub">{t('plan_familiarInviteNote')}</p>
+            <a className="pf-btn pf-btn-primary" href="/">{t('pay_returnToApp')}</a>
           </div>
         </main>
       )}
@@ -280,6 +299,8 @@ function formatDate(iso: string) {
 const CSS = `
 .pf-root{min-height:100vh;background:radial-gradient(1200px 600px at 80% -10%,#0b3b37 0%,#071513 45%,#05100f 100%);color:#e6f2f0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;}
 .pf-top{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;max-width:1040px;margin:0 auto;}
+.pf-back-btn{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:600;color:#5eead4;background:rgba(45,212,191,.1);border:1px solid rgba(94,234,212,.25);padding:7px 14px;border-radius:999px;text-decoration:none;transition:background .15s;}
+.pf-back-btn:hover{background:rgba(45,212,191,.2);}
 .pf-brand{display:flex;align-items:center;gap:9px;}
 .pf-shield{font-size:22px;}
 .pf-brand-name{font-weight:800;font-size:19px;letter-spacing:-.01em;}

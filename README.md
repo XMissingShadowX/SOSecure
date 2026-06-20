@@ -120,6 +120,7 @@
 | Geocodificación | Photon / Komoot |
 | Mobile | Capacitor 8 (Android) |
 | Email | Resend API |
+| Pagos | PayPal Orders API v2 (sandbox y live) |
 | Gráficas | recharts |
 | Iconos | lucide-react |
 | Fechas | date-fns |
@@ -136,9 +137,28 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=tu-clave-anonima
 SUPABASE_SERVICE_ROLE_KEY=tu-clave-service-role
 NEXT_PUBLIC_ANTHROPIC_API_KEY=tu-clave-anthropic
 RESEND_API_KEY=tu-clave-resend
+
+# PayPal (obtener en developer.paypal.com → Apps & Credentials)
+PAYPAL_CLIENT_ID=tu-client-id
+PAYPAL_CLIENT_SECRET=tu-client-secret
+PAYPAL_MODE=sandbox   # cambiar a "live" en producción
+
+# URL pública de la app (ngrok para desarrollo local, dominio real en producción)
+NEXT_PUBLIC_APP_URL=https://sosecure.site
 ```
 
 > **Nunca** commitear `.env.local`. Ya está en `.gitignore`.
+
+### Configurar webhooks de PayPal
+
+En [developer.paypal.com](https://developer.paypal.com) → tu app → **Webhooks**, registra las siguientes URLs con el evento `PAYMENT.CAPTURE.COMPLETED`:
+
+| Plan | URL |
+|------|-----|
+| Premium | `https://tu-dominio/api/premium/webhook` |
+| Familiar | `https://tu-dominio/api/family/webhook` |
+
+Para pruebas locales usa [ngrok](https://ngrok.com) para exponer `localhost:3000` y pon la URL temporal de ngrok como `NEXT_PUBLIC_APP_URL`.
 
 ---
 
