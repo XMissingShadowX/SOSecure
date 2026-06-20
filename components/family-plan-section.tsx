@@ -17,8 +17,10 @@ import {
   ensureOwnedGroup, listMembers, removeMember,
   type FamilyGroup, type FamilyMember,
 } from '@/lib/family'
+import { useTranslation } from '@/lib/i18n'
 
 export function FamilyPlanSection() {
+  const { t } = useTranslation()
   const [group, setGroup] = useState<FamilyGroup | null>(null)
   const [members, setMembers] = useState<FamilyMember[]>([])
   const [loading, setLoading] = useState(true)
@@ -48,8 +50,8 @@ export function FamilyPlanSection() {
 
   const handleInvite = async () => {
     const email = inviteEmail.trim().toLowerCase()
-    if (!email.includes('@')) { setErr('Escribe un correo válido'); return }
-    if (free <= 0) { setErr('Ya alcanzaste el límite de 5 miembros'); return }
+    if (!email.includes('@')) { setErr(t('family_inviteInvalidEmail')); return }
+    if (free <= 0) { setErr(t('family_inviteLimit')); return }
     setSending(true); setErr(null); setMsg(null)
     try {
       const res = await fetch('/api/family/invite', {
@@ -60,14 +62,14 @@ export function FamilyPlanSection() {
       const data = await res.json()
       const r = data.results?.[0]
       if (data.success && r?.ok) {
-        setMsg('Invitación enviada')
+        setMsg(t('family_inviteSent'))
         setInviteEmail(''); setInviteName('')
         await refresh()
       } else {
-        setErr(r?.reason ?? data.error ?? 'No se pudo invitar')
+        setErr(r?.reason ?? data.error ?? t('family_inviteError'))
       }
     } catch {
-      setErr('Error de conexión')
+      setErr(t('family_connectionError'))
     }
     setSending(false)
   }
@@ -81,8 +83,8 @@ export function FamilyPlanSection() {
   if (loading) {
     return (
       <div>
-        <p className="text-sm font-medium mb-3">Plan Familiar</p>
-        <div className="p-3 rounded-lg border border-border text-xs text-muted-foreground">Cargando…</div>
+        <p className="text-sm font-medium mb-3">{t('family_title')}</p>
+        <div className="p-3 rounded-lg border border-border text-xs text-muted-foreground">{t('family_loading')}</div>
       </div>
     )
   }
@@ -91,32 +93,32 @@ export function FamilyPlanSection() {
     <div>
       <div className="flex items-center gap-2 mb-3">
         <Users className="w-4 h-4" />
-        <p className="text-sm font-medium">Plan Familiar</p>
+        <p className="text-sm font-medium">{t('family_title')}</p>
       </div>
 
       <div className="p-3 rounded-lg border border-border space-y-3">
         {/* Estado */}
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium">{FAMILY_PLAN.name}</p>
+            <p className="text-sm font-medium">{t('plan_familiarNameLabel')}</p>
             <p className="text-xs text-muted-foreground">
-              {formatAmount(FAMILY_PLAN.amountCents)} / {FAMILY_PLAN.period} · hasta {FAMILY_PLAN.maxMembers} usuarios
+              {t('plan_familiarSubtitle').replace('{amount}', formatAmount(FAMILY_PLAN.amountCents)).replace('{period}', t('plan_familiarPeriod')).replace('{n}', String(FAMILY_PLAN.maxMembers))}
             </p>
           </div>
           {isActive ? (
             <span className="flex items-center gap-1 text-xs text-primary font-medium bg-primary/15 px-2 py-1 rounded-full">
-              <BadgeCheck className="w-3.5 h-3.5" /> Activo
+              <BadgeCheck className="w-3.5 h-3.5" /> {t('family_active')}
             </span>
           ) : (
             <span className="flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
-              <Clock className="w-3.5 h-3.5" /> Sin activar
+              <Clock className="w-3.5 h-3.5" /> {t('family_inactive')}
             </span>
           )}
         </div>
 
         {isActive && group?.current_period_end && (
           <p className="text-xs text-muted-foreground">
-            Válido hasta el {new Date(group.current_period_end).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })}.
+            {t('family_validUntil').replace('{date}', new Date(group.current_period_end).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' }))}
           </p>
         )}
 
@@ -124,10 +126,10 @@ export function FamilyPlanSection() {
         {!isActive && (
           <>
             <p className="text-xs text-muted-foreground">
-              Activa el plan para proteger a toda tu familia con una sola suscripción anual.
+              {t('family_desc')}
             </p>
             <Button className="w-full" size="sm" onClick={goToPayment}>
-              Activar plan familiar — {formatAmount(FAMILY_PLAN.amountCents)}
+              {t('plan_familiarActivateBtn').replace('{amount}', formatAmount(FAMILY_PLAN.amountCents))}
             </Button>
           </>
         )}
@@ -136,7 +138,7 @@ export function FamilyPlanSection() {
         {isActive && (
           <>
             <div className="pt-1">
-              <p className="text-xs font-medium mb-2">Miembros ({used}/{FAMILY_PLAN.maxMembers})</p>
+              <p className="text-xs font-medium mb-2">{t('family_membersCount').replace('{used}', String(used)).replace('{max}', String(FAMILY_PLAN.maxMembers))}</p>
               <div className="space-y-1.5">
                 {members.map(m => (
                   <div key={m.id} className="flex items-center justify-between gap-2 p-2 rounded-md bg-muted">
@@ -147,7 +149,7 @@ export function FamilyPlanSection() {
                       <div className="min-w-0">
                         <p className="text-xs font-medium truncate">{m.name || m.email}</p>
                         <p className="text-[11px] text-muted-foreground truncate">
-                          {m.role === 'owner' ? 'Titular' : m.status === 'active' ? 'Activo' : 'Invitado'}
+                          {m.role === 'owner' ? t('family_owner') : m.status === 'active' ? t('family_active') : t('family_invited')}
                           {m.email && m.name ? ` · ${m.email}` : ''}
                         </p>
                       </div>
@@ -169,9 +171,9 @@ export function FamilyPlanSection() {
             {/* Invitar */}
             {free > 0 ? (
               <div className="pt-1 space-y-2">
-                <p className="text-xs font-medium">Invitar miembro ({free} {free === 1 ? 'cupo' : 'cupos'})</p>
+                <p className="text-xs font-medium">{t('family_inviteSlots').replace('{n}', String(free)).replace('{slot}', free === 1 ? t('family_inviteSlot1') : t('family_inviteSlotsN'))}</p>
                 <Input
-                  placeholder="Nombre (opcional)"
+                  placeholder={t('family_inviteName')}
                   value={inviteName}
                   onChange={e => setInviteName(e.target.value)}
                   className="h-9 text-sm"
@@ -185,11 +187,11 @@ export function FamilyPlanSection() {
                 />
                 <Button className="w-full" size="sm" variant="outline" onClick={handleInvite} disabled={sending}>
                   <Plus className="w-3.5 h-3.5 mr-1" />
-                  {sending ? 'Enviando…' : 'Enviar invitación'}
+                  {sending ? t('family_inviteSending') : t('family_inviteSend')}
                 </Button>
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground pt-1">Tu plan está completo (5/5).</p>
+              <p className="text-xs text-muted-foreground pt-1">{t('family_full')}</p>
             )}
           </>
         )}

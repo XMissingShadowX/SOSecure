@@ -59,3 +59,13 @@ android/app/src/main/assets/public/
 .claude/settings.json
 
 certificates
+
+# documentos
+PLAN_FREE_VS_PREMIUM.md
+generar_documento.py
+generar_respuestas.py
+enviar_respuestas.py
+*.pdf
+*.docx
+*.xlsx
+*.pptx

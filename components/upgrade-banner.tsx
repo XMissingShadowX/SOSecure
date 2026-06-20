@@ -4,6 +4,7 @@ import { Lock } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { useTranslation } from '@/lib/i18n'
 
 interface UpgradeBannerProps {
   title: string
@@ -13,6 +14,7 @@ interface UpgradeBannerProps {
 
 export function UpgradeBanner({ title, description, compact = false }: UpgradeBannerProps) {
   const router = useRouter()
+  const { t } = useTranslation()
 
   if (compact) {
     return (
@@ -26,10 +28,10 @@ export function UpgradeBanner({ title, description, compact = false }: UpgradeBa
         </div>
         <div className="flex gap-2">
           <Button size="sm" className="flex-1 text-xs h-8" onClick={() => router.push('/plan-premium/pago')}>
-            Premium — $59/mes
+            {t('plan_premiumBtnShort')}
           </Button>
           <Button size="sm" variant="outline" className="flex-1 text-xs h-8" onClick={() => router.push('/plan-familiar/pago')}>
-            Familiar — $499/año
+            {t('plan_familiarBtnShort')}
           </Button>
         </div>
       </div>
@@ -48,10 +50,10 @@ export function UpgradeBanner({ title, description, compact = false }: UpgradeBa
         </div>
         <div className="flex flex-col gap-2 w-full">
           <Button className="w-full" onClick={() => router.push('/plan-premium/pago')}>
-            Plan Premium — $59/mes
+            {t('plan_premiumBtn')}
           </Button>
           <Button variant="outline" className="w-full" onClick={() => router.push('/plan-familiar/pago')}>
-            Plan Familiar — $499/año
+            {t('plan_familiarBtn')}
           </Button>
         </div>
       </CardContent>

@@ -3,17 +3,23 @@
 import Link from 'next/link'
 import { Shield, Mail, ArrowLeft, RefreshCw } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
-import { useState, Suspense } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { useTranslation } from '@/lib/i18n'
 
 function SignUpSuccessContent() {
+  const { t } = useTranslation()
+  const [mounted, setMounted] = useState(false)
   const searchParams = useSearchParams()
   const email = searchParams.get('email') ?? ''
   const [resending, setResending] = useState(false)
   const [resent, setResent] = useState(false)
   const [resendError, setResendError] = useState<string | null>(null)
+
+  useEffect(() => { setMounted(true) }, [])
+  if (!mounted) return null
 
   const handleResend = async () => {
     if (!email) return
@@ -32,7 +38,6 @@ function SignUpSuccessContent() {
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-sm space-y-6">
-        {/* Logo */}
         <div className="flex flex-col items-center gap-2 mb-8">
           <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center">
             <Shield className="w-10 h-10 text-primary" />
@@ -47,22 +52,22 @@ function SignUpSuccessContent() {
                 <Mail className="w-7 h-7 text-primary" />
               </div>
             </div>
-            <CardTitle className="text-xl">Revisa tu correo</CardTitle>
+            <CardTitle className="text-xl">{t('auth_checkEmail')}</CardTitle>
             <CardDescription>
-              Enviamos un enlace de verificación a{' '}
+              {t('auth_verificationSent')}{' '}
               {email ? (
                 <span className="font-medium text-foreground">{email}</span>
               ) : (
-                'tu correo electrónico'
+                t('auth_yourEmail')
               )}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="bg-muted/50 rounded-lg p-4 text-sm text-muted-foreground space-y-2">
-              <p>1. Abre tu bandeja de entrada</p>
-              <p>2. Busca un correo de <span className="font-medium">SOSecure</span></p>
-              <p>3. Haz clic en el enlace de verificación</p>
-              <p>4. Serás redirigido para iniciar sesión</p>
+              <p>{t('auth_step1')}</p>
+              <p>{t('auth_step2')}</p>
+              <p>{t('auth_step3')}</p>
+              <p>{t('auth_step4')}</p>
             </div>
 
             {resendError && (
@@ -71,7 +76,7 @@ function SignUpSuccessContent() {
 
             {resent ? (
               <p className="text-xs text-green-600 text-center font-medium">
-                ✓ Correo reenviado correctamente
+                {t('auth_resent')}
               </p>
             ) : (
               <Button
@@ -81,7 +86,7 @@ function SignUpSuccessContent() {
                 disabled={resending || !email}
               >
                 <RefreshCw className={`w-4 h-4 mr-2 ${resending ? 'animate-spin' : ''}`} />
-                {resending ? 'Reenviando...' : 'Reenviar correo'}
+                {resending ? t('auth_resending') : t('auth_resend')}
               </Button>
             )}
 
@@ -97,16 +102,16 @@ function SignUpSuccessContent() {
             <Link href="/auth/login">
               <Button variant="ghost" className="w-full">
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Volver al inicio de sesión
+                {t('auth_backToLogin')}
               </Button>
             </Link>
           </CardContent>
         </Card>
 
         <p className="text-center text-xs text-muted-foreground">
-          ¿Correo equivocado?{' '}
+          {t('auth_wrongEmail')}{' '}
           <Link href="/auth/sign-up" className="text-primary hover:underline">
-            Regístrate de nuevo
+            {t('auth_signUpAgain')}
           </Link>
         </p>
       </div>

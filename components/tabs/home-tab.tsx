@@ -38,26 +38,19 @@ import {
 import { FieldGroup, Field, FieldLabel } from '@/components/ui/field'
 import { Badge } from '@/components/ui/badge'
 import type { EmergencyContact, FrequentPlace } from '@/lib/types'
+import { useTranslation } from '@/lib/i18n'
 import { usePremium } from '@/hooks/use-premium'
 import { UpgradeBanner } from '@/components/upgrade-banner'
 import { FREE_MAX_CONTACTS, PREMIUM_PLAN } from '@/lib/plan-config'
 
-// Niveles de importancia para los contactos de emergencia, cada uno con un valor, etiqueta y color asociado 
-// para la interfaz de usuario.
-const importanceLevels: { value: EmergencyContact['importance']; label: string; color: string }[] = [
-  { value: 'primary', label: 'Principal', color: 'bg-destructive text-destructive-foreground' },
-  { value: 'secondary', label: 'Secundario', color: 'bg-warning text-warning-foreground' },
-  { value: 'tertiary', label: 'Terciario', color: 'bg-primary text-primary-foreground' },
-]
-
 // Tipos de lugares frecuentes que un usuario puede agregar, cada uno con un valor, etiqueta e ícono 
 // asociado para la interfaz de usuario.
-const placeTypes = [
-  { value: 'home', label: 'Casa', icon: Home },
-  { value: 'work', label: 'Trabajo', icon: Briefcase },
-  { value: 'school', label: 'Escuela', icon: BookOpen },
-  { value: 'gym', label: 'Gimnasio', icon: Heart },
-  { value: 'other', label: 'Otro', icon: Star },
+const placeTypeIcons = [
+  { value: 'home', icon: Home },
+  { value: 'work', icon: Briefcase },
+  { value: 'school', icon: BookOpen },
+  { value: 'gym', icon: Heart },
+  { value: 'other', icon: Star },
 ]
 
 // Mapeo de tipos de lugares a sus respectivos íconos para mostrar en la interfaz de usuario.
@@ -72,7 +65,24 @@ const placeIcons: Record<string, React.ElementType> = {
 export function HomeTab() {
   const { isPremium } = usePremium()
   const MAX_CONTACTS = isPremium ? PREMIUM_PLAN.features.maxContacts : FREE_MAX_CONTACTS
+  const { t } = useTranslation()
   const { currentLocation: coordinates, locationLoading, locationError, contacts, setContacts, nearbyIncidents, frequentPlaces, addFrequentPlace, removeFrequentPlace, simpleMode } = useAppStore()
+
+  const placeTypes = [
+    { value: 'home', label: t('home_placeHome'), icon: Home },
+    { value: 'work', label: t('home_placeWork'), icon: Briefcase },
+    { value: 'school', label: t('home_placeSchool'), icon: BookOpen },
+    { value: 'gym', label: t('home_placeGym'), icon: Heart },
+    { value: 'other', label: t('home_placeOther'), icon: Star },
+  ]
+
+  // Niveles de importancia para los contactos de emergencia, cada uno con un valor, etiqueta y color asociado
+  // para la interfaz de usuario.
+  const importanceLevels: { value: EmergencyContact['importance']; label: string; color: string }[] = [
+    { value: 'primary', label: t('home_priority_primary'), color: 'bg-destructive text-destructive-foreground' },
+    { value: 'secondary', label: t('home_priority_secondary'), color: 'bg-warning text-warning-foreground' },
+    { value: 'tertiary', label: t('home_priority_tertiary'), color: 'bg-primary text-primary-foreground' },
+  ]
   // Estados locales para manejar la visibilidad de los diálogos de agregar contacto y lugar, el contacto que se 
   // está editando, los datos del nuevo contacto y lugar que se están agregando, las sugerencias de lugares basadas 
   // en la búsqueda, y el estado de carga de los contactos.
@@ -283,13 +293,13 @@ export function HomeTab() {
           <Shield className={cn("w-5 h-5 shrink-0", !coordinates ? "text-muted-foreground" : nearbyDangerCount > 0 ? "text-warning" : "text-safe")} />
           <div className="text-center">
             <p className={cn("font-semibold text-base", !coordinates ? "text-muted-foreground" : nearbyDangerCount > 0 ? "text-warning" : "text-safe")}>
-              {!coordinates ? 'Determinando ubicación...' : nearbyDangerCount > 0 ? `${nearbyDangerCount} Alerta${nearbyDangerCount > 1 ? 's' : ''} Cercana${nearbyDangerCount > 1 ? 's' : ''}` : 'Zona Aparentemente Segura'}
+              {!coordinates ? t('home_locationLoading') : nearbyDangerCount > 0 ? `${nearbyDangerCount} ${nearbyDangerCount > 1 ? t('home_alertPlural') : t('home_alertSingular')}` : t('home_safeZone')}
             </p>
             <p className="text-sm text-muted-foreground">
-              {locationLoading ? 'Obteniendo ubicación...'
+              {locationLoading ? t('home_gettingLocation')
                 : locationError ? locationError
                 : coordinates ? `${coordinates.latitude.toFixed(4)}, ${coordinates.longitude.toFixed(4)}`
-                : 'Activa la ubicación'}
+                : t('activate_location')}
             </p>
           </div>
         </CardContent>
@@ -299,19 +309,19 @@ export function HomeTab() {
       {!simpleMode && (
         <Card>
           <CardHeader className="pb-0">
-            <CardTitle className="text-base">Consejos de Seguridad</CardTitle>
+            <CardTitle className="text-base">{t('home_tips_title')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {[
-              { n: 1, bold: 'Mantén presionado SOS 2 segundos', rest: ' para activar el modo de emergencia' },
-              { n: 2, bold: 'Revisa el mapa', rest: ' para ver incidentes reportados cerca de ti' },
-              { n: 3, bold: 'Usa el temporizador de seguridad', rest: ' si sales a un lugar desconocido' },
-            ].map(t => (
-              <div key={t.n} className="flex items-start gap-3 text-sm">
+              { n: 1, text: t('home_tip1') },
+              { n: 2, text: t('home_tip2') },
+              { n: 3, text: t('home_tip3') },
+            ].map(tip => (
+              <div key={tip.n} className="flex items-start gap-3 text-sm">
                 <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <span className="text-primary font-semibold text-xs">{t.n}</span>
+                  <span className="text-primary font-semibold text-xs">{tip.n}</span>
                 </div>
-                <p className="text-muted-foreground"><strong className="text-foreground">{t.bold}</strong>{t.rest}</p>
+                <p className="text-muted-foreground">{tip.text}</p>
               </div>
             ))}
           </CardContent>
@@ -323,14 +333,14 @@ export function HomeTab() {
         <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <MapPin className="w-5 h-5 text-primary" />
-            Ubicación Actual
+            {t('home_currentLocation')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {locationLoading ? (
             <div className="flex items-center gap-2 text-muted-foreground">
               <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              <span>Adquiriendo GPS...</span>
+              <span>{t('home_acquiringGps')}</span>
             </div>
           ) : locationError ? (
             <div className="flex items-center gap-2 text-destructive">
@@ -341,18 +351,18 @@ export function HomeTab() {
             simpleMode ? (
               <div className="flex items-center gap-2 p-3 bg-safe/10 rounded-lg">
                 <span className="text-safe text-lg">✓</span>
-                <p className="font-medium text-safe">Ubicación activa</p>
+                <p className="font-medium text-safe">{t('home_locationActive')}</p>
               </div>
             ) : (
               <div className="space-y-2 bg-muted">
                 <p className="font-mono text-sm bg-muted px-3 py-2 rounded">
                   {coordinates.latitude.toFixed(6)}, {coordinates.longitude.toFixed(6)}
                 </p>
-                <p className="text-xs text-muted-foreground">Tu ubicación se monitorea para funciones de seguridad</p>
+                <p className="text-xs text-muted-foreground">{t('home_locationActiveDesc')}</p>
               </div>
             )
           ) : (
-            <p className="text-muted-foreground">Ubicación no disponible</p>
+            <p className="text-muted-foreground">{t('home_noLocation')}</p>
           )}
         </CardContent>
       </Card>
@@ -363,7 +373,7 @@ export function HomeTab() {
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-base">
               <Navigation className="w-5 h-5 text-primary" />
-              Lugares Frecuentes
+              {t('home_frequentPlaces')}
             </CardTitle>
             <span className="text-sm text-muted-foreground">{frequentPlaces.length} guardados</span>
           </div>
@@ -371,7 +381,7 @@ export function HomeTab() {
         <CardContent className="space-y-3">
           {frequentPlaces.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-3">
-              Agrega lugares frecuentes para acceder rápido a ellos
+              {t('home_noFrequentPlaces')}
             </p>
           ) : (
             <div className="grid grid-cols-2 gap-2">
@@ -396,17 +406,17 @@ export function HomeTab() {
             <DialogTrigger asChild>
               <Button variant="outline" className="w-full">
                 <Plus className="w-4 h-4 mr-2" />
-                Agregar lugar frecuente
+                {t('home_addFrequentPlace')}
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Agregar Lugar Frecuente</DialogTitle>
-                <DialogDescription>Busca una dirección o usa tu ubicación actual.</DialogDescription>
+                <DialogTitle>{t('home_addFrequentPlace')}</DialogTitle>
+                <DialogDescription>{t('home_addPlace_desc')}</DialogDescription>
               </DialogHeader>
               <FieldGroup>
                 <Field>
-                  <FieldLabel>Tipo de lugar</FieldLabel>
+                  <FieldLabel>{t('home_addPlace_type')}</FieldLabel>
                   <Select value={newPlace.type} onValueChange={(v) => setNewPlace({ ...newPlace, type: v, label: placeTypes.find(p => p.value === v)?.label || v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -417,14 +427,14 @@ export function HomeTab() {
                   </Select>
                 </Field>
                 <Field>
-                  <FieldLabel>Nombre</FieldLabel>
-                  <Input placeholder="Ej. Casa de mamá" value={newPlace.label} onChange={(e) => setNewPlace({ ...newPlace, label: e.target.value })} />
+                  <FieldLabel>{t('home_addPlace_name')}</FieldLabel>
+                  <Input placeholder={t('home_addPlace_namePlaceholder')} value={newPlace.label} onChange={(e) => setNewPlace({ ...newPlace, label: e.target.value })} />
                 </Field>
                 <Field>
-                  <FieldLabel>Dirección (opcional)</FieldLabel>
+                  <FieldLabel>{t('home_addPlace_address')}</FieldLabel>
                   <div className="relative">
                     <Input
-                      placeholder="Busca una dirección..."
+                      placeholder={t('home_addPlace_addressPlaceholder')}
                       value={newPlace.address}
                       onChange={async (e) => {
                         const value = e.target.value
@@ -477,8 +487,8 @@ export function HomeTab() {
                 )}
               </FieldGroup>
               <DialogFooter>
-                <Button variant="outline" onClick={() => { setShowAddPlace(false); setPlaceSuggestions([]) }}>Cancelar</Button>
-                <Button onClick={addPlace} disabled={!newPlace.label || !coordinates}>Guardar</Button>
+                <Button variant="outline" onClick={() => { setShowAddPlace(false); setPlaceSuggestions([]) }}>{t('cancel')}</Button>
+                <Button onClick={addPlace} disabled={!newPlace.label || !coordinates}>{t('save')}</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -491,7 +501,7 @@ export function HomeTab() {
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-base">
               <Users className="w-5 h-5 text-primary" />
-              Contactos de Emergencia
+              {t('home_contacts')}
             </CardTitle>
             <span className="text-sm text-muted-foreground">{contacts.length}/{MAX_CONTACTS}</span>
           </div>
@@ -500,12 +510,12 @@ export function HomeTab() {
           {loading ? (
             <div className="flex items-center gap-2 text-muted-foreground py-4">
               <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              <span>Cargando contactos...</span>
+              <span>{t('home_contactsLoading')}</span>
             </div>
           ) : contacts.length === 0 ? (
             <div className="text-center py-6">
               <Users className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
-              <p className="text-muted-foreground mb-3">Sin contactos de emergencia</p>
+              <p className="text-muted-foreground mb-3">{t('home_contactsNone')}</p>
               <p className="text-sm text-muted-foreground">Agrega hasta {MAX_CONTACTS} contactos</p>
             </div>
           ) : (
@@ -555,8 +565,8 @@ export function HomeTab() {
 
           {contacts.length >= MAX_CONTACTS && !isPremium && (
             <UpgradeBanner
-              title="Límite de contactos alcanzado"
-              description={`El plan gratuito permite hasta ${FREE_MAX_CONTACTS} contactos. Actualiza para agregar hasta 10.`}
+              title={t('home_limitReached')}
+              description={t('home_limitReachedDesc').replace('{n}', String(FREE_MAX_CONTACTS))}
               compact
             />
           )}
@@ -566,52 +576,52 @@ export function HomeTab() {
               <DialogTrigger asChild>
                 <Button variant="outline" className="w-full">
                   <Plus className="w-4 h-4 mr-2" />
-                  Agregar Contacto
+                  {t('home_addContact')}
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Agregar Contacto de Emergencia</DialogTitle>
-                  <DialogDescription>Esta persona será notificada durante una alerta SOS.</DialogDescription>
+                  <DialogTitle>{t('home_addContact')}</DialogTitle>
+                  <DialogDescription>{t('home_addContact_desc')}</DialogDescription>
                 </DialogHeader>
                 <FieldGroup>
                   <Field>
-                    <FieldLabel>Nombre</FieldLabel>
-                    <Input placeholder="Nombre del contacto" value={newContact.name} onChange={(e) => setNewContact({ ...newContact, name: e.target.value })} />
+                    <FieldLabel>{t('home_addPlace_name')}</FieldLabel>
+                    <Input placeholder={t('home_addContact_name')} value={newContact.name} onChange={(e) => setNewContact({ ...newContact, name: e.target.value })} />
                   </Field>
                   <Field>
-                    <FieldLabel>Teléfono</FieldLabel>
+                    <FieldLabel>{t('home_phone')}</FieldLabel>
                     <Input type="tel" placeholder="+52 555 000 0000" value={newContact.phone} onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })} />
                   </Field>
                   {!simpleMode && (
                     <>
                       <Field>
-                        <FieldLabel>Email (para alertas automáticas)</FieldLabel>
+                        <FieldLabel>{t('home_addContact_email')}</FieldLabel>
                         <Input
                           type="email"
-                          placeholder="correo@ejemplo.com"
+                          placeholder={t('home_emailPlaceholder')}
                           value={newContact.email || ''}
                           onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
                         />
                       </Field>
                       <Field>
-                        <FieldLabel>Relación (Opcional)</FieldLabel>
+                        <FieldLabel>{t('home_addContact_relation')}</FieldLabel>
                         <Select value={newContact.relationship} onValueChange={(v) => setNewContact({ ...newContact, relationship: v })}>
-                          <SelectTrigger><SelectValue placeholder="Selecciona relación" /></SelectTrigger>
+                          <SelectTrigger><SelectValue placeholder={t('home_addContact_selectRelation')} /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="parent">Padre/Madre</SelectItem>
-                            <SelectItem value="spouse">Esposo/a</SelectItem>
-                            <SelectItem value="sibling">Hermano/a</SelectItem>
-                            <SelectItem value="friend">Amigo/a</SelectItem>
-                            <SelectItem value="partner">Pareja</SelectItem>
-                            <SelectItem value="other">Otro</SelectItem>
+                            <SelectItem value="parent">{t('home_relation_parent')}</SelectItem>
+                            <SelectItem value="spouse">{t('home_relation_spouse')}</SelectItem>
+                            <SelectItem value="sibling">{t('home_relation_sibling')}</SelectItem>
+                            <SelectItem value="friend">{t('home_relation_friend')}</SelectItem>
+                            <SelectItem value="partner">{t('home_relation_partner')}</SelectItem>
+                            <SelectItem value="other">{t('home_relation_other')}</SelectItem>
                           </SelectContent>
                         </Select>
                       </Field>
                     </>
                   )}
                   {!simpleMode && <Field>
-                    <FieldLabel>Importancia</FieldLabel>
+                    <FieldLabel>{t('home_addContact_priority')}</FieldLabel>
                     <div className="flex gap-2">
                       {importanceLevels.map((level) => (
                         <button
@@ -629,8 +639,8 @@ export function HomeTab() {
                   </Field>}
                 </FieldGroup>
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setShowAddContact(false)}>Cancelar</Button>
-                  <Button onClick={addContact} disabled={!newContact.name || !newContact.phone}>Agregar</Button>
+                  <Button variant="outline" onClick={() => setShowAddContact(false)}>{t('cancel')}</Button>
+                  <Button onClick={addContact} disabled={!newContact.name || !newContact.phone}>{t('home_addContact')}</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
@@ -640,47 +650,47 @@ export function HomeTab() {
           <Dialog open={!!editingContact} onOpenChange={(open) => { if (!open) setEditingContact(null) }}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Editar Contacto</DialogTitle>
-                <DialogDescription>Modifica los datos del contacto de emergencia.</DialogDescription>
+                <DialogTitle>{t('home_editContact')}</DialogTitle>
+                <DialogDescription>{t('home_editContact_desc')}</DialogDescription>
               </DialogHeader>
               <FieldGroup>
                 <Field>
-                  <FieldLabel>Nombre</FieldLabel>
-                  <Input placeholder="Nombre del contacto" value={editContact.name} onChange={(e) => setEditContact({ ...editContact, name: e.target.value })} />
+                  <FieldLabel>{t('home_addPlace_name')}</FieldLabel>
+                  <Input placeholder={t('home_addContact_name')} value={editContact.name} onChange={(e) => setEditContact({ ...editContact, name: e.target.value })} />
                 </Field>
                 <Field>
-                  <FieldLabel>Teléfono</FieldLabel>
+                  <FieldLabel>{t('home_phone')}</FieldLabel>
                   <Input type="tel" placeholder="+52 555 000 0000" value={editContact.phone} onChange={(e) => setEditContact({ ...editContact, phone: e.target.value })} />
                 </Field>
                 {!simpleMode && (
                   <>
                     <Field>
-                      <FieldLabel>Email</FieldLabel>
+                      <FieldLabel>{t('home_addContact_email')}</FieldLabel>
                       <Input
                         type="email"
-                        placeholder="correo@ejemplo.com"
+                        placeholder={t('home_emailPlaceholder')}
                         value={editContact.email || ''}
                         onChange={(e) => setEditContact({ ...editContact, email: e.target.value })}
                       />
                     </Field>
                     <Field>
-                      <FieldLabel>Relación (Opcional)</FieldLabel>
+                      <FieldLabel>{t('home_addContact_relation')}</FieldLabel>
                       <Select value={editContact.relationship} onValueChange={(v) => setEditContact({ ...editContact, relationship: v })}>
-                        <SelectTrigger><SelectValue placeholder="Selecciona relación" /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder={t('home_addContact_selectRelation')} /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="parent">Padre/Madre</SelectItem>
-                          <SelectItem value="spouse">Esposo/a</SelectItem>
-                          <SelectItem value="sibling">Hermano/a</SelectItem>
-                          <SelectItem value="friend">Amigo/a</SelectItem>
-                          <SelectItem value="partner">Pareja</SelectItem>
-                          <SelectItem value="other">Otro</SelectItem>
+                          <SelectItem value="parent">{t('home_relation_parent')}</SelectItem>
+                          <SelectItem value="spouse">{t('home_relation_spouse')}</SelectItem>
+                          <SelectItem value="sibling">{t('home_relation_sibling')}</SelectItem>
+                          <SelectItem value="friend">{t('home_relation_friend')}</SelectItem>
+                          <SelectItem value="partner">{t('home_relation_partner')}</SelectItem>
+                          <SelectItem value="other">{t('home_relation_other')}</SelectItem>
                         </SelectContent>
                       </Select>
                     </Field>
                   </>
                 )}
                 {!simpleMode && <Field>
-                  <FieldLabel>Importancia</FieldLabel>
+                  <FieldLabel>{t('home_addContact_priority')}</FieldLabel>
                   <div className="flex gap-2">
                     {importanceLevels.map((level) => (
                       <button
@@ -698,8 +708,8 @@ export function HomeTab() {
                 </Field>}
               </FieldGroup>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setEditingContact(null)}>Cancelar</Button>
-                <Button onClick={saveEditContact} disabled={!editContact.name || !editContact.phone}>Guardar cambios</Button>
+                <Button variant="outline" onClick={() => setEditingContact(null)}>{t('cancel')}</Button>
+                <Button onClick={saveEditContact} disabled={!editContact.name || !editContact.phone}>{t('home_saveChanges')}</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

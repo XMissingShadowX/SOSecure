@@ -25,7 +25,8 @@ import { MedicTab } from './tabs/medic-tab'
 import { BeforeTab } from './tabs/before-tab'
 import { DuringTab } from './tabs/during-tab'
 import { AfterTab } from './tabs/after-tab'
-import { Shield, Settings, LogOut, BellRing, WifiOff, Sun, Moon, UserCircle, Trash2, Lock, LockOpen, KeyRound, CheckCircle2, Delete, ShieldCheck, Volume2, Puzzle } from 'lucide-react'
+import { Shield, Settings, LogOut, BellRing, WifiOff, Sun, Moon, UserCircle, Trash2, Lock, LockOpen, KeyRound, CheckCircle2, Delete, ShieldCheck, Volume2, Puzzle, Languages } from 'lucide-react'
+import { useTranslation, LANG_LABELS, type Lang } from '@/lib/i18n'
 import { PinLock } from './pin-lock'
 import { hashPin } from '@/lib/pin'
 import { Button } from '@/components/ui/button'
@@ -58,7 +59,8 @@ import {
 import type { User } from '@supabase/supabase-js'
 
 export function AppShell() {
-  const { activeTab, setCurrentLocation, setLocationStatus, setNearbyIncidents, offlineQueue, isLiveSharing, voiceKeyword, sosActive, volumePresses, setVolumePresses, volumeWindow, setVolumeWindow, simpleMode, setSimpleMode } = useAppStore()
+  const { activeTab, setCurrentLocation, setLocationStatus, setNearbyIncidents, offlineQueue, isLiveSharing, voiceKeyword, sosActive, volumePresses, setVolumePresses, volumeWindow, setVolumeWindow, simpleMode, setSimpleMode, language, setLanguage } = useAppStore()
+  const { t } = useTranslation()
   const { coordinates, loading: locationLoading, error: locationError } = useGeolocation({ watch: true })
   const [user, setUser] = useState<User | null>(null)
   const liveBroadcastRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -500,9 +502,9 @@ export function AppShell() {
           <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center">
             <Shield className="w-9 h-9 text-primary" />
           </div>
-          <h2 className="text-lg font-bold">Revisa tu correo</h2>
+          <h2 className="text-lg font-bold">{t('settings_checkEmail')}</h2>
           <p className="text-sm text-muted-foreground max-w-xs">
-            Enviamos un enlace a <strong>{user.email}</strong> para restablecer tu PIN. Al ingresar, podrás configurar uno nuevo.
+            {t('settings_resetPinSent').replace('{email}', user.email ?? '')}
           </p>
         </div>
       )
@@ -528,13 +530,13 @@ export function AppShell() {
               {!isOnline && (
                 <div className="flex items-center gap-1 px-2 py-0.5 bg-warning/20 rounded-full">
                   <WifiOff className="w-3 h-3 text-warning" />
-                  <span className="text-xs text-warning font-medium">Sin internet</span>
+                  <span className="text-xs text-warning font-medium">{t('header_offline')}</span>
                 </div>
               )}
               {offlineQueue.length > 0 && isOnline && (
                 <div className="flex items-center gap-1 px-2 py-0.5 bg-primary/20 rounded-full">
                   <BellRing className="w-3 h-3 text-primary" />
-                  <span className="text-xs text-primary font-medium">{offlineQueue.length} sync</span>
+                  <span className="text-xs text-primary font-medium">{t('header_sync').replace('{n}', String(offlineQueue.length))}</span>
                 </div>
               )}
             </div>
@@ -557,12 +559,12 @@ export function AppShell() {
                   )}
                   <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
                     <Settings className="w-4 h-4 mr-2" />
-                    Ajustes
+                    {t('header_settings')}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleSignOut}>
                     <LogOut className="w-4 h-4 mr-2" />
-                    Cerrar sesión
+                    {t('header_signout')}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -572,18 +574,53 @@ export function AppShell() {
             <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
               <DialogContent className="max-w-sm">
                 <DialogHeader>
-                  <DialogTitle>Ajustes</DialogTitle>
+                  <DialogTitle>{t('settings_title')}</DialogTitle>
                 </DialogHeader>
 
                 <div className="space-y-6 pt-2 max-h-[70vh] overflow-y-auto pr-1">
+                  {/* Idioma */}
+                  <div>
+                    <p className="text-sm font-medium mb-3 flex items-center gap-2">
+                      <Languages className="w-4 h-4" />
+                      {t('settings_language')}
+                    </p>
+                    <div className="grid grid-cols-1 gap-1.5">
+                      {(Object.entries(LANG_LABELS) as [Lang, string][]).map(([code, label]) => (
+                        <button
+                          key={code}
+                          type="button"
+                          onClick={() => setLanguage(code)}
+                          style={{
+                            padding: '8px 12px',
+                            borderRadius: '8px',
+                            fontSize: '0.875rem',
+                            fontWeight: language === code ? 600 : 400,
+                            border: '1px solid',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            backgroundColor: language === code
+                              ? (isDark ? 'oklch(0.75 0.15 180)' : 'oklch(0.55 0.15 180)')
+                              : (isDark ? 'oklch(0.22 0.02 260)' : 'oklch(0.91 0.01 260)'),
+                            borderColor: language === code
+                              ? (isDark ? 'oklch(0.75 0.15 180)' : 'oklch(0.55 0.15 180)')
+                              : (isDark ? 'oklch(0.28 0.02 260)' : 'oklch(0.90 0.01 260)'),
+                            color: language === code ? 'white' : (isDark ? 'oklch(0.95 0.01 260)' : 'oklch(0.15 0.01 260)'),
+                          }}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Modo Simple */}
                   <div>
                     <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-primary/5">
                       <div className="flex items-center gap-2">
                         <Puzzle className="w-4 h-4 text-primary" />
                         <div>
-                          <p className="text-sm font-medium">Modo Simple</p>
-                          <p className="text-xs text-muted-foreground">Interfaz más grande y fácil de usar</p>
+                          <p className="text-sm font-medium">{t('settings_simpleMode')}</p>
+                          <p className="text-xs text-muted-foreground">{t('settings_simpleModeDesc')}</p>
                         </div>
                       </div>
                       <button
@@ -621,29 +658,29 @@ export function AppShell() {
 
                   {/* Tema */}
                   <div>
-                    <p className="text-sm font-medium mb-3">Apariencia</p>
+                    <p className="text-sm font-medium mb-3">{t('settings_appearance')}</p>
                     <div className="flex items-center justify-between p-3 rounded-lg border border-border">
                       <div className="flex items-center gap-2">
                         {isDark ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-                        <span className="text-sm">{isDark ? 'Tema oscuro' : 'Tema claro'}</span>
+                        <span className="text-sm">{isDark ? t('settings_darkTheme') : t('settings_lightTheme')}</span>
                       </div>
                       <Button variant="outline" size="sm" onClick={toggleTheme}>
                         {isDark ? <Sun className="w-4 h-4 mr-1" /> : <Moon className="w-4 h-4 mr-1" />}
-                        {isDark ? 'Cambiar a claro' : 'Cambiar a oscuro'}
+                        {isDark ? t('settings_switchToLight') : t('settings_switchToDark')}
                       </Button>
                     </div>
                   </div>
 
                   {/* PIN de seguridad */}
                   <div>
-                    <p className="text-sm font-medium mb-3">PIN de seguridad</p>
+                    <p className="text-sm font-medium mb-3">{t('settings_pin')}</p>
                     <div className="rounded-lg border border-border p-3 space-y-3">
 
                       {/* Toggle activar/desactivar — inline styles para evitar override del tema */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Lock className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm">Activar PIN</span>
+                          <span className="text-sm">{t('settings_pinEnable')}</span>
                         </div>
                         <button
                           type="button"
@@ -686,12 +723,12 @@ export function AppShell() {
                             className="flex items-center gap-2 text-sm text-primary hover:underline"
                           >
                             <KeyRound className="w-4 h-4" />
-                            Cambiar PIN
+                            {t('settings_pinChange')}
                           </button>
 
                           {/* Tiempo de bloqueo */}
                           <div className="flex items-center justify-between pt-1">
-                            <span className="text-sm text-muted-foreground">Bloquear tras</span>
+                            <span className="text-sm text-muted-foreground">{t('settings_pinLockAfter')}</span>
                             <select
                               value={pinProfile.pin_timeout_minutes}
                               onChange={e => changeTimeout(Number(e.target.value))}
@@ -706,10 +743,10 @@ export function AppShell() {
                                 borderColor: isDark ? 'oklch(0.28 0.02 260)' : 'oklch(0.90 0.01 260)',
                               }}
                             >
-                              <option value={1}>1 minuto</option>
-                              <option value={5}>5 minutos</option>
-                              <option value={15}>15 minutos</option>
-                              <option value={30}>30 minutos</option>
+                              <option value={1}>{t('settings_pin1min')}</option>
+                              <option value={5}>{t('settings_pin5min')}</option>
+                              <option value={15}>{t('settings_pin15min')}</option>
+                              <option value={30}>{t('settings_pin30min')}</option>
                             </select>
                           </div>
                         </>
@@ -719,7 +756,7 @@ export function AppShell() {
                       {(pinStep === 'enter-new' || pinStep === 'confirm-new') && (
                         <div className="space-y-3 pt-1">
                           <p className="text-xs text-muted-foreground font-medium text-center">
-                            {pinStep === 'enter-new' ? 'Ingresa tu nuevo PIN (4 dígitos)' : 'Confirma tu nuevo PIN'}
+                            {pinStep === 'enter-new' ? t('settings_pinEnterNew') : t('settings_pinConfirm')}
                           </p>
 
                           {/* Dots */}
@@ -741,7 +778,7 @@ export function AppShell() {
                           </div>
 
                           {pinMismatch && (
-                            <p className="text-xs text-destructive text-center">Los PINs no coinciden, intenta de nuevo</p>
+                            <p className="text-xs text-destructive text-center">{t('settings_pinMismatch')}</p>
                           )}
 
                           {/* Keypad 3×4 */}
@@ -785,7 +822,7 @@ export function AppShell() {
                             onClick={() => { setPinStep('idle'); setPinNewDigits([]); setPinConfirmDigits([]) }}
                             className="text-xs text-muted-foreground hover:text-foreground w-full text-center pt-1"
                           >
-                            Cancelar
+                            {t('cancel')}
                           </button>
                         </div>
                       )}
@@ -793,7 +830,7 @@ export function AppShell() {
                       {pinStep === 'done' && (
                         <div className="flex items-center gap-2 text-sm text-primary py-1">
                           <CheckCircle2 className="w-4 h-4" />
-                          PIN configurado correctamente
+                          {t('settings_pinSaved')}
                         </div>
                       )}
                     </div>
@@ -803,14 +840,14 @@ export function AppShell() {
                   <div>
                     <p className="text-sm font-medium mb-3 flex items-center gap-2">
                       <Volume2 className="w-4 h-4" />
-                      Activación por volumen
+                      {t('settings_volume')}
                     </p>
                     <div className="rounded-lg border border-border p-3 space-y-4">
 
                       {/* Número de pulsaciones */}
                       <div>
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm text-muted-foreground">Pulsaciones requeridas</span>
+                          <span className="text-sm text-muted-foreground">{t('settings_volumePresses')}</span>
                           <span className="text-sm font-bold text-primary">{volumePresses}×</span>
                         </div>
                         <div className="flex gap-2">
@@ -845,7 +882,7 @@ export function AppShell() {
                       {/* Ventana de tiempo */}
                       <div>
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm text-muted-foreground">Ventana de tiempo</span>
+                          <span className="text-sm text-muted-foreground">{t('settings_volumeWindow')}</span>
                           <span className="text-sm font-bold text-primary">{volumeWindow / 1000}s</span>
                         </div>
                         <div className="flex gap-2">
@@ -878,7 +915,7 @@ export function AppShell() {
                       </div>
 
                       <p className="text-xs text-muted-foreground">
-                        Presiona volumen <strong>{volumePresses}×</strong> en menos de <strong>{volumeWindow / 1000}s</strong> para activar el SOS.
+                        {t('settings_volumeHint').replace('{n}', String(volumePresses)).replace('{s}', String(volumeWindow / 1000))}
                       </p>
                     </div>
                   </div>
@@ -891,7 +928,7 @@ export function AppShell() {
 
                   {/* Cuenta */}
                   <div>
-                    <p className="text-sm font-medium mb-3">Cuenta</p>
+                    <p className="text-sm font-medium mb-3">{t('settings_account')}</p>
                     <div className="p-3 rounded-lg border border-destructive/40 space-y-2">
                       {deleteError && (
                         <p className="text-xs text-destructive">{deleteError}</p>
@@ -900,29 +937,29 @@ export function AppShell() {
                         <AlertDialogTrigger asChild>
                           <Button variant="destructive" size="sm" className="w-full" disabled={deletingAccount}>
                             <Trash2 className="w-4 h-4 mr-2" />
-                            {deletingAccount ? 'Eliminando...' : 'Eliminar cuenta'}
+                            {deletingAccount ? t('settings_deleteAccountDeleting') : t('settings_deleteAccount')}
                           </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
-                            <AlertDialogTitle>¿Eliminar tu cuenta?</AlertDialogTitle>
+                            <AlertDialogTitle>{t('settings_deleteAccountTitle')}</AlertDialogTitle>
                             <AlertDialogDescription>
-                              Esta acción es permanente. Se borrarán todos tus datos y no podrás recuperarlos.
+                              {t('settings_deleteAccountDesc')}
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
                             <AlertDialogAction
                               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                               onClick={handleDeleteAccount}
                             >
-                              Sí, eliminar
+                              {t('settings_deleteAccountConfirm')}
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
                       <p className="text-xs text-muted-foreground">
-                        Si no inicias sesión en 30 días, tu cuenta será eliminada permanentemente.
+                        {t('settings_deleteAccountNote')}
                       </p>
                     </div>
                   </div>
@@ -935,7 +972,7 @@ export function AppShell() {
         {simpleMode && (
           <div className="bg-warning/20 border-b border-warning/30 px-4 py-1.5 flex items-center justify-center gap-2">
             <Puzzle className="w-3.5 h-3.5 text-warning" />
-            <span className="text-xs font-medium text-warning">Modo Simple activado</span>
+            <span className="text-xs font-medium text-warning">{t('settings_simpleModeActive')}</span>
           </div>
         )}
 

@@ -38,31 +38,29 @@ import {
   generateRecordingId,
   type RecordingMeta,
 } from '@/lib/recordings'
+import { useTranslation } from '@/lib/i18n'
 
-const incidentTypesForm: { value: IncidentType; label: string }[] = [
-  { value: 'theft-assault-violence', label: 'Robo/Asalto/Violencia' },
-  { value: 'harassment-suspicious', label: 'Acoso/Actividad Sospechosa' },
-  { value: 'accident', label: 'Accidente' },
-  { value: 'SOS', label: 'Alerta SOS' },
-]
+// Array construido dentro del componente para acceder a t() — ver DuringTab
 
-const incidentQuestions: Partial<Record<IncidentType, string[]>> = {
+// Questions are rendered dynamically via t() keys — see DuringTab component
+const incidentQuestionKeys: Partial<Record<IncidentType, string[]>> = {
   'theft-assault-violence': [
-    '¿Hubo uso de arma o amenaza con arma?',
-    '¿Hubo violencia física contra alguna persona?',
-    '¿La víctima resultó herida?',
+    'during_q_weapon',
+    'during_q_violence',
+    'during_q_injured',
   ],
   'harassment-suspicious': [
-    '¿La persona sospechosa está siguiendo o persiguiendo a alguien?',
-    '¿Hubo amenazas directas o comportamiento agresivo?',
-    '¿Existe riesgo inmediato para una persona vulnerable?',
+    'during_q_following',
+    'during_q_threats',
+    'during_q_vulnerable',
   ],
   'accident': [
-    '¿Hay personas lesionadas?',
-    '¿Hay riesgo de incendio, explosión o fuga de combustible?',
-    '¿El accidente bloquea completamente la circulación?',
+    'during_q_injuredAcc',
+    'during_q_fire',
+    'during_q_blocked',
   ],
 }
+
 
 function calculateSeverity(answers: string[]): IncidentSeverity {
   const score = answers.reduce((sum, a) => sum + (a === 'si' ? 1 : a === 'no_se' ? 0.5 : 0), 0)
@@ -161,6 +159,21 @@ function useStreetNames(locationHistory: { coordinates: { latitude: number; long
 const VIDEO_FREE_LIMIT_MS = 30_000
 
 export function DuringTab() {
+  const { t } = useTranslation()
+
+  const incidentTypesForm: { value: IncidentType; label: string }[] = [
+    { value: 'theft-assault-violence', label: t('during_incidentTheft') },
+    { value: 'harassment-suspicious', label: t('during_incidentHarassment') },
+    { value: 'accident', label: t('during_incidentAccident') },
+    { value: 'SOS', label: t('during_incidentSOS') },
+  ]
+
+  const incidentQuestions: Partial<Record<IncidentType, string[]>> = {
+    'theft-assault-violence': [t('during_q_weapon'), t('during_q_violence'), t('during_q_injured')],
+    'harassment-suspicious': [t('during_q_following'), t('during_q_threats'), t('during_q_vulnerable')],
+    'accident': [t('during_q_injuredAcc'), t('during_q_fire'), t('during_q_blocked')],
+  }
+
   const { isPremium } = usePremium()
   const { sosActive, setSosActive, contacts, locationHistory, voiceKeyword, currentLocation: coordinates, sosStream, simpleMode } = useAppStore()
   const [isOnline, setIsOnline] = useState(true)
@@ -318,7 +331,7 @@ export function DuringTab() {
             // Se actualiza el estado con la información de la última grabación, y se muestra un mensaje al usuario 
             // indicando que la grabación está lista y preguntando qué desea hacer con ella.
             setLastRecording(meta)
-            setStatusMsg('Grabación lista. ¿Qué deseas hacer?')
+            setStatusMsg(t('during_recReady'))
             setRecordingStatus('idle')
           }
 
@@ -334,7 +347,7 @@ export function DuringTab() {
         setStatusMsg('')
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Error desconocido'
-        setRecordingError(`Micrófono: ${msg}`)
+        setRecordingError(t('during_micError').replace('{msg}', msg))
       }
     }
   }, [isRecordingAudio, audioRecorder, audioStream, coordinates, sosStream])
@@ -348,7 +361,7 @@ export function DuringTab() {
     if (!lastRecording) return
     setRecordingStatus('saving')
     saveRecordingLocally(lastRecording)
-    setStatusMsg('✅ Descarga iniciada en tu dispositivo')
+    setStatusMsg(t('during_downloadStarted'))
     setRecordingStatus('done')
   }, [lastRecording])
 
@@ -361,12 +374,12 @@ export function DuringTab() {
     // si hubo un error, y se actualiza el estado para reflejar que la acción de envío ha sido completada.
     if (!lastRecording) return
     setRecordingStatus('sending')
-    setStatusMsg('Enviando a contactos...')
+    setStatusMsg(t('during_sendingContacts'))
     const result = await sendRecordingToContacts(lastRecording, contacts)
     if (result.success) {
-      setStatusMsg(`✅ Compartido vía ${result.method === 'share' ? 'sistema' : 'WhatsApp'}`)
+      setStatusMsg(t('during_sharedVia').replace('{method}', result.method === 'share' ? t('during_shareSystem') : 'WhatsApp'))
     } else {
-      setStatusMsg('⚠️ No se pudo enviar. Guarda localmente.')
+      setStatusMsg(t('during_errorSend'))
     }
     setRecordingStatus('done')
   }, [lastRecording, contacts])
@@ -375,12 +388,12 @@ export function DuringTab() {
   const handleSendViaChat = useCallback(async () => {
     if (!lastRecording) return
     setRecordingStatus('sending')
-    setStatusMsg('Subiendo y enviando por chat...')
+    setStatusMsg(t('during_uploadingChat'))
 
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      setStatusMsg('⚠️ Inicia sesión para usar el chat')
+      setStatusMsg(t('during_errorChat'))
       setRecordingStatus('idle')
       return
     }
@@ -391,7 +404,7 @@ export function DuringTab() {
       .from('recordings')
       .upload(path, lastRecording.blob, { contentType: lastRecording.mimeType, upsert: false })
     if (upErr) {
-      setStatusMsg('⚠️ Error al subir el archivo')
+      setStatusMsg(t('during_errorUpload'))
       setRecordingStatus('idle')
       return
     }
@@ -418,7 +431,7 @@ export function DuringTab() {
       }
     }
 
-    setStatusMsg(sent > 0 ? `✅ Enviado a ${sent} contacto(s) por chat` : '⚠️ Ningún contacto tiene cuenta SOSecure')
+    setStatusMsg(sent > 0 ? t('during_sentContacts').replace('{n}', String(sent)) : t('during_noSOSAccount'))
     setRecordingStatus('done')
   }, [lastRecording, contacts])
 
@@ -431,12 +444,12 @@ export function DuringTab() {
     // y se actualiza el estado para reflejar que la acción de subida ha sido completada.
     if (!lastRecording) return
     setRecordingStatus('uploading')
-    setStatusMsg('Subiendo a la nube...')
+    setStatusMsg(t('during_uploadingCloud'))
     const result = await uploadRecordingToDB(lastRecording)
     if (result.error) {
-      setStatusMsg(`⚠️ Error: ${result.error}`)
+      setStatusMsg(`⚠️ ${result.error}`)
     } else {
-      setStatusMsg('✅ Grabación guardada en la nube')
+      setStatusMsg(t('during_savedCloud'))
     }
     setRecordingStatus('done')
   }, [lastRecording])
@@ -519,7 +532,7 @@ export function DuringTab() {
               longitude: coordinates?.longitude,
             }
             setLastRecording(meta)
-            setStatusMsg('Video listo. ¿Qué deseas hacer?')
+            setStatusMsg(t('during_vidReady'))
             setRecordingStatus('idle')
           }
           videoChunksRef.current = []
@@ -549,7 +562,7 @@ export function DuringTab() {
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Error desconocido'
-        setRecordingError(`Cámara: ${msg}`)
+        setRecordingError(t('during_cameraError').replace('{msg}', msg))
       }
     }
   }, [isRecordingVideo, videoStream, coordinates, sosStream])
@@ -570,10 +583,10 @@ export function DuringTab() {
         <CardContent className="flex items-center justify-center gap-3 py-2 px-3">
           <Radio className={`w-5 h-5 shrink-0 ${sosActive ? 'text-destructive animate-pulse' : 'text-primary'}`} />
           <div className="text-center">
-            <p className="font-semibold text-base">{sosActive ? '🚨 SOS ACTIVO' : 'Modo DURANTE'}</p>
+            <p className="font-semibold text-base">{sosActive ? t('during_sosActive') : t('during_title')}</p>
             <div className="flex items-center justify-center gap-1.5">
               {isOnline ? <Wifi className="w-3 h-3 text-safe" /> : <WifiOff className="w-3 h-3 text-destructive" />}
-              <p className="text-sm text-muted-foreground">{isOnline ? 'En línea' : 'Sin internet'}</p>
+              <p className="text-sm text-muted-foreground">{isOnline ? t('during_online') : t('during_offline')}</p>
             </div>
           </div>
         </CardContent>
@@ -584,28 +597,33 @@ export function DuringTab() {
         <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <CirclePlus className="w-5 h-5 text-warning" />
-            Reportar un Incidente
+            {t('during_report')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 pt-3">
           <FieldGroup>
             <Field>
-              <FieldLabel>Tipo de Incidente</FieldLabel>
+              <FieldLabel>{t('during_incidentType')}</FieldLabel>
               <Select value={incidentType} onValueChange={(v) => {
                 setIncidentType(v as IncidentType)
                 setQuestionAnswers(['', '', ''])
               }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {incidentTypesForm.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  {incidentTypesForm.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.value === 'theft-assault-violence' ? t('during_incidentTheft')
+                        : type.value === 'harassment-suspicious' ? t('during_incidentHarassment')
+                        : type.value === 'accident' ? t('during_incidentAccident')
+                        : t('during_incidentSOS')}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </Field>
-            {!simpleMode && (incidentQuestions[incidentType] || []).map((question, idx) => (
+            {!simpleMode && (incidentQuestionKeys[incidentType] || []).map((questionKey, idx) => (
               <Field key={idx}>
-                <FieldLabel>{question}</FieldLabel>
+                <FieldLabel>{t(questionKey as Parameters<typeof t>[0])}</FieldLabel>
                 <div className="flex gap-2">
                   {(['si', 'no', 'no_se'] as const).map((opt) => (
                     <button
@@ -622,16 +640,16 @@ export function DuringTab() {
                           : 'bg-muted text-muted-foreground hover:bg-muted/80'
                       }`}
                     >
-                      {opt === 'si' ? 'Sí' : opt === 'no' ? 'No' : 'No sé'}
+                      {opt === 'si' ? t('yes') : opt === 'no' ? t('no') : t('during_dontKnow')}
                     </button>
                   ))}
                 </div>
               </Field>
             ))}
             <Field>
-              <FieldLabel>Detalles (Opcional)</FieldLabel>
+              <FieldLabel>{t('during_details')}</FieldLabel>
               <Textarea
-                placeholder="Detalles adicionales..."
+                placeholder={t('during_detailsPlaceholder')}
                 rows={2}
                 value={incidentDescription}
                 onChange={(e) => setIncidentDescription(e.target.value)}
@@ -644,7 +662,7 @@ export function DuringTab() {
           {reportStatus === 'done' ? (
             <div className="flex items-center justify-center gap-2 p-3 bg-primary/10 rounded-lg">
               <CheckCircle className="w-4 h-4 text-primary" />
-              <p className="text-sm text-primary font-medium">¡Incidente reportado con éxito!</p>
+              <p className="text-sm text-primary font-medium">{t('during_reportSuccess')}</p>
             </div>
           ) : (
             <Button
@@ -652,11 +670,11 @@ export function DuringTab() {
               onClick={reportIncident}
               disabled={reportStatus === 'sending' || !coordinates || (!simpleMode && (incidentQuestions[incidentType]?.length ?? 0) > 0 && questionAnswers.some(a => a === ''))}
             >
-              {reportStatus === 'sending' ? 'Enviando...' : 'Enviar Reporte'}
+              {reportStatus === 'sending' ? t('during_sending') : t('during_sendReport')}
             </Button>
           )}
           {!coordinates && (
-            <p className="text-xs text-muted-foreground text-center">Activa la ubicación para poder reportar</p>
+            <p className="text-xs text-muted-foreground text-center">{t('during_locationNeeded')}</p>
           )}
         </CardContent>
       </Card>
@@ -666,47 +684,47 @@ export function DuringTab() {
         <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <AlertTriangle className="w-5 h-5 text-warning" />
-            Activación Alternativa de SOS
+            {t('during_altActivation')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Métodos discretos para activar SOS sin levantar sospechas:
+            {t('during_altActivationDesc')}
           </p>
           <div className="space-y-2">
             <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
               <span className="text-2xl">👆</span>
               <div>
-                <p className="text-sm font-medium">Secuencia de taps</p>
-                <p className="text-xs text-muted-foreground">Toca el botón de abajo 3 veces rápido</p>
+                <p className="text-sm font-medium">{t('during_tapSeq')}</p>
+                <p className="text-xs text-muted-foreground">{t('during_tapSeqDesc')}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
               <span className="text-2xl">🎙️</span>
               <div className="flex-1">
-                <p className="text-sm font-medium">Activación por voz</p>
+                <p className="text-sm font-medium">{t('during_voiceActivation')}</p>
                 {voiceKeyword ? (
                   <p className="text-xs text-muted-foreground">
-                    Di <span className="font-semibold text-foreground">&quot;{voiceKeyword}&quot;</span> para activar SOS
+                    {t('during_voiceSayKeyword').replace('{kw}', voiceKeyword)}
                   </p>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    Sin palabra clave — configúrala en la pestaña <span className="font-medium">Antes</span>
+                    {t('during_voiceNoKeyword')}
                   </p>
                 )}
               </div>
               {voiceKeyword && !sosActive && (
                 <span className="flex items-center gap-1 text-[10px] text-green-600 font-medium">
                   <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                  Escuchando
+                  {t('during_listening')}
                 </span>
               )}
             </div>
             <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
               <span className="text-2xl">⏱️</span>
               <div>
-                <p className="text-sm font-medium">Temporizador expirado</p>
-                <p className="text-xs text-muted-foreground">El timer de seguridad activa SOS automáticamente</p>
+                <p className="text-sm font-medium">{t('during_timerExpired')}</p>
+                <p className="text-xs text-muted-foreground">{t('during_timerExpiredDesc')}</p>
               </div>
             </div>
           </div>
@@ -717,7 +735,7 @@ export function DuringTab() {
             className="w-full py-3 px-4 rounded-lg border-2 border-dashed border-warning bg-warning/10 text-warning font-medium text-sm hover:bg-warning/20 active:scale-95 transition-all flex items-center justify-center gap-2"
           >
             <span className="text-lg">👆</span>
-            Toque secreto
+            {t('during_secretTap')}
             <span className="ml-auto bg-warning text-warning-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
               {Math.max(0, 3 - tapCountDisplay)}
             </span>
@@ -730,7 +748,7 @@ export function DuringTab() {
         <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <Video className="w-5 h-5 text-primary" />
-            Grabación de Emergencia
+            {t('during_recording')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -750,7 +768,7 @@ export function DuringTab() {
             />
             {isRecordingVideo && (
               <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 bg-destructive rounded text-xs text-white font-bold">
-                <div className="w-2 h-2 rounded-full bg-white animate-pulse" /> REC
+                <div className="w-2 h-2 rounded-full bg-white animate-pulse" /> {t('during_recStatus')}
               </div>
             )}
             {videoSecondsLeft !== null && (
@@ -772,28 +790,28 @@ export function DuringTab() {
               variant={isRecordingAudio ? 'destructive' : 'outline'}
               className="flex-1"
             >
-              {isRecordingAudio ? <><MicOff className="w-4 h-4 mr-2" />Detener Audio</> : <><Mic className="w-4 h-4 mr-2" />Grabar Audio</>}
+              {isRecordingAudio ? <><MicOff className="w-4 h-4 mr-2" />{t('during_stopAudio')}</> : <><Mic className="w-4 h-4 mr-2" />{t('during_audioRec')}</>}
             </Button>
             <Button
               onClick={toggleVideo}
               variant={isRecordingVideo ? 'destructive' : 'outline'}
               className="flex-1"
             >
-              {isRecordingVideo ? <><VideoOff className="w-4 h-4 mr-2" />Detener Video</> : <><Video className="w-4 h-4 mr-2" />Grabar Video</>}
+              {isRecordingVideo ? <><VideoOff className="w-4 h-4 mr-2" />{t('during_stopVideo')}</> : <><Video className="w-4 h-4 mr-2" />{t('during_videoRec')}</>}
             </Button>
           </div>
 
              {isRecordingAudio && (
             <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-lg">
               <div className="w-3 h-3 rounded-full bg-destructive animate-pulse" />
-              <p className="text-sm text-destructive font-medium">Grabando audio... Toca "Detener" cuando termines</p>
+              <p className="text-sm text-destructive font-medium">{t('during_recordingAudio')}</p>
             </div>
           )}
 
           {/* Panel de acciones post-grabación */}
           {lastRecording && (
             <div className="space-y-3 pt-2 border-t border-border">
-              <p className="text-sm font-medium text-center">{statusMsg || '¿Qué deseas hacer con la grabación?'}</p>
+              <p className="text-sm font-medium text-center">{statusMsg || t('during_recOptions')}</p>
 
               {recordingStatus !== 'done' && (
                 <div className="flex flex-col gap-2">
@@ -805,7 +823,7 @@ export function DuringTab() {
                       disabled={recordingStatus !== 'idle'}
                     >
                       <Save className="w-4 h-4 mr-2" />
-                      Guardar en dispositivo
+                      {t('during_saveDevice')}
                     </Button>
                   )}
                   <Button
@@ -815,8 +833,8 @@ export function DuringTab() {
                     disabled={recordingStatus !== 'idle' || contacts.length === 0}
                   >
                     <Send className="w-4 h-4 mr-2" />
-                    Enviar a contactos de emergencia
-                    {contacts.length === 0 && <span className="ml-1 text-xs text-muted-foreground">(sin contactos)</span>}
+                    {t('during_sendContacts')}
+                    {contacts.length === 0 && <span className="ml-1 text-xs text-muted-foreground">{t('during_noContacts')}</span>}
                   </Button>
                   {!simpleMode && (
                     <>
@@ -827,7 +845,7 @@ export function DuringTab() {
                         disabled={recordingStatus !== 'idle'}
                       >
                         <MessageCircle className="w-4 h-4 mr-2" />
-                        Enviar por Chat de Emergencia
+                        {t('during_sendChat')}
                       </Button>
                       <Button
                         variant="outline"
@@ -836,7 +854,7 @@ export function DuringTab() {
                         disabled={recordingStatus !== 'idle'}
                       >
                         <Upload className="w-4 h-4 mr-2" />
-                        Guardar en la nube (Supabase)
+                        {t('during_saveCloud')}
                       </Button>
                     </>
                   )}
@@ -857,7 +875,7 @@ export function DuringTab() {
                   className="w-full text-muted-foreground"
                   onClick={() => { setLastRecording(null); setRecordingStatus('idle'); setStatusMsg('') }}
                 >
-                  Limpiar
+                  {t('during_clear')}
                 </Button>
               )}
             </div>
@@ -865,7 +883,7 @@ export function DuringTab() {
 
           {!lastRecording && (
             <p className="text-xs text-muted-foreground text-center">
-              Al detener la grabación podrás guardarla, enviarla o subirla a la nube
+              {t('during_recHint')}
             </p>
           )}
         </CardContent>
@@ -876,24 +894,24 @@ export function DuringTab() {
         <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <WifiOff className="w-5 h-5 text-primary" />
-            Historial de Ubicación (últimos 10 min)
+            {t('during_locationHistory')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {lastLocations.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Activa la ubicación para registrar el historial</p>
+            <p className="text-sm text-muted-foreground">{t('during_locationNeededHist')}</p>
           ) : (
             <div className="space-y-2">
               {lastLocations.reverse().map((loc, i) => (
                 <div key={i} className="flex items-center gap-2 p-2 bg-muted/50 rounded text-xs">
-                  <Badge variant="outline" className="text-xs">{i === 0 ? 'Ahora' : `Hace ${Math.round((Date.now() - loc.timestamp) / 60000)} min`}</Badge>
+                  <Badge variant="outline" className="text-xs">{i === 0 ? t('now') : t('minutes_ago').replace('{n}', String(Math.round((Date.now() - loc.timestamp) / 60000)))}</Badge>
                   <span className="text-muted-foreground">{streetNames[`${loc.coordinates.latitude.toFixed(5)},${loc.coordinates.longitude.toFixed(5)}`] ?? '📍 Cargando...'}</span>
                 </div>
               ))}
             </div>
           )}
           <p className="text-xs text-muted-foreground mt-2">
-            Este historial se comparte con contactos de confianza en caso de secuestro o robo
+            {t('during_locationHistoryNote')}
           </p>
         </CardContent>
       </Card>}

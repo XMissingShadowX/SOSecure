@@ -19,6 +19,7 @@ import { useAppStore } from '@/lib/store'
 import { createClient } from '@/lib/supabase/client'
 import { createLiveBroadcaster, type LiveBroadcaster } from '@/lib/live-stream'
 import { sendAlarmNotification, playAlarmSound } from '@/lib/notifications'
+import { useTranslation } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -37,6 +38,7 @@ const SECRET_TAP_WINDOW = 3000
 
 export function SOSButton() {
   const { sosActive, setSosActive, setSosAlert, setSosStream, contacts, setActiveTab, currentLocation: coordinates, volumePresses, volumeWindow, simpleMode } = useAppStore()
+  const { t } = useTranslation()
   const [holdProgress, setHoldProgress] = useState(0)
   const [isHolding, setIsHolding] = useState(false)
   const [showCancelDialog, setShowCancelDialog] = useState(false)
@@ -115,7 +117,7 @@ export function SOSButton() {
     setMinimized(false)
 
     playAlarmSound()
-    sendAlarmNotification('🚨 SOSecure SOS Activado', 'Alerta de emergencia enviada a tus contactos', true)
+    sendAlarmNotification(t('sos_alertActivated'), t('sos_alertSent'), true)
 
     let activeStream: MediaStream | null = null
     try {
@@ -458,7 +460,7 @@ export function SOSButton() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-destructive">
                     <div className="w-3 h-3 rounded-full bg-destructive animate-pulse" />
-                    <span className="font-semibold">SOS ACTIVO</span>
+                    <span className="font-semibold">{t('sos_active')}</span>
                   </div>
                   <button
                     onClick={() => setMinimized(true)}
@@ -491,7 +493,7 @@ export function SOSButton() {
                   {recordingStream && !recordingStream.getVideoTracks().length && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-card">
                       <Mic className="w-10 h-10 text-destructive animate-pulse" />
-                      <p className="text-xs text-muted-foreground">Solo audio activo</p>
+                      <p className="text-xs text-muted-foreground">{t('sos_audioOnly')}</p>
                     </div>
                   )}
                   {isRecording && (
@@ -504,7 +506,7 @@ export function SOSButton() {
 
                 {coordinates && (
                   <div className="p-3 bg-card rounded-lg border border-border">
-                    <p className="text-xs text-muted-foreground mb-0.5">Tu ubicación</p>
+                    <p className="text-xs text-muted-foreground mb-0.5">{t('sos_location')}</p>
                     <p className="font-mono text-sm text-foreground">
                       {coordinates.latitude.toFixed(6)}, {coordinates.longitude.toFixed(6)}
                     </p>
@@ -515,7 +517,7 @@ export function SOSButton() {
                   <div className="p-3 bg-card rounded-lg border border-border">
                     <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
                       <Bell className="w-3.5 h-3.5" />
-                      Contactos notificados
+                      {t('sos_contactsNotified')}
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       {contactsNotified.map((name) => (
@@ -529,7 +531,7 @@ export function SOSButton() {
                   onClick={() => { setMinimized(true); setActiveTab('before') }}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-primary font-medium text-sm hover:bg-primary/90 transition-colors !text-black dark:!text-white"
                 >
-                  Ver en Mapa
+                  {t('sos_viewMap')}
                 </button>
 
                 <button
@@ -540,12 +542,12 @@ export function SOSButton() {
                   {isSaving ? (
                     <>
                       <span className="w-4 h-4 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
-                      Guardando...
+                      {t('sos_saving')}
                     </>
                   ) : (
                     <>
                       <Download className="w-4 h-4" />
-                      {savedToCloud ? '✅ Guardado — cerrar alerta' : 'Guardar y cerrar alerta'}
+                      {savedToCloud ? t('sos_saveClose') : t('sos_save')}
                     </>
                   )}
                 </button>
@@ -563,7 +565,7 @@ export function SOSButton() {
                     className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border bg-card text-foreground text-sm hover:bg-muted transition-colors"
                   >
                     <StopCircle className="w-4 h-4" />
-                    Detener grabación
+                    {t('sos_stopRec')}
                   </button>
                 ) : !isRecording && (
                   <button
@@ -609,7 +611,7 @@ export function SOSButton() {
                     className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border bg-card text-foreground text-sm hover:bg-muted transition-colors"
                   >
                     <Video className="w-4 h-4" />
-                    Reanudar grabación
+                    {t('sos_resumeRec')}
                   </button>
                 )}
 
@@ -618,7 +620,7 @@ export function SOSButton() {
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-destructive text-destructive font-medium text-sm hover:bg-destructive hover:text-destructive-foreground transition-colors"
                 >
                   <X className="w-4 h-4" />
-                  Falsa alarma
+                  {t('sos_falseAlarm')}
                 </button>
 
               </div>
@@ -633,22 +635,22 @@ export function SOSButton() {
           >
             <div className="w-2.5 h-2.5 rounded-full bg-destructive-foreground animate-ping" />
             <ChevronUp className="w-4 h-4" />
-            <span className="text-xs font-bold tracking-wide">SOS ACTIVO</span>
+            <span className="text-xs font-bold tracking-wide">{t('sos_active')}</span>
           </button>
         )}
 
         <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
           <AlertDialogContent className="z-[300]">
             <AlertDialogHeader>
-              <AlertDialogTitle>¿Marcar como falsa alarma?</AlertDialogTitle>
+              <AlertDialogTitle>{t('sos_falseAlarmTitle')}</AlertDialogTitle>
               <AlertDialogDescription>
-                Esto eliminará la alerta del sistema. Tus contactos ya han sido notificados.
+                {t('sos_falseAlarmDesc')}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Mantener activo</AlertDialogCancel>
+              <AlertDialogCancel>{t('sos_keepActive')}</AlertDialogCancel>
               <AlertDialogAction onClick={cancelSOS} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                Sí, es falsa alarma
+                {t('sos_confirmFalse')}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -682,7 +684,7 @@ export function SOSButton() {
           isHolding && "sos-pulse"
         )}
         style={simpleMode ? { width: '7rem', height: '7rem', minWidth: '7rem', minHeight: '7rem' } : { width: '5rem', height: '5rem', minWidth: '5rem', minHeight: '5rem' }}
-        aria-label="Mantén presionado 2 segundos para activar SOS"
+        aria-label={t('sos_holdToActivate')}
       >
         {isHolding && (
           <svg className="absolute inset-0 w-full h-full -rotate-90">
@@ -705,7 +707,7 @@ export function SOSButton() {
         className="whitespace-nowrap text-sm font-medium px-3 py-1 rounded-full -mt-1"
         style={{ backgroundColor: 'rgba(220, 38, 38, 0.2)', color: '#991b1b' }}
       >
-        {isHolding ? 'Mantén presionado...' : 'Presiona'}
+        {isHolding ? t('sos_holding') : t('sos_press')}
       </p>
     </div>
   )

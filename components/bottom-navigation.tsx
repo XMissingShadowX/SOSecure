@@ -12,18 +12,20 @@
 import { Home, Brain, TriangleAlert, Radio, CheckCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/lib/store'
+import { useTranslation } from '@/lib/i18n'
 import type { TabId } from '@/lib/types'
-
-const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
-  { id: 'home', label: 'Inicio', icon: Home },
-  { id: 'before', label: 'Antes', icon: TriangleAlert },
-  { id: 'during', label: 'Durante', icon: Radio },
-  { id: 'after', label: 'Después', icon: CheckCircle },
-  { id: 'medic', label: 'Apoyo', icon: Brain },
-]
 
 export function BottomNavigation() {
   const { activeTab, setActiveTab, simpleMode } = useAppStore()
+  const { t } = useTranslation()
+
+  const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
+    { id: 'home', label: t('nav_home'), icon: Home },
+    { id: 'before', label: t('nav_before'), icon: TriangleAlert },
+    { id: 'during', label: t('nav_during'), icon: Radio },
+    { id: 'after', label: t('nav_after'), icon: CheckCircle },
+    { id: 'medic', label: t('nav_support'), icon: Brain },
+  ]
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-sm border-t border-border safe-area-bottom">

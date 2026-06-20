@@ -24,6 +24,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { usePremium } from '@/hooks/use-premium'
 import { UpgradeBanner } from '@/components/upgrade-banner'
+import { useTranslation } from '@/lib/i18n'
 import type { Coordinates, SafetyScore } from '@/lib/types'
 import type { RouteInfo } from '@/components/route-map'
 
@@ -38,7 +39,7 @@ const RouteMap = dynamic(
       <div className="h-full w-full flex items-center justify-center bg-muted rounded-lg">
         <div className="flex items-center gap-2 text-muted-foreground">
           <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          <span>Cargando mapa...</span>
+          <span>Loading map...</span>
         </div>
       </div>
     )
@@ -88,6 +89,7 @@ export function calculateSafetyScore(
 // funciones para buscar destinos utilizando la API de Photon, seleccionar rutas, y mostrar información relevante sobre la 
 // seguridad de cada ruta. También muestra consejos de seguridad para los usuarios al planear sus rutas.
 export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
+  const { t } = useTranslation()
   const { isPremium } = usePremium()
   const {
     nearbyIncidents, routeOrigin, routeDestination, setRouteOrigin, setRouteDestination, frequentPlaces,
@@ -273,20 +275,20 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
           <CardContent className="p-4 space-y-3">
             <h4 className="font-medium flex items-center gap-2">
               <Shield className="w-5 h-5 text-primary" />
-              Consejos de Seguridad en Ruta
+              {t('routes_tips_title')}
             </h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li className="flex items-start gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-safe mt-2 flex-shrink-0" />
-                Elige rutas con mayor puntuación de seguridad cuando sea posible
+                {t('routes_tip1')}
               </li>
               <li className="flex items-start gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-warning mt-2 flex-shrink-0" />
-                Evita zonas con incidentes recientes de alta severidad
+                {t('routes_tip2')}
               </li>
               <li className="flex items-start gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2 flex-shrink-0" />
-                Las calles principales bien iluminadas son más seguras de noche
+                {t('routes_tip3')}
               </li>
             </ul>
           </CardContent>
@@ -297,7 +299,7 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
         <CardHeader className="pb-0">
           <CardTitle className="flex items-center gap-2 text-base">
             <Navigation className="w-5 h-5 text-primary" />
-            Planear Ruta Segura
+            {t('routes_planRoute')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -307,7 +309,7 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
             <div className="flex-1 relative min-w-0">
               {isEditingOrigin ? (
                 <>
-                  <p className="text-xs text-muted-foreground mb-1">Punto de inicio</p>
+                  <p className="text-xs text-muted-foreground mb-1">{t('routes_startPoint')}</p>
                   <input
                     autoFocus
                     type="text"
@@ -334,9 +336,9 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
                 </>
               ) : (
                 <>
-                  <p className="text-xs text-muted-foreground">Desde</p>
+                  <p className="text-xs text-muted-foreground">{t('routes_from')}</p>
                   <p className="text-sm font-medium truncate">
-                    {customOriginLabel ?? (coordinates ? 'Ubicación actual' : 'Esperando ubicación...')}
+                    {customOriginLabel ?? (coordinates ? t('routes_currentLocation') : t('routes_waitingLocation'))}
                   </p>
                 </>
               )}
@@ -347,14 +349,14 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
                   onClick={() => setIsEditingOrigin(true)}
                   className="text-xs text-primary hover:underline"
                 >
-                  Cambiar
+                  {t('routes_change')}
                 </button>
               ) : (
                 <button
                   onClick={resetOriginToGps}
                   className="text-xs text-muted-foreground hover:text-foreground whitespace-nowrap"
                 >
-                  Mi ubicación
+                  {t('routes_myLocation')}
                 </button>
               )}
             </div>
@@ -364,7 +366,7 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
             <MapPin className="w-4 h-4 text-destructive flex-shrink-0" />
             <div className="flex-1 relative">
               <Input
-                placeholder="¿A dónde vas?"
+                placeholder={t('routes_where')}
                 value={destinationInput}
                 onChange={async (e) => {
                   const value = e.target.value
@@ -392,7 +394,7 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
               />
               {suggestions.length > 0 && (
                 <div className="absolute top-6 left-0 right-0 bg-card border border-border rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
-                  {searching && <p className="text-xs text-muted-foreground p-2">Buscando...</p>}
+                  {searching && <p className="text-xs text-muted-foreground p-2">{t('routes_searching')}</p>}
                   {suggestions.map((s, i) => (
                     <button
                       key={i}
@@ -425,14 +427,14 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
             </div>
           ) : (
             <p className="text-xs text-muted-foreground">
-              Agrega lugares frecuentes en Inicio para acceso rápido aquí
+              {t('routes_frequentHint')}
             </p>
           )}
 
           {searchLimitReached && (
             <UpgradeBanner
-              title="Límite de búsquedas alcanzado"
-              description="El plan gratuito permite 1 búsqueda de ruta por día. Actualiza para búsquedas ilimitadas."
+              title={t('routes_limitReached')}
+              description={t('routes_limitDesc')}
               compact
             />
           )}
@@ -441,11 +443,11 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
             {showRoutes || searchLimitReached ? (
               <Button variant="outline" onClick={resetRoute} className="flex-1">
                 <RotateCcw className="w-4 h-4 mr-2" />
-                Reiniciar
+                {t('routes_reset')}
               </Button>
             ) : (
               <Button onClick={handleSearch} className="flex-1" disabled={!destinationInput || !routeOrigin}>
-                Planear Ruta Segura
+                {t('routes_planRoute')}
               </Button>
             )}
           </div>
@@ -465,9 +467,9 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
               setRouteInfo(info)
 
               const names: Record<string, string> = {
-                safest: 'Ruta más Segura',
-                fastest: 'Ruta más Rápida',
-                alternate: 'Ruta Alternativa',
+                safest: t('routes_safest'),
+                fastest: t('routes_fastest'),
+                alternate: t('routes_alternative'),
               }
 
               const safetyScore = routeDestination
@@ -493,7 +495,7 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
 
       {showRoutes && routeOptions.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-muted-foreground">Opciones de Ruta</h3>
+          <h3 className="text-sm font-semibold text-muted-foreground">{t('routes_options')}</h3>
           {routeOptions.filter((_, i) => !simpleMode || i === 0).map((route, i) => {
             const isLocked = !isPremium && i > 0
             return (
@@ -533,7 +535,7 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
                             <div className={cn("text-2xl font-bold", getSafetyColor(route.safetyScore.risk_level))}>
                               {route.safetyScore.score}
                             </div>
-                            <p className="text-xs text-muted-foreground">Puntuación de Seguridad</p>
+                            <p className="text-xs text-muted-foreground">{t('routes_safetyScore')}</p>
                           </>
                         )}
                       </div>
@@ -541,13 +543,13 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
                     {route.incidentsOnRoute > 0 && !simpleMode && (
                       <div className="flex items-center gap-2 text-sm text-warning">
                         <AlertTriangle className="w-4 h-4" />
-                        <span>{route.incidentsOnRoute} incidente{route.incidentsOnRoute > 1 ? 's' : ''} cerca de la ruta</span>
+                        <span>{t('routes_incidents').replace('{n}', String(route.incidentsOnRoute)).replace('{s}', route.incidentsOnRoute > 1 ? 's' : '')}</span>
                       </div>
                     )}
                     {route.safetyScore.risk_level === 'safe' && route.incidentsOnRoute === 0 && (
                       <div className="flex items-center gap-2 text-sm text-safe">
                         <Shield className="w-4 h-4" />
-                        <span>Sin incidentes reportados en esta ruta</span>
+                        <span>{t('routes_noIncidents')}</span>
                       </div>
                     )}
                   </CardContent>

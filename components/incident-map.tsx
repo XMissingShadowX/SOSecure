@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet.heat'
 import { useAppStore } from '@/lib/store'
+import { useTranslation } from '@/lib/i18n'
 import type { Incident, Coordinates } from '@/lib/types'
 import 'leaflet/dist/leaflet.css'
 
@@ -160,6 +161,7 @@ interface IncidentMapProps {
 
 export function IncidentMap({ incidents, userLocation, onMapClick, showHeatZones = true, currentUserId, isAdmin = false, onEdit, onDelete, flyToUserTrigger = 0 }: IncidentMapProps) {
   const { mapCenter, mapZoom } = useAppStore()
+  const { t } = useTranslation()
 
   const [isDark, setIsDark] = useState(() => {
     if (typeof window === 'undefined') return true
@@ -190,7 +192,7 @@ export function IncidentMap({ incidents, userLocation, onMapClick, showHeatZones
         className="absolute top-3 left-3 z-[1000] flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium shadow-md bg-background/90 border border-border hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
       >
         {viewMode === 'markers' ? '📍' : '🔥'}
-        <span>{viewMode === 'markers' ? 'Marcadores' : 'Calor'}</span>
+        <span>{viewMode === 'markers' ? t('map_markers') : t('map_heat')}</span>
       </button>
 
       <MapContainer
@@ -225,7 +227,7 @@ export function IncidentMap({ incidents, userLocation, onMapClick, showHeatZones
           <Marker position={[userLocation.latitude, userLocation.longitude]} icon={userIcon}>
             <Popup>
               <div className="text-center p-1">
-                <strong>Estás aquí</strong>
+                <strong>{t('map_youAreHere')}</strong>
               </div>
             </Popup>
           </Marker>

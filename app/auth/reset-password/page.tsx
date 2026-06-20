@@ -8,8 +8,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { FieldGroup, Field, FieldLabel } from '@/components/ui/field'
 import { InputGroup, InputGroupInput, InputGroupAddon } from '@/components/ui/input-group'
+import { useTranslation } from '@/lib/i18n'
 
 function ResetPasswordContent() {
+  const { t } = useTranslation()
+  const [mounted, setMounted] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const [password, setPassword] = useState('')
@@ -20,33 +23,36 @@ function ResetPasswordContent() {
   const [done, setDone] = useState(false)
   const [sessionReady, setSessionReady] = useState(false)
 
-  // Supabase envía ?code=... cuando se usa PKCE (flujo por defecto en v2).
-  // Intercambiamos el code por una sesión de tipo "recovery" antes de permitir el cambio.
+  useEffect(() => { setMounted(true) }, [])
+
   useEffect(() => {
+    if (!mounted) return
     const code = searchParams.get('code')
     if (!code) {
-      setError('Enlace inválido o expirado. Solicita uno nuevo.')
+      setError(t('auth_resetInvalidLink'))
       return
     }
     const supabase = createClient()
     supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
       if (error) {
-        setError('El enlace ha expirado o ya fue usado. Solicita uno nuevo.')
+        setError(t('auth_resetExpired'))
       } else {
         setSessionReady(true)
       }
     })
-  }, [searchParams])
+  }, [mounted, searchParams, t])
+
+  if (!mounted) return null
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres.')
+      setError(t('auth_resetShort'))
       return
     }
     if (password !== confirm) {
-      setError('Las contraseñas no coinciden.')
+      setError(t('auth_resetNoMatch'))
       return
     }
     setLoading(true)
@@ -69,20 +75,20 @@ function ResetPasswordContent() {
             <Shield className="w-10 h-10 text-primary" />
           </div>
           <h1 className="text-2xl font-bold">SOSecure</h1>
-          <p className="text-sm text-muted-foreground">Tu acompañante de seguridad personal</p>
+          <p className="text-sm text-muted-foreground">{t('app_tagline')}</p>
         </div>
 
         <Card>
           <CardHeader className="space-y-1">
-            <CardTitle className="text-xl">Nueva contraseña</CardTitle>
-            <CardDescription>Elige una contraseña segura para tu cuenta.</CardDescription>
+            <CardTitle className="text-xl">{t('auth_resetTitle')}</CardTitle>
+            <CardDescription>{t('auth_resetDesc')}</CardDescription>
           </CardHeader>
           <CardContent>
             {done ? (
               <div className="flex flex-col items-center gap-3 py-4 text-center">
                 <CheckCircle className="w-10 h-10 text-safe" />
-                <p className="font-medium">¡Contraseña actualizada!</p>
-                <p className="text-sm text-muted-foreground">Redirigiendo al inicio de sesión...</p>
+                <p className="font-medium">{t('auth_resetDone')}</p>
+                <p className="text-sm text-muted-foreground">{t('auth_resetRedirecting')}</p>
               </div>
             ) : (
               <form onSubmit={handleSubmit}>
@@ -94,12 +100,12 @@ function ResetPasswordContent() {
                     </div>
                   )}
                   <Field>
-                    <FieldLabel>Nueva contraseña</FieldLabel>
+                    <FieldLabel>{t('auth_resetNewPass')}</FieldLabel>
                     <InputGroup>
                       <InputGroupAddon><Lock className="w-4 h-4" /></InputGroupAddon>
                       <InputGroupInput
                         type={showPassword ? 'text' : 'password'}
-                        placeholder="Mínimo 6 caracteres"
+                        placeholder={t('auth_resetMinChars')}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
@@ -111,12 +117,12 @@ function ResetPasswordContent() {
                     </InputGroup>
                   </Field>
                   <Field>
-                    <FieldLabel>Confirmar contraseña</FieldLabel>
+                    <FieldLabel>{t('auth_resetConfirm')}</FieldLabel>
                     <InputGroup>
                       <InputGroupAddon><Lock className="w-4 h-4" /></InputGroupAddon>
                       <InputGroupInput
                         type={showPassword ? 'text' : 'password'}
-                        placeholder="Repite la contraseña"
+                        placeholder={t('auth_resetRepeat')}
                         value={confirm}
                         onChange={(e) => setConfirm(e.target.value)}
                         required
@@ -125,7 +131,7 @@ function ResetPasswordContent() {
                     </InputGroup>
                   </Field>
                   <Button type="submit" className="w-full" disabled={loading || !sessionReady}>
-                    {!sessionReady && !error ? 'Verificando enlace...' : loading ? 'Guardando...' : 'Guardar nueva contraseña'}
+                    {!sessionReady && !error ? t('auth_resetVerifying') : loading ? t('auth_resetSaving') : t('auth_resetSave')}
                   </Button>
                 </FieldGroup>
               </form>
@@ -139,7 +145,7 @@ function ResetPasswordContent() {
 
 export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center"><p className="text-muted-foreground">Cargando...</p></div>}>
+    <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center"><p className="text-muted-foreground">Loading...</p></div>}>
       <ResetPasswordContent />
     </Suspense>
   )
