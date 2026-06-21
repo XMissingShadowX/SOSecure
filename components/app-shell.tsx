@@ -46,6 +46,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -584,33 +591,16 @@ export function AppShell() {
                       <Languages className="w-4 h-4" />
                       {t('settings_language')}
                     </p>
-                    <div className="grid grid-cols-1 gap-1.5">
-                      {(Object.entries(LANG_LABELS) as [Lang, string][]).map(([code, label]) => (
-                        <button
-                          key={code}
-                          type="button"
-                          onClick={() => setLanguage(code)}
-                          style={{
-                            padding: '8px 12px',
-                            borderRadius: '8px',
-                            fontSize: '0.875rem',
-                            fontWeight: language === code ? 600 : 400,
-                            border: '1px solid',
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                            backgroundColor: language === code
-                              ? (isDark ? 'oklch(0.75 0.15 180)' : 'oklch(0.55 0.15 180)')
-                              : (isDark ? 'oklch(0.22 0.02 260)' : 'oklch(0.91 0.01 260)'),
-                            borderColor: language === code
-                              ? (isDark ? 'oklch(0.75 0.15 180)' : 'oklch(0.55 0.15 180)')
-                              : (isDark ? 'oklch(0.28 0.02 260)' : 'oklch(0.90 0.01 260)'),
-                            color: language === code ? 'white' : (isDark ? 'oklch(0.95 0.01 260)' : 'oklch(0.15 0.01 260)'),
-                          }}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
+                    <Select value={language} onValueChange={(v) => setLanguage(v as Lang)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(Object.entries(LANG_LABELS) as [Lang, string][]).map(([code, label]) => (
+                          <SelectItem key={code} value={code}>{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {/* Modo Simple */}
