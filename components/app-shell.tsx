@@ -603,48 +603,7 @@ export function AppShell() {
                     </Select>
                   </div>
 
-                  {/* Modo Simple */}
-                  <div>
-                    <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-primary/5">
-                      <div className="flex items-center gap-2">
-                        <Puzzle className="w-4 h-4 text-primary" />
-                        <div>
-                          <p className="text-sm font-medium">{t('settings_simpleMode')}</p>
-                          <p className="text-xs text-muted-foreground">{t('settings_simpleModeDesc')}</p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setSimpleMode(!simpleMode)}
-                        style={{
-                          position: 'relative',
-                          width: '44px',
-                          height: '24px',
-                          borderRadius: '9999px',
-                          border: 'none',
-                          cursor: 'pointer',
-                          flexShrink: 0,
-                          backgroundColor: simpleMode
-                            ? (isDark ? 'oklch(0.75 0.15 180)' : 'oklch(0.55 0.15 180)')
-                            : (isDark ? 'oklch(0.35 0.02 260)' : 'oklch(0.78 0.01 260)'),
-                          transition: 'background-color 0.2s',
-                        }}
-                      >
-                        <span style={{
-                          position: 'absolute',
-                          top: '4px',
-                          left: '0',
-                          width: '16px',
-                          height: '16px',
-                          borderRadius: '9999px',
-                          backgroundColor: 'white',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                          transition: 'transform 0.2s',
-                          transform: simpleMode ? 'translateX(24px)' : 'translateX(4px)',
-                        }} />
-                      </button>
-                    </div>
-                  </div>
+                  
 
                   {/* Tema */}
                   <div>
@@ -658,6 +617,48 @@ export function AppShell() {
                         {isDark ? <Sun className="w-4 h-4 mr-1" /> : <Moon className="w-4 h-4 mr-1" />}
                         {isDark ? t('settings_switchToLight') : t('settings_switchToDark')}
                       </Button>
+                    </div>
+                    {/* Modo Simple */}
+                    <div className="pt-3">
+                      <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-primary/5">
+                        <div className="flex items-center gap-2">
+                          <Puzzle className="w-4 h-4 text-primary" />
+                          <div>
+                            <p className="text-sm font-medium">{t('settings_simpleMode')}</p>
+                            <p className="text-xs text-muted-foreground">{t('settings_simpleModeDesc')}</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSimpleMode(!simpleMode)}
+                          style={{
+                            position: 'relative',
+                            width: '44px',
+                            height: '24px',
+                            borderRadius: '9999px',
+                            border: 'none',
+                            cursor: 'pointer',
+                            flexShrink: 0,
+                            backgroundColor: simpleMode
+                              ? (isDark ? 'oklch(0.75 0.15 180)' : 'oklch(0.55 0.15 180)')
+                              : (isDark ? 'oklch(0.35 0.02 260)' : 'oklch(0.78 0.01 260)'),
+                            transition: 'background-color 0.2s',
+                          }}
+                        >
+                          <span style={{
+                            position: 'absolute',
+                            top: '4px',
+                            left: '0',
+                            width: '16px',
+                            height: '16px',
+                            borderRadius: '9999px',
+                            backgroundColor: 'white',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                            transition: 'transform 0.2s',
+                            transform: simpleMode ? 'translateX(24px)' : 'translateX(4px)',
+                          }} />
+                        </button>
+                      </div>
                     </div>
                   </div>
 
