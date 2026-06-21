@@ -250,7 +250,7 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
     const allAnswered = questions.length === 0 || questionAnswers.every(a => a !== '')
     if (!coordinates || !allAnswered) return
 
-    const autoTitle = incidentTypesForm.find(t => t.value === newIncident.incident_type)?.label || 'Incidente'
+    const autoTitle = incidentTypesForm.find(it => it.value === newIncident.incident_type)?.label || t('during_incidentSOS')
     const autoSeverity: IncidentSeverity = questions.length > 0 ? calculateSeverity(questionAnswers) : 'medium'
 
     if (!isOnline) {
@@ -559,8 +559,8 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
             <SelectValue placeholder={t('map_filterType')} />
           </SelectTrigger>
           <SelectContent>
-            {incidentTypes.map(t => (
-              <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+            {incidentTypes.map(it => (
+              <SelectItem key={it.value} value={it.value}>{it.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
