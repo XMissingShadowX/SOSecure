@@ -24,6 +24,7 @@
 | Gráficas | recharts |
 | Iconos | lucide-react |
 | Fechas | date-fns |
+| i18n | Sistema propio (`lib/i18n.ts`) — es, en, nah, myn, tze |
 
 ---
 
@@ -57,6 +58,9 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 NEXT_PUBLIC_ANTHROPIC_API_KEY=
 RESEND_API_KEY=
+PAYPAL_CLIENT_ID=
+PAYPAL_CLIENT_SECRET=
+PAYPAL_MODE=sandbox   # o 'live' para producción
 ```
 
 > **Nunca** commitear `.env.local`. Ya está en `.gitignore`.
@@ -217,6 +221,7 @@ FrequentPlace    // Lugar favorito guardado
 - Usar `supabase/server.ts` para operaciones con privilegios
 - Usar `supabase/client.ts` desde componentes cliente
 - Validar siempre la sesión en rutas protegidas
+- **Usar admin client (service role) para cualquier INSERT/UPDATE en tablas con RLS** — el cliente de servidor con sesión de usuario puede ser bloqueado por RLS silenciosamente
 
 ### Commits
 - En **español**
@@ -234,6 +239,9 @@ FrequentPlace    // Lugar favorito guardado
 - `sos_locations` — Ubicaciones en tiempo real durante SOS
 - `incidents` — Incidentes reportados con coordenadas y votos
 - `recordings` — Grabaciones almacenadas con límite de tamaño
+- `family_groups` — Grupos del plan familiar (un registro por dueño)
+- `family_members` — Miembros del grupo familiar con estado e invite_token
+- `premium_subscriptions` — Suscripciones individuales al plan premium
 
 ### Clientes Supabase
 ```ts
@@ -242,6 +250,10 @@ import { createClient } from '@/lib/supabase/client'
 
 // Servidor (API routes, Server Components)
 import { createClient } from '@/lib/supabase/server'
+
+// Admin / service role (bypasea RLS — usar en API routes que escriben tablas con RLS)
+import { createClient } from '@supabase/supabase-js'
+const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } })
 ```
 
 ### Realtime
@@ -343,3 +355,43 @@ npm run cap:android  # Luego Build > Generate Signed APK en Android Studio
 - `bottom-navigation.tsx` agranda íconos y barra (`h-20` vs `h-16`) en simpleMode.
 - `sos-button.tsx` agranda el botón a `w-28 h-28` (vs `w-20 h-20`) y ajusta SVG circle `cx/cy/r` y posición `bottom-24` (vs `bottom-20`) para la barra más alta.
 - `app-shell.tsx` muestra banner amarillo cuando está activo y agrega clase `text-lg` al `<main>` para escalar tipografía base.
+
+### Plan Familiar y Plan Premium — Pagos con PayPal
+
+- Pasarela activa: **PayPal** (`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_MODE`)
+- Flujo: `FamilyPlanSection` → `/plan-familiar/pago` → `/api/family/checkout` → PayPal → captura en retorno → webhook confirma
+- **Webhooks** configurados en PayPal Developer Dashboard → eventos `PAYMENT.CAPTURE.COMPLETED`:
+  - `https://sosecure.site/api/family/webhook`
+  - `https://sosecure.site/api/premium/webhook`
+- Todos los writes a `family_groups`, `family_members` y `premium_subscriptions` usan **admin client** para evitar bloqueo RLS
+- `FamilyPlanSection` usa `getOwnedGroup` (no `ensureOwnedGroup`) para reflejar el status actualizado
+- La gestión de miembros (invitar/quitar) solo se muestra al **dueño** (`group?.status === 'active'`), no a miembros invitados
+- Los miembros invitados ven su estado con `getMemberGroup()` de `lib/family.ts`
+
+### RLS en `family_groups` y `family_members`
+
+Políticas activas necesarias (aplicar en Supabase → SQL Editor si no existen):
+
+```sql
+-- family_groups: solo el dueño puede leer/escribir su grupo
+-- Los miembros leen su grupo via función SECURITY DEFINER para evitar recursión infinita
+CREATE OR REPLACE FUNCTION get_user_group_ids(uid uuid)
+RETURNS SETOF uuid LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
+  SELECT group_id FROM family_members WHERE user_id = uid AND status = 'active'
+$$;
+
+CREATE POLICY "member can read group" ON family_groups FOR SELECT TO authenticated
+  USING (id IN (SELECT get_user_group_ids(auth.uid())) OR owner_id = auth.uid());
+```
+
+**NO crear política** `member can read` que haga subquery a `family_groups` desde `family_members` — causa recursión infinita (`42P17`).
+
+### Internacionalización (i18n)
+- Sistema propio en `lib/i18n.ts`: objeto plano `es` como fuente de verdad, más `en`, `nah` (Náhuatl), `myn` (Maya Yucateco), `tze` (Tseltal).
+- **Lenguas indígenas usan `...es` como base** — cualquier clave sin override explícito muestra el español. Al agregar una clave nueva a `es`, también agregarla a `en` (TypeScript lo exige: `en: typeof es`) y añadir overrides en los bloques `nah`, `myn`, `tze`.
+- Hook de acceso: `const { t } = useTranslation()` — lee `language` del store Zustand y devuelve `t(key: string): string`.
+- El idioma se persiste en `language: Lang` dentro del store (localStorage). Selector en Ajustes (`app-shell.tsx`) usa `<Select>` de shadcn/ui.
+- **Nunca llamar `t()` a nivel de módulo** — los arrays/objetos con strings traducidos deben definirse dentro del componente (o factory), no en el scope del archivo. De lo contrario quedan congelados en español.
+- **Strings que NO se traducen** (van siempre en código): `incident_type` en la BD (`'theft-assault-violence'`, etc.), respuestas del cuestionario (`'si'`/`'no'`/`'no_se'`), `severity` (`'high'`/`'medium'`/`'low'`). Solo la UI los traduce para mostrar.
+- Reemplazos dinámicos: patrón `.replace('{key}', value)` — la clave `{key}` se define igual en todos los idiomas.
+- **Hidratación en páginas auth**: páginas con `useSearchParams` necesitan `if (!mounted) return null` para evitar mismatch entre el render del servidor (español) y el cliente (idioma guardado).
