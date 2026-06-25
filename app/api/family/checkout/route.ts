@@ -137,6 +137,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'La captura no se completó', detail: capture }, { status: 502 })
     }
 
+    // ── Acción: verificar pago Mercado Pago al regresar del checkout ──────
+    if (action === 'capture-mercadopago') {
+      if (!token) return NextResponse.json({ error: 'Falta payment_id de Mercado Pago' }, { status: 400 })
+      if (!MP_ACCESS_TOKEN) return NextResponse.json({ error: 'Mercado Pago no configurado' }, { status: 500 })
+
+      const res = await fetch(`https://api.mercadopago.com/v1/payments/${token}`, {
+        headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` },
+      })
+      const payment = await res.json()
+
+      if (payment.status === 'approved') {
+        const now = new Date()
+        const end = new Date(now)
+        end.setFullYear(end.getFullYear() + 1)
+        await admin.from('family_groups')
+          .update({
+            status: 'active',
+            provider: 'mercadopago',
+            provider_ref: String(payment.id),
+            amount_cents: FAMILY_PLAN.amountCents,
+            currency: FAMILY_PLAN.currency,
+            current_period_start: now.toISOString(),
+            current_period_end: end.toISOString(),
+          })
+          .eq('id', group.id)
+          .eq('owner_id', user.id)
+        return NextResponse.json({ success: true, period_end: end.toISOString() })
+      }
+      return NextResponse.json({ error: 'Pago no aprobado', status: payment.status }, { status: 402 })
+    }
+
     // ── Acción: activar (modo demo / manual) ───────────────────────────
     if (action === 'activate') {
       const now = new Date()

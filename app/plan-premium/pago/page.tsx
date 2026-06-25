@@ -47,7 +47,7 @@ export default function PagoPlanPremiumPage() {
 
       // ¿Regresó del proveedor? Verificar si ya quedó activo.
       if (statusParam === 'success') {
-        // PayPal regresa con ?token=ORDER_ID — hay que capturar el pago
+        // PayPal regresa con ?token=ORDER_ID
         const paypalToken = params.get('token')
         if (paypalToken) {
           const captureRes = await fetch('/api/premium/checkout', {
@@ -63,7 +63,24 @@ export default function PagoPlanPremiumPage() {
           }
         }
 
-        // Para Stripe / Mercado Pago: esperar que llegue el webhook
+        // Mercado Pago regresa con ?collection_id=PAYMENT_ID&collection_status=approved
+        const mpPaymentId = params.get('collection_id') ?? params.get('payment_id')
+        const mpStatus = params.get('collection_status')
+        if (mpPaymentId && mpStatus === 'approved') {
+          const captureRes = await fetch('/api/premium/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'capture-mercadopago', token: mpPaymentId }),
+          })
+          const captureData = await captureRes.json()
+          if (captureData.success) {
+            setPeriodEnd(captureData.period_end ?? null)
+            setView('success')
+            return
+          }
+        }
+
+        // Fallback: esperar webhook (Stripe u otros)
         let active = sub?.status === 'active'
         for (let i = 0; i < 5 && !active; i++) {
           await new Promise(r => setTimeout(r, 1500))
