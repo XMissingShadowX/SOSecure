@@ -210,7 +210,7 @@ export async function POST(req: NextRequest) {
           auto_return: 'approved',
           external_reference: sub.id,
           metadata: { subscription_id: sub.id, user_id: user.id, kind: 'premium' },
-          notification_url: `${BASE_URL}/api/premium/webhook`,
+          notification_url: `${BASE_URL}/api/family/webhook`,
         }),
       })
       const data = await res.json()
