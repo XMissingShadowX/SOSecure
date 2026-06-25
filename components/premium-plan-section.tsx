@@ -13,15 +13,19 @@ import { Star, BadgeCheck, Clock, Sparkles, EyeOff, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PREMIUM_PLAN, formatAmount } from '@/lib/plan-config'
 import { getSubscription, type PremiumSubscription } from '@/lib/premium'
+import { getOwnedGroup, getMemberGroup } from '@/lib/family'
 import { useTranslation } from '@/lib/i18n'
 
 export function PremiumPlanSection() {
   const { t } = useTranslation()
   const [sub, setSub] = useState<PremiumSubscription | null>(null)
+  const [hasFamilyPlan, setHasFamilyPlan] = useState(false)
   const [loading, setLoading] = useState(true)
 
   const refresh = useCallback(async () => {
-    setSub(await getSubscription())
+    const [s, owned, member] = await Promise.all([getSubscription(), getOwnedGroup(), getMemberGroup()])
+    setSub(s)
+    setHasFamilyPlan(owned?.status === 'active' || member?.status === 'active')
     setLoading(false)
   }, [])
 
@@ -92,8 +96,16 @@ export function PremiumPlanSection() {
           </p>
         )}
 
-        {/* Si NO está activo: invitar al pago */}
-        {!isActive && (
+        {/* Si tiene plan familiar activo: ya tiene acceso premium incluido */}
+        {!isActive && hasFamilyPlan && (
+          <div className="flex items-center gap-2 p-2 rounded-md bg-primary/10">
+            <BadgeCheck className="w-4 h-4 text-primary shrink-0" />
+            <p className="text-xs text-primary font-medium">Incluido en tu Plan Familiar</p>
+          </div>
+        )}
+
+        {/* Si NO está activo y no tiene plan familiar: mostrar botón de compra */}
+        {!isActive && !hasFamilyPlan && (
           <Button className="w-full" size="sm" onClick={goToPayment}>
             <Star className="w-3.5 h-3.5 mr-1" />
             {t('plan_premiumActivateBtn').replace('{amount}', formatAmount(PREMIUM_PLAN.amountCents)).replace('{period}', t('plan_premiumPeriod'))}
