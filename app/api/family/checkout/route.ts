@@ -54,15 +54,43 @@ export async function POST(req: NextRequest) {
     const body = (await req.json().catch(() => ({}))) as { action?: string; token?: string }
     const { action, token } = body
 
-    // Grupo del dueño
-    const { data: group } = await supabase
+    // Grupo del dueño — crear si no existe
+    let { data: group } = await supabase
       .from('family_groups')
       .select('*')
       .eq('owner_id', user.id)
       .maybeSingle()
 
     if (!group) {
-      return NextResponse.json({ error: 'Primero crea tu plan familiar' }, { status: 400 })
+      const { data: newGroup } = await supabase
+        .from('family_groups')
+        .insert({
+          owner_id: user.id,
+          name: 'Mi Plan Familiar',
+          plan_id: FAMILY_PLAN.id,
+          max_members: FAMILY_PLAN.maxMembers,
+          status: 'pending',
+          currency: FAMILY_PLAN.currency,
+          amount_cents: FAMILY_PLAN.amountCents,
+        })
+        .select('*')
+        .single()
+
+      if (newGroup) {
+        await supabase.from('family_members').insert({
+          group_id: newGroup.id,
+          user_id: user.id,
+          email: user.email ?? '',
+          role: 'owner',
+          status: 'active',
+          joined_at: new Date().toISOString(),
+        })
+      }
+      group = newGroup
+    }
+
+    if (!group) {
+      return NextResponse.json({ error: 'No se pudo crear el grupo familiar' }, { status: 500 })
     }
 
     // ── Acción: capturar orden PayPal ──────────────────────────────────
