@@ -127,3 +127,20 @@ export async function hasActivePlan(): Promise<boolean> {
   const { data } = await supabase.rpc('has_active_family_plan')
   return data === true
 }
+
+/** Devuelve el grupo al que pertenece el usuario como miembro (no dueño). */
+export async function getMemberGroup(): Promise<FamilyGroup | null> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const { data } = await supabase
+    .from('family_members')
+    .select('group_id, family_groups(*)')
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .neq('role', 'owner')
+    .maybeSingle()
+
+  return (data?.family_groups as unknown as FamilyGroup) ?? null
+}
