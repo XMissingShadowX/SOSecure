@@ -53,14 +53,32 @@ npm run lint
 ## Variables de Entorno (`.env.local`)
 
 ```env
+# Supabase
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
+
+# Anthropic
 NEXT_PUBLIC_ANTHROPIC_API_KEY=
+ANTHROPIC_API_KEY=
+
+# Email
 RESEND_API_KEY=
+
+# PayPal
 PAYPAL_CLIENT_ID=
 PAYPAL_CLIENT_SECRET=
-PAYPAL_MODE=sandbox   # o 'live' para producción
+PAYPAL_MODE=sandbox         # o 'live' para producción
+PAYPAL_WEBHOOK_ID_FAMILY=   # ID del webhook en PayPal Developer Dashboard (plan familiar)
+PAYPAL_WEBHOOK_ID_PREMIUM=  # ID del webhook en PayPal Developer Dashboard (plan premium)
+
+# Mercado Pago
+MERCADOPAGO_ACCESS_TOKEN=
+NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY=
+MERCADOPAGO_WEBHOOK_SECRET= # Clave secreta generada en el panel de MP → Webhooks
+
+# App
+NEXT_PUBLIC_APP_URL=https://sosecure.site
 ```
 
 > **Nunca** commitear `.env.local`. Ya está en `.gitignore`.
@@ -356,17 +374,27 @@ npm run cap:android  # Luego Build > Generate Signed APK en Android Studio
 - `sos-button.tsx` agranda el botón a `w-28 h-28` (vs `w-20 h-20`) y ajusta SVG circle `cx/cy/r` y posición `bottom-24` (vs `bottom-20`) para la barra más alta.
 - `app-shell.tsx` muestra banner amarillo cuando está activo y agrega clase `text-lg` al `<main>` para escalar tipografía base.
 
-### Plan Familiar y Plan Premium — Pagos con PayPal
+### Plan Familiar y Plan Premium — Pagos
 
-- Pasarela activa: **PayPal** (`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_MODE`)
-- Flujo: `FamilyPlanSection` → `/plan-familiar/pago` → `/api/family/checkout` → PayPal → captura en retorno → webhook confirma
-- **Webhooks** configurados en PayPal Developer Dashboard → eventos `PAYMENT.CAPTURE.COMPLETED`:
-  - `https://sosecure.site/api/family/webhook`
-  - `https://sosecure.site/api/premium/webhook`
+- Pasarelas activas: **Mercado Pago** (preferida) y **PayPal** (respaldo). El usuario elige en la página de pago.
+- El código detecta automáticamente el proveedor según las variables de entorno presentes. Si ambos están configurados, el usuario elige.
+- Flujo general: `FamilyPlanSection` / `PremiumPlanSection` → página de pago → `/api/family/checkout` o `/api/premium/checkout` → proveedor → captura al regresar → webhook como respaldo
+
+**Activación al regresar (sin webhook):**
+- **PayPal:** regresa con `?token=ORDER_ID` → se llama `action: 'capture-paypal'` para capturar y activar
+- **Mercado Pago:** regresa con `?collection_id=PAYMENT_ID&collection_status=approved` → se llama `action: 'capture-mercadopago'` para verificar con la API de MP y activar
+
+**Webhooks (respaldo si el usuario cierra antes de regresar):**
+- MP y PayPal (family): `https://sosecure.site/api/family/webhook` — maneja ambos planes family y premium de MP
+- PayPal (premium): `https://sosecure.site/api/premium/webhook`
+- Verificación de firma habilitada cuando `MERCADOPAGO_WEBHOOK_SECRET` y `PAYPAL_WEBHOOK_ID_*` están configurados; sin ellas acepta todo (modo dev)
+
+**Reglas de negocio:**
 - Todos los writes a `family_groups`, `family_members` y `premium_subscriptions` usan **admin client** para evitar bloqueo RLS
 - `FamilyPlanSection` usa `getOwnedGroup` (no `ensureOwnedGroup`) para reflejar el status actualizado
 - La gestión de miembros (invitar/quitar) solo se muestra al **dueño** (`group?.status === 'active'`), no a miembros invitados
 - Los miembros invitados ven su estado con `getMemberGroup()` de `lib/family.ts`
+- Si el usuario tiene plan familiar activo (dueño o miembro), `PremiumPlanSection` muestra "Incluido en tu Plan Familiar" en lugar del botón de compra — incluso si tienen premium individual
 
 ### RLS en `family_groups` y `family_members`
 
