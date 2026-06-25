@@ -28,19 +28,14 @@ type View = 'loading' | 'auth' | 'checkout' | 'success'
 export default function PagoPlanPremiumPage() {
   const { t } = useTranslation()
   const [view, setView] = useState<View>('loading')
-  const [demoOpen, setDemoOpen] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [periodEnd, setPeriodEnd] = useState<string | null>(null)
-
-  // Campos del formulario demo
-  const [card, setCard] = useState({ name: '', number: '', exp: '', cvc: '' })
 
   useEffect(() => {
     const init = async () => {
       const params = new URLSearchParams(window.location.search)
       const statusParam = params.get('status')
-      const demoParam = params.get('demo')
 
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
@@ -81,7 +76,6 @@ export default function PagoPlanPremiumPage() {
         setView('success'); return
       }
 
-      if (demoParam === '1') setDemoOpen(true)
       setView('checkout')
     }
     init().catch(() => { setError(t('pay_errorLoad')); setView('checkout') })
@@ -96,37 +90,8 @@ export default function PagoPlanPremiumPage() {
         body: JSON.stringify({ action: 'create-session' }),
       })
       const data = await res.json()
-      if (data.provider === 'demo') {
-        setDemoOpen(true)
-        setProcessing(false)
-        return
-      }
       if (data.url) { window.location.href = data.url; return }
       setError(data.error ?? t('pay_errorStart'))
-    } catch {
-      setError(t('family_connectionError'))
-    }
-    setProcessing(false)
-  }
-
-  const payDemo = async () => {
-    if (!card.name || card.number.replace(/\s/g, '').length < 12 || !card.exp || card.cvc.length < 3) {
-      setError(t('pay_completeCard')); return
-    }
-    setProcessing(true); setError(null)
-    try {
-      const res = await fetch('/api/premium/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'activate' }),
-      })
-      const data = await res.json()
-      if (data.success) {
-        setPeriodEnd(data.period_end ?? null)
-        setView('success')
-      } else {
-        setError(data.error ?? t('pay_errorProcess'))
-      }
     } catch {
       setError(t('family_connectionError'))
     }
@@ -192,55 +157,11 @@ export default function PagoPlanPremiumPage() {
           {/* Método de pago */}
           <section className="pf-card">
             <h2 className="pf-h2">{t('pay_payMethod')}</h2>
-
-            {!demoOpen && (
-              <>
-                <button className="pf-btn pf-btn-primary" onClick={payWithProvider} disabled={processing}>
-                  {processing ? t('pay_redirecting') : t('pay_pay').replace('{amount}', formatAmount(PREMIUM_PLAN.amountCents))}
-                </button>
-                <p className="pf-methods">{t('pay_methods')}</p>
-                <p className="pf-redirect-note">{t('pay_redirectNote')}</p>
-                <button className="pf-link" onClick={() => setDemoOpen(true)}>
-                  {t('pay_demoLink')}
-                </button>
-              </>
-            )}
-
-            {demoOpen && (
-              <div className="pf-form">
-                <div className="pf-demo-flag">{t('pay_demoFlag')}</div>
-                <label className="pf-label">{t('pay_cardName')}</label>
-                <input className="pf-input" value={card.name}
-                  onChange={e => setCard({ ...card, name: e.target.value })}
-                  placeholder={t('pay_cardNamePlaceholder')} />
-
-                <label className="pf-label">{t('pay_cardNumber')}</label>
-                <input className="pf-input" value={card.number} inputMode="numeric"
-                  onChange={e => setCard({ ...card, number: formatCard(e.target.value) })}
-                  placeholder="4242 4242 4242 4242" maxLength={19} />
-
-                <div className="pf-row">
-                  <div className="pf-col">
-                    <label className="pf-label">{t('pay_cardExpiry')}</label>
-                    <input className="pf-input" value={card.exp} inputMode="numeric"
-                      onChange={e => setCard({ ...card, exp: formatExp(e.target.value) })}
-                      placeholder="MM/AA" maxLength={5} />
-                  </div>
-                  <div className="pf-col">
-                    <label className="pf-label">{t('pay_cardCvc')}</label>
-                    <input className="pf-input" value={card.cvc} inputMode="numeric"
-                      onChange={e => setCard({ ...card, cvc: e.target.value.replace(/\D/g, '').slice(0, 4) })}
-                      placeholder="123" maxLength={4} />
-                  </div>
-                </div>
-
-                <button className="pf-btn pf-btn-primary" onClick={payDemo} disabled={processing}>
-                  {processing ? t('pay_processing') : t('pay_pay').replace('{amount}', formatAmount(PREMIUM_PLAN.amountCents))}
-                </button>
-                <button className="pf-link" onClick={() => setDemoOpen(false)}>{t('pay_back')}</button>
-              </div>
-            )}
-
+            <button className="pf-btn pf-btn-primary" onClick={payWithProvider} disabled={processing}>
+              {processing ? t('pay_redirecting') : t('pay_pay').replace('{amount}', formatAmount(PREMIUM_PLAN.amountCents))}
+            </button>
+            <p className="pf-methods">{t('pay_methods')}</p>
+            <p className="pf-redirect-note">{t('pay_redirectNote')}</p>
             {error && <p className="pf-error">{error}</p>}
             <p className="pf-trust">{t('pay_trust')}</p>
           </section>
@@ -264,13 +185,6 @@ export default function PagoPlanPremiumPage() {
   )
 }
 
-function formatCard(v: string) {
-  return v.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim()
-}
-function formatExp(v: string) {
-  const d = v.replace(/\D/g, '').slice(0, 4)
-  return d.length >= 3 ? `${d.slice(0, 2)}/${d.slice(2)}` : d
-}
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })
 }
