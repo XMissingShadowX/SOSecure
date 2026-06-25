@@ -134,7 +134,7 @@ export async function getMemberGroup(): Promise<FamilyGroup | null> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('family_members')
     .select('group_id, family_groups(*)')
     .eq('user_id', user.id)
@@ -142,5 +142,6 @@ export async function getMemberGroup(): Promise<FamilyGroup | null> {
     .neq('role', 'owner')
     .maybeSingle()
 
+  console.log('[family] getMemberGroup uid:', user.id, 'data:', data, 'error:', error)
   return (data?.family_groups as unknown as FamilyGroup) ?? null
 }
