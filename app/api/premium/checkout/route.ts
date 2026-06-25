@@ -17,7 +17,16 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { PREMIUM_PLAN } from '@/lib/plan-config'
+
+function adminClient() {
+  return createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://sosecure.site'
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY
@@ -69,6 +78,7 @@ async function ensureSubRow(supabase: any, userId: string) {
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createServerClient()
+    const admin = adminClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
@@ -77,7 +87,7 @@ export async function POST(req: NextRequest) {
     const body = (await req.json().catch(() => ({}))) as { action?: string; token?: string }
     const { action, token } = body
 
-    const sub = await ensureSubRow(supabase, user.id)
+    const sub = await ensureSubRow(admin, user.id)
     if (!sub) {
       return NextResponse.json({ error: 'No se pudo crear la suscripción' }, { status: 500 })
     }
@@ -129,7 +139,7 @@ export async function POST(req: NextRequest) {
         const now = new Date()
         const end = new Date(now)
         end.setMonth(end.getMonth() + 1)
-        await supabase.from('premium_subscriptions')
+        await admin.from('premium_subscriptions')
           .update({
             status: 'active',
             provider: 'paypal',
@@ -177,7 +187,7 @@ export async function POST(req: NextRequest) {
       if (!url) {
         return NextResponse.json({ error: 'No se pudo crear la preferencia de Mercado Pago', detail: data }, { status: 502 })
       }
-      await supabase.from('premium_subscriptions')
+      await admin.from('premium_subscriptions')
         .update({ provider: 'mercadopago', provider_ref: data.id })
         .eq('id', sub.id)
       return NextResponse.json({ url, provider: 'mercadopago' })
@@ -217,7 +227,7 @@ export async function POST(req: NextRequest) {
       if (!approveLink) {
         return NextResponse.json({ error: 'PayPal no devolvió URL de aprobación', detail: order }, { status: 502 })
       }
-      await supabase.from('premium_subscriptions')
+      await admin.from('premium_subscriptions')
         .update({ provider: 'paypal', provider_ref: order.id })
         .eq('id', sub.id)
       return NextResponse.json({ url: approveLink, provider: 'paypal' })
@@ -250,7 +260,7 @@ export async function POST(req: NextRequest) {
       if (!data.url) {
         return NextResponse.json({ error: 'No se pudo crear la sesión de Stripe', detail: data }, { status: 502 })
       }
-      await supabase.from('premium_subscriptions')
+      await admin.from('premium_subscriptions')
         .update({ provider: 'stripe', provider_ref: data.id })
         .eq('id', sub.id)
       return NextResponse.json({ url: data.url, provider: 'stripe' })
