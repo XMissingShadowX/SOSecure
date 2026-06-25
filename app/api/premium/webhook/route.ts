@@ -22,6 +22,68 @@ import { createClient } from '@supabase/supabase-js'
 import { PREMIUM_PLAN } from '@/lib/plan-config'
 
 const MP_ACCESS_TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN
+const MP_WEBHOOK_SECRET = process.env.MERCADOPAGO_WEBHOOK_SECRET
+const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID
+const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET
+const PAYPAL_WEBHOOK_ID = process.env.PAYPAL_WEBHOOK_ID_PREMIUM
+const PAYPAL_BASE = process.env.PAYPAL_MODE === 'live'
+  ? 'https://api-m.paypal.com'
+  : 'https://api-m.sandbox.paypal.com'
+
+async function verifyMercadoPagoSignature(req: NextRequest, rawBody: string): Promise<boolean> {
+  if (!MP_WEBHOOK_SECRET) return true
+  const xSignature = req.headers.get('x-signature')
+  const xRequestId = req.headers.get('x-request-id')
+  const dataId = new URL(req.url).searchParams.get('data.id') ?? ''
+  if (!xSignature) return false
+
+  const parts = Object.fromEntries(xSignature.split(',').map(p => p.split('=')))
+  const ts = parts['ts']
+  const v1 = parts['v1']
+  if (!ts || !v1) return false
+
+  const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`
+  const encoder = new TextEncoder()
+  const key = await crypto.subtle.importKey(
+    'raw', encoder.encode(MP_WEBHOOK_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  )
+  const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(manifest))
+  const hex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('')
+  return hex === v1
+}
+
+async function verifyPayPalSignature(req: NextRequest, rawBody: string): Promise<boolean> {
+  if (!PAYPAL_WEBHOOK_ID || !PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) return true
+  try {
+    const tokenRes = await fetch(`${PAYPAL_BASE}/v1/oauth2/token`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString('base64')}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: 'grant_type=client_credentials',
+    })
+    const { access_token } = await tokenRes.json()
+
+    const verifyRes = await fetch(`${PAYPAL_BASE}/v1/notifications/verify-webhook-signature`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        auth_algo: req.headers.get('paypal-auth-algo'),
+        cert_url: req.headers.get('paypal-cert-url'),
+        transmission_id: req.headers.get('paypal-transmission-id'),
+        transmission_sig: req.headers.get('paypal-transmission-sig'),
+        transmission_time: req.headers.get('paypal-transmission-time'),
+        webhook_id: PAYPAL_WEBHOOK_ID,
+        webhook_event: JSON.parse(rawBody),
+      }),
+    })
+    const result = await verifyRes.json()
+    return result.verification_status === 'SUCCESS'
+  } catch {
+    return false
+  }
+}
 
 function admin() {
   return createClient(
@@ -52,7 +114,8 @@ async function activateSub(subId: string, provider: string, ref?: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({} as any))
+    const rawBody = await req.text()
+    const body = JSON.parse(rawBody || '{}')
 
     // ── Stripe ─────────────────────────────────────────────
     if (body?.type === 'checkout.session.completed') {
@@ -69,6 +132,8 @@ export async function POST(req: NextRequest) {
 
     // ── Mercado Pago ───────────────────────────────────────
     if (body?.type === 'payment' && body?.data?.id && MP_ACCESS_TOKEN) {
+      const valid = await verifyMercadoPagoSignature(req, rawBody)
+      if (!valid) return NextResponse.json({ error: 'Firma inválida' }, { status: 401 })
       const paymentId = body.data.id
       const res = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
         headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` },
@@ -85,6 +150,8 @@ export async function POST(req: NextRequest) {
 
     // ── PayPal ─────────────────────────────────────────────
     if (body?.event_type === 'PAYMENT.CAPTURE.COMPLETED') {
+      const valid = await verifyPayPalSignature(req, rawBody)
+      if (!valid) return NextResponse.json({ error: 'Firma inválida' }, { status: 401 })
       const resource = body?.resource
       // custom_id lo pusimos en la orden al crearla
       const subId = resource?.custom_id
