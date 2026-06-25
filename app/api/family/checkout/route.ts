@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
         const now = new Date()
         const end = new Date(now)
         end.setFullYear(end.getFullYear() + 1)
-        await supabase.from('family_groups')
+        await admin.from('family_groups')
           .update({
             status: 'active',
             provider: 'paypal',
@@ -198,7 +198,7 @@ export async function POST(req: NextRequest) {
       if (!url) {
         return NextResponse.json({ error: 'No se pudo crear la preferencia de Mercado Pago', detail: data }, { status: 502 })
       }
-      await supabase.from('family_groups')
+      await admin.from('family_groups')
         .update({ provider: 'mercadopago', provider_ref: data.id })
         .eq('id', group.id)
       return NextResponse.json({ url, provider: 'mercadopago' })
@@ -238,7 +238,7 @@ export async function POST(req: NextRequest) {
       if (!approveLink) {
         return NextResponse.json({ error: 'PayPal no devolvió URL de aprobación', detail: order }, { status: 502 })
       }
-      await supabase.from('family_groups')
+      await admin.from('family_groups')
         .update({ provider: 'paypal', provider_ref: order.id })
         .eq('id', group.id)
       return NextResponse.json({ url: approveLink, provider: 'paypal' })
@@ -270,7 +270,7 @@ export async function POST(req: NextRequest) {
       if (!data.url) {
         return NextResponse.json({ error: 'No se pudo crear la sesión de Stripe', detail: data }, { status: 502 })
       }
-      await supabase.from('family_groups')
+      await admin.from('family_groups')
         .update({ provider: 'stripe', provider_ref: data.id })
         .eq('id', group.id)
       return NextResponse.json({ url: data.url, provider: 'stripe' })
