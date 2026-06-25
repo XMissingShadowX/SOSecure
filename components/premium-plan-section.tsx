@@ -31,7 +31,7 @@ export function PremiumPlanSection() {
 
   useEffect(() => { refresh() }, [refresh])
 
-  const isActive = sub?.status === 'active'
+  const isActive = sub?.status === 'active' && !hasFamilyPlan
 
   const goToPayment = () => {
     // Redirige a la página web de pago (misma app, sesión compartida)
