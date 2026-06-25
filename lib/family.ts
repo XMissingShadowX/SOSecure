@@ -47,12 +47,13 @@ export async function getOwnedGroup(): Promise<FamilyGroup | null> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('family_groups')
     .select('*')
     .eq('owner_id', user.id)
     .maybeSingle()
 
+  console.log('[family] getOwnedGroup uid:', user.id, 'data:', data, 'error:', error)
   return (data as FamilyGroup) ?? null
 }
 
