@@ -10,7 +10,16 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { FAMILY_PLAN } from '@/lib/plan-config'
+
+function adminClient() {
+  return createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://sosecure.site'
@@ -23,6 +32,7 @@ interface InviteInput {
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createServerClient()
+    const admin = adminClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
@@ -33,8 +43,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Sin miembros para invitar' }, { status: 400 })
     }
 
-    // Grupo del dueño (debe existir; lo crea la UI antes de invitar)
-    const { data: group } = await supabase
+    // Grupo del dueño
+    const { data: group } = await admin
       .from('family_groups')
       .select('*')
       .eq('owner_id', user.id)
@@ -57,7 +67,7 @@ export async function POST(req: NextRequest) {
       }
 
       // ¿Ya existe en el grupo?
-      const { data: existing } = await supabase
+      const { data: existing } = await admin
         .from('family_members')
         .select('*')
         .eq('group_id', group.id)
@@ -67,7 +77,7 @@ export async function POST(req: NextRequest) {
       let member = existing
 
       if (!member) {
-        const { data: inserted, error: insErr } = await supabase
+        const { data: inserted, error: insErr } = await admin
           .from('family_members')
           .insert({
             group_id: group.id,
@@ -92,7 +102,7 @@ export async function POST(req: NextRequest) {
         }
         member = inserted
       } else if (member.status === 'removed') {
-        await supabase
+        await admin
           .from('family_members')
           .update({ status: 'invited', name: m.name ?? member.name })
           .eq('id', member.id)
