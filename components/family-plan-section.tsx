@@ -41,7 +41,7 @@ export function FamilyPlanSection() {
 
   useEffect(() => { refresh() }, [refresh])
 
-  const isActive = group?.status === 'active'
+  const isActive = group?.status === 'active' || memberGroup?.status === 'active'
   const used = members.length
   const free = Math.max(0, FAMILY_PLAN.maxMembers - used)
 
