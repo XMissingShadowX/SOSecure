@@ -60,8 +60,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    const body = (await req.json().catch(() => ({}))) as { action?: string; token?: string }
-    const { action, token } = body
+    const body = (await req.json().catch(() => ({}))) as { action?: string; token?: string; provider?: string }
+    const { action, token, provider: preferredProvider } = body
 
     // Grupo del dueño — usar admin para evitar bloqueo RLS en SELECT e INSERT
     const admin = adminClient()
@@ -170,8 +170,9 @@ export async function POST(req: NextRequest) {
     const successUrl = `${BASE_URL}/plan-familiar/pago/?status=success`
     const cancelUrl = `${BASE_URL}/plan-familiar/pago/?status=cancel`
 
+    // Si el usuario eligió PayPal explícitamente, saltar Mercado Pago
     // 1) Mercado Pago (recomendado en MX: tarjeta, OXXO, SPEI)
-    if (MP_ACCESS_TOKEN) {
+    if (MP_ACCESS_TOKEN && preferredProvider !== 'paypal') {
       const res = await fetch('https://api.mercadopago.com/checkout/preferences', {
         method: 'POST',
         headers: {
@@ -205,7 +206,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2) PayPal Orders
-    if (PAYPAL_CLIENT_ID && PAYPAL_CLIENT_SECRET) {
+    if (PAYPAL_CLIENT_ID && PAYPAL_CLIENT_SECRET && preferredProvider !== 'mercadopago') {
       const token = await getPayPalToken()
       const res = await fetch(`${PAYPAL_BASE}/v2/checkout/orders`, {
         method: 'POST',

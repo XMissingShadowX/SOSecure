@@ -53,7 +53,6 @@ export async function getOwnedGroup(): Promise<FamilyGroup | null> {
     .eq('owner_id', user.id)
     .maybeSingle()
 
-  console.log('[family] getOwnedGroup uid:', user.id, 'data:', data, 'error:', error)
   return (data as FamilyGroup) ?? null
 }
 
@@ -142,6 +141,5 @@ export async function getMemberGroup(): Promise<FamilyGroup | null> {
     .neq('role', 'owner')
     .maybeSingle()
 
-  console.log('[family] getMemberGroup uid:', user.id, 'data:', data, 'error:', error)
   return (data?.family_groups as unknown as FamilyGroup) ?? null
 }
