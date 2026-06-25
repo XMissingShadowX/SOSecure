@@ -24,6 +24,7 @@ import { ShieldCheck } from 'lucide-react'
 import { useTranslation } from '@/lib/i18n'
 
 type View = 'loading' | 'auth' | 'checkout' | 'success'
+type Provider = 'mercadopago' | 'paypal'
 
 export default function PagoPlanFamiliarPage() {
   const { t } = useTranslation()
@@ -32,6 +33,7 @@ export default function PagoPlanFamiliarPage() {
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [periodEnd, setPeriodEnd] = useState<string | null>(null)
+  const [provider, setProvider] = useState<Provider>('mercadopago')
 
   useEffect(() => {
     const init = async () => {
@@ -91,7 +93,7 @@ export default function PagoPlanFamiliarPage() {
       const res = await fetch('/api/family/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'create-session' }),
+        body: JSON.stringify({ action: 'create-session', provider }),
       })
       const data = await res.json()
       if (data.url) { window.location.href = data.url; return }
@@ -176,10 +178,41 @@ export default function PagoPlanFamiliarPage() {
           {/* Método de pago */}
           <section className="pf-card">
             <h2 className="pf-h2">{t('pay_payMethod')}</h2>
-            <button className="pf-btn pf-btn-primary" onClick={payWithProvider} disabled={processing}>
+
+            {/* Selector de proveedor */}
+            <div className="pf-provider-grid">
+              <button
+                className={`pf-provider-btn ${provider === 'mercadopago' ? 'pf-provider-active' : ''}`}
+                onClick={() => setProvider('mercadopago')}
+              >
+                <span className="pf-provider-logo">
+                  <svg width="22" height="22" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="16" fill="#009EE3"/><path d="M8 17.6c0-4.2 3.6-7.6 8-7.6s8 3.4 8 7.6c0 .4-.3.7-.7.7H8.7c-.4 0-.7-.3-.7-.7z" fill="#fff"/></svg>
+                </span>
+                <span>Mercado Pago</span>
+                {provider === 'mercadopago' && <span className="pf-provider-check">✓</span>}
+              </button>
+              <button
+                className={`pf-provider-btn ${provider === 'paypal' ? 'pf-provider-active' : ''}`}
+                onClick={() => setProvider('paypal')}
+              >
+                <span className="pf-provider-logo">
+                  <svg width="22" height="22" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="16" fill="#003087"/><path d="M20.5 10.5c.7 2.5-.6 5.3-3.6 6H14l-1 5.5H10l2.5-13.5h5.5c1.5 0 2.3.9 2.5 2z" fill="#009CDE"/><path d="M22.5 13c.5 2-.5 4.5-3 5.5H17l-.8 4.5H14l2.3-12h4.7c1.2 0 1.8.7 1.5 2z" fill="#fff"/></svg>
+                </span>
+                <span>PayPal</span>
+                {provider === 'paypal' && <span className="pf-provider-check">✓</span>}
+              </button>
+            </div>
+
+            {provider === 'mercadopago' && (
+              <p className="pf-provider-note">Tarjeta, OXXO, SPEI y más</p>
+            )}
+            {provider === 'paypal' && (
+              <p className="pf-provider-note">Tarjeta o saldo PayPal</p>
+            )}
+
+            <button className="pf-btn pf-btn-primary" onClick={payWithProvider} disabled={processing} style={{marginTop:'14px'}}>
               {processing ? t('pay_redirecting') : t('pay_pay').replace('{amount}', formatAmount(FAMILY_PLAN.amountCents))}
             </button>
-            <p className="pf-methods">{t('pay_methods')}</p>
             <p className="pf-redirect-note">{t('pay_redirectNote')}</p>
             {error && <p className="pf-error">{error}</p>}
             <p className="pf-trust">{t('pay_trust')}</p>
@@ -264,4 +297,11 @@ const CSS = `
 .pf-success-icon{width:64px;height:64px;border-radius:50%;background:#2dd4bf;color:#06201c;font-size:34px;font-weight:900;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;}
 .pf-spinner{width:34px;height:34px;border:3px solid rgba(94,234,212,.25);border-top-color:#2dd4bf;border-radius:50%;animation:pf-spin .8s linear infinite;margin:60px auto;}
 @keyframes pf-spin{to{transform:rotate(360deg);}}
+.pf-provider-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px;}
+.pf-provider-btn{display:flex;align-items:center;gap:8px;padding:12px 14px;border-radius:12px;border:1.5px solid rgba(159,198,192,.25);background:rgba(0,0,0,.2);color:#d3eae6;font-size:14px;font-weight:600;cursor:pointer;position:relative;transition:border-color .15s,background .15s;}
+.pf-provider-btn:hover{border-color:rgba(45,212,191,.4);background:rgba(45,212,191,.06);}
+.pf-provider-active{border-color:#2dd4bf !important;background:rgba(45,212,191,.1) !important;}
+.pf-provider-logo{display:flex;align-items:center;}
+.pf-provider-check{margin-left:auto;color:#2dd4bf;font-weight:900;font-size:13px;}
+.pf-provider-note{font-size:12px;color:#82aaa4;text-align:center;margin:4px 0 0;}
 `
