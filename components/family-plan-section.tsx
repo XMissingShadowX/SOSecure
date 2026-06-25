@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { FAMILY_PLAN, formatAmount } from '@/lib/plan-config'
 import {
-  getOwnedGroup, listMembers, removeMember,
+  getOwnedGroup, getMemberGroup, listMembers, removeMember,
   type FamilyGroup, type FamilyMember,
 } from '@/lib/family'
 import { useTranslation } from '@/lib/i18n'
@@ -22,6 +22,7 @@ import { useTranslation } from '@/lib/i18n'
 export function FamilyPlanSection() {
   const { t } = useTranslation()
   const [group, setGroup] = useState<FamilyGroup | null>(null)
+  const [memberGroup, setMemberGroup] = useState<FamilyGroup | null>(null)
   const [members, setMembers] = useState<FamilyMember[]>([])
   const [loading, setLoading] = useState(true)
   const [inviteEmail, setInviteEmail] = useState('')
@@ -31,8 +32,9 @@ export function FamilyPlanSection() {
   const [err, setErr] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
-    const g = await getOwnedGroup()
+    const [g, mg] = await Promise.all([getOwnedGroup(), getMemberGroup()])
     setGroup(g)
+    setMemberGroup(mg)
     if (g) setMembers(await listMembers(g.id))
     setLoading(false)
   }, [])
@@ -122,8 +124,19 @@ export function FamilyPlanSection() {
           </p>
         )}
 
+        {/* Si es miembro (no dueño) de un plan activo */}
+        {!group && memberGroup?.status === 'active' && (
+          <div className="flex items-center gap-2 p-2 rounded-md bg-primary/10">
+            <BadgeCheck className="w-4 h-4 text-primary shrink-0" />
+            <div>
+              <p className="text-xs font-medium text-primary">{t('family_active')}</p>
+              <p className="text-[11px] text-muted-foreground">{memberGroup.name}</p>
+            </div>
+          </div>
+        )}
+
         {/* Si NO está activo: invitar al pago */}
-        {!isActive && (
+        {!isActive && !memberGroup && (
           <>
             <p className="text-xs text-muted-foreground">
               {t('family_desc')}
