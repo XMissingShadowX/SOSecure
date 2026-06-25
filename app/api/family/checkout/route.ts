@@ -19,7 +19,16 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { FAMILY_PLAN } from '@/lib/plan-config'
+
+function adminClient() {
+  return createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://sosecure.site'
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY
@@ -62,7 +71,8 @@ export async function POST(req: NextRequest) {
       .maybeSingle()
 
     if (!group) {
-      const { data: newGroup } = await supabase
+      const admin = adminClient()
+      const { data: newGroup } = await admin
         .from('family_groups')
         .insert({
           owner_id: user.id,
@@ -77,7 +87,7 @@ export async function POST(req: NextRequest) {
         .single()
 
       if (newGroup) {
-        await supabase.from('family_members').insert({
+        await admin.from('family_members').insert({
           group_id: newGroup.id,
           user_id: user.id,
           email: user.email ?? '',
