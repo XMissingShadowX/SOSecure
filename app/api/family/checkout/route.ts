@@ -63,15 +63,15 @@ export async function POST(req: NextRequest) {
     const body = (await req.json().catch(() => ({}))) as { action?: string; token?: string }
     const { action, token } = body
 
-    // Grupo del dueño — crear si no existe
-    let { data: group } = await supabase
+    // Grupo del dueño — usar admin para evitar bloqueo RLS en SELECT e INSERT
+    const admin = adminClient()
+    let { data: group } = await admin
       .from('family_groups')
       .select('*')
       .eq('owner_id', user.id)
       .maybeSingle()
 
     if (!group) {
-      const admin = adminClient()
       const { data: newGroup } = await admin
         .from('family_groups')
         .insert({
