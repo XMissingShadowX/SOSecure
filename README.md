@@ -120,7 +120,7 @@
 | Geocodificación | Photon / Komoot |
 | Mobile | Capacitor 8 (Android) |
 | Email | Resend API |
-| Pagos | PayPal Orders API v2 (sandbox y live) |
+| Pagos | Mercado Pago Checkout Pro + PayPal Orders API v2 |
 | Gráficas | recharts |
 | Iconos | lucide-react |
 | Fechas | date-fns |
@@ -132,33 +132,57 @@
 Crea un archivo `.env.local`:
 
 ```env
+# Supabase
 NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=tu-clave-anonima
 SUPABASE_SERVICE_ROLE_KEY=tu-clave-service-role
+
+# Anthropic
 NEXT_PUBLIC_ANTHROPIC_API_KEY=tu-clave-anthropic
+ANTHROPIC_API_KEY=tu-clave-anthropic
+
+# Email
 RESEND_API_KEY=tu-clave-resend
 
-# PayPal (obtener en developer.paypal.com → Apps & Credentials)
+# Mercado Pago (preferido en México — tarjeta, OXXO, SPEI)
+MERCADOPAGO_ACCESS_TOKEN=APP_USR-...
+NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY=APP_USR-...
+MERCADOPAGO_WEBHOOK_SECRET=   # Clave secreta del panel MP → Webhooks
+
+# PayPal (respaldo)
 PAYPAL_CLIENT_ID=tu-client-id
 PAYPAL_CLIENT_SECRET=tu-client-secret
-PAYPAL_MODE=sandbox   # cambiar a "live" en producción
+PAYPAL_MODE=sandbox            # cambiar a "live" en producción
+PAYPAL_WEBHOOK_ID_FAMILY=      # ID del webhook en PayPal Developer Dashboard
+PAYPAL_WEBHOOK_ID_PREMIUM=     # ID del webhook en PayPal Developer Dashboard
 
-# URL pública de la app (ngrok para desarrollo local, dominio real en producción)
+# URL pública de la app
 NEXT_PUBLIC_APP_URL=https://sosecure.site
 ```
 
 > **Nunca** commitear `.env.local`. Ya está en `.gitignore`.
 
-### Configurar webhooks de PayPal
+### Pasarelas de pago
 
-En [developer.paypal.com](https://developer.paypal.com) → tu app → **Webhooks**, registra las siguientes URLs con el evento `PAYMENT.CAPTURE.COMPLETED`:
+El usuario **elige el proveedor** en la página de pago (Mercado Pago o PayPal). El API detecta automáticamente cuál usar según la variable de entorno disponible y la preferencia enviada.
 
-| Plan | URL |
-|------|-----|
-| Premium | `https://tu-dominio/api/premium/webhook` |
-| Familiar | `https://tu-dominio/api/family/webhook` |
+**Flujo de activación:**
+1. Usuario elige proveedor y hace clic en "Pagar"
+2. Se redirige al checkout del proveedor
+3. Al regresar, la app captura/verifica el pago directamente con la API del proveedor y activa el plan al instante
+4. Si el usuario cierra la pestaña antes de regresar, el webhook lo activa como respaldo
 
-Para pruebas locales usa [ngrok](https://ngrok.com) para exponer `localhost:3000` y pon la URL temporal de ngrok como `NEXT_PUBLIC_APP_URL`.
+**Webhooks** — configurar en los paneles de cada proveedor con evento de pago completado:
+
+| Proveedor | URL | Evento |
+|-----------|-----|--------|
+| Mercado Pago | `https://sosecure.site/api/family/webhook` | Pagos (maneja family y premium) |
+| PayPal (family) | `https://sosecure.site/api/family/webhook` | `PAYMENT.CAPTURE.COMPLETED` |
+| PayPal (premium) | `https://sosecure.site/api/premium/webhook` | `PAYMENT.CAPTURE.COMPLETED` |
+
+La verificación de firma está implementada — se activa automáticamente cuando `MERCADOPAGO_WEBHOOK_SECRET` y `PAYPAL_WEBHOOK_ID_*` están configurados.
+
+**Regla de negocio:** Si el usuario tiene plan familiar activo (dueño o miembro), el plan premium individual no se ofrece — se muestra como "Incluido en tu Plan Familiar".
 
 ---
 
@@ -601,6 +625,6 @@ SOSecure/
 
 ## Despliegue
 
-- **Producción Web**: Vercel — `https://sosecure-ten.vercel.app`
+- **Producción Web**: Vercel — `https://sosecure.site`
 - **Branch principal**: `main`
 - **APK**: El export estático (`/out`) es el que empaqueta Capacitor para Android
