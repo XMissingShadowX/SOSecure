@@ -147,8 +147,8 @@ export function FamilyPlanSection() {
           </>
         )}
 
-        {/* Si está activo: gestión de miembros */}
-        {isActive && (
+        {/* Si está activo: gestión de miembros (solo dueño) */}
+        {group?.status === 'active' && (
           <>
             <div className="pt-1">
               <p className="text-xs font-medium mb-2">{t('family_membersCount').replace('{used}', String(used)).replace('{max}', String(FAMILY_PLAN.maxMembers))}</p>
