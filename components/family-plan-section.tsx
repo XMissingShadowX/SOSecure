@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { FAMILY_PLAN, formatAmount } from '@/lib/plan-config'
 import {
-  ensureOwnedGroup, listMembers, removeMember,
+  getOwnedGroup, listMembers, removeMember,
   type FamilyGroup, type FamilyMember,
 } from '@/lib/family'
 import { useTranslation } from '@/lib/i18n'
@@ -31,7 +31,7 @@ export function FamilyPlanSection() {
   const [err, setErr] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
-    const g = await ensureOwnedGroup()
+    const g = await getOwnedGroup()
     setGroup(g)
     if (g) setMembers(await listMembers(g.id))
     setLoading(false)
