@@ -19,7 +19,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { FAMILY_PLAN } from '@/lib/plan-config'
+import { FAMILY_PLAN, PREMIUM_PLAN } from '@/lib/plan-config'
 
 const MP_ACCESS_TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN
 const MP_WEBHOOK_SECRET = process.env.MERCADOPAGO_WEBHOOK_SECRET
@@ -114,6 +114,25 @@ async function activateGroup(groupId: string, provider: string, ref?: string) {
     .eq('id', groupId)
 }
 
+async function activateSub(subId: string, provider: string, ref?: string) {
+  const now = new Date()
+  const end = new Date(now)
+  end.setMonth(end.getMonth() + 1)
+
+  await admin()
+    .from('premium_subscriptions')
+    .update({
+      status: 'active',
+      provider,
+      provider_ref: ref ?? null,
+      amount_cents: PREMIUM_PLAN.amountCents,
+      currency: PREMIUM_PLAN.currency,
+      current_period_start: now.toISOString(),
+      current_period_end: end.toISOString(),
+    })
+    .eq('id', subId)
+}
+
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text()
@@ -139,9 +158,13 @@ export async function POST(req: NextRequest) {
       })
       const payment = await res.json()
       if (payment?.status === 'approved') {
-        const groupId = payment.external_reference || payment.metadata?.group_id
-        if (groupId) {
-          await activateGroup(groupId, 'mercadopago', String(paymentId))
+        const isPremium = payment.metadata?.kind === 'premium'
+        if (isPremium) {
+          const subId = payment.external_reference || payment.metadata?.subscription_id
+          if (subId) await activateSub(subId, 'mercadopago', String(paymentId))
+        } else {
+          const groupId = payment.external_reference || payment.metadata?.group_id
+          if (groupId) await activateGroup(groupId, 'mercadopago', String(paymentId))
         }
       }
       return NextResponse.json({ received: true })
