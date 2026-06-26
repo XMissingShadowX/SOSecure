@@ -54,8 +54,8 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-    const body = (await req.json().catch(() => ({}))) as { action?: string; token?: string; provider?: string }
-    const { action, token, provider } = body
+    const body = (await req.json().catch(() => ({}))) as { action?: string; token?: string; provider?: string; payerEmail?: string }
+    const { action, token, provider, payerEmail } = body
 
     const admin = adminClient()
 
@@ -191,6 +191,7 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify({
           reason: `${FAMILY_PLAN.name} — SOSecure`,
+          payer_email: payerEmail || user.email,
           auto_recurring: {
             frequency: 1,
             frequency_type: 'years',
