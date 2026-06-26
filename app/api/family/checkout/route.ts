@@ -54,8 +54,8 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-    const body = (await req.json().catch(() => ({}))) as { action?: string; token?: string }
-    const { action, token } = body
+    const body = (await req.json().catch(() => ({}))) as { action?: string; token?: string; provider?: string }
+    const { action, token, provider } = body
 
     const admin = adminClient()
 
@@ -182,7 +182,7 @@ export async function POST(req: NextRequest) {
     const cancelUrl = `${BASE_URL}/plan-familiar/pago/?status=cancel`
 
     // 1) Mercado Pago — preapproval (suscripción recurrente)
-    if (MP_ACCESS_TOKEN) {
+    if (MP_ACCESS_TOKEN && provider !== 'paypal') {
       const res = await fetch('https://api.mercadopago.com/preapproval', {
         method: 'POST',
         headers: {
