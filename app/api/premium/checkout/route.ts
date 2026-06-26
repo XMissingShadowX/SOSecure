@@ -1,18 +1,16 @@
 /*
   POST /api/premium/checkout
-  Maneja la activación del Plan Premium (individual, mensual). Dos acciones:
+  Maneja la suscripción recurrente del Plan Premium (mensual, individual).
 
-  1) action: 'create-session'  (por defecto)
-     Crea una sesión de pago en una pasarela ALOJADA y devuelve { url }
-     para redirigir al usuario. Detecta el proveedor según las llaves:
-       - Mercado Pago  (MERCADOPAGO_ACCESS_TOKEN)   ← recomendado en México
-       - Stripe        (STRIPE_SECRET_KEY)
-       - demo          (sin llaves) → devuelve la URL del formulario demo
-     La activación REAL ocurre en el webhook del proveedor, no aquí.
+  Proveedores:
+   - Mercado Pago: usa preapproval (suscripción mensual automática)
+   - PayPal: usa Subscriptions API (requiere PAYPAL_PREMIUM_PLAN_ID en env)
 
-  2) action: 'activate'
-     Activa el plan directamente. Úsalo para el MODO DEMO de la
-     presentación o para activaciones manuales.
+  Acciones:
+   - create-session (default): crea la suscripción y devuelve { url }
+   - capture-mercadopago: verifica preapproval al regresar del checkout de MP
+   - capture-paypal: verifica suscripción al regresar del checkout de PayPal
+   - activate: activa manualmente (modo demo / admin)
 */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -29,10 +27,10 @@ function adminClient() {
 }
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://sosecure.site'
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY
 const MP_ACCESS_TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN
 const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID
 const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET
+const PAYPAL_PREMIUM_PLAN_ID = process.env.PAYPAL_PREMIUM_PLAN_ID
 const PAYPAL_BASE = process.env.PAYPAL_MODE === 'live'
   ? 'https://api-m.paypal.com'
   : 'https://api-m.sandbox.paypal.com'
@@ -50,9 +48,8 @@ async function getPayPalToken(): Promise<string> {
   return data.access_token
 }
 
-/** Crea la fila de suscripción si no existe y devuelve su id. */
-async function ensureSubRow(supabase: any, userId: string) {
-  const { data: existing } = await supabase
+async function ensureSubRow(admin: ReturnType<typeof adminClient>, userId: string) {
+  const { data: existing } = await admin
     .from('premium_subscriptions')
     .select('*')
     .eq('user_id', userId)
@@ -60,7 +57,7 @@ async function ensureSubRow(supabase: any, userId: string) {
 
   if (existing) return existing
 
-  const { data } = await supabase
+  const { data } = await admin
     .from('premium_subscriptions')
     .insert({
       user_id: userId,
@@ -80,26 +77,80 @@ export async function POST(req: NextRequest) {
     const supabase = await createServerClient()
     const admin = adminClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
+    if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-    const body = (await req.json().catch(() => ({}))) as { action?: string; token?: string; provider?: string }
-    const { action, token, provider: preferredProvider } = body
+    const body = (await req.json().catch(() => ({}))) as { action?: string; token?: string }
+    const { action, token } = body
 
     const sub = await ensureSubRow(admin, user.id)
-    if (!sub) {
-      return NextResponse.json({ error: 'No se pudo crear la suscripción' }, { status: 500 })
+    if (!sub) return NextResponse.json({ error: 'No se pudo crear la suscripción' }, { status: 500 })
+
+    // ── Verificar preapproval de Mercado Pago al regresar ──────────────
+    if (action === 'capture-mercadopago') {
+      if (!token) return NextResponse.json({ error: 'Falta preapproval_id' }, { status: 400 })
+      if (!MP_ACCESS_TOKEN) return NextResponse.json({ error: 'MP no configurado' }, { status: 500 })
+
+      const res = await fetch(`https://api.mercadopago.com/preapproval/${token}`, {
+        headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` },
+      })
+      const preapproval = await res.json()
+
+      if (preapproval.status === 'authorized') {
+        const now = new Date()
+        const end = new Date(now)
+        end.setMonth(end.getMonth() + 1)
+        await admin.from('premium_subscriptions')
+          .update({
+            status: 'active',
+            provider: 'mercadopago',
+            provider_ref: preapproval.id,
+            amount_cents: PREMIUM_PLAN.amountCents,
+            currency: PREMIUM_PLAN.currency,
+            current_period_start: now.toISOString(),
+            current_period_end: end.toISOString(),
+          })
+          .eq('user_id', user.id)
+        return NextResponse.json({ success: true, period_end: end.toISOString() })
+      }
+      return NextResponse.json({ error: 'Suscripción no autorizada', status: preapproval.status }, { status: 402 })
     }
 
-    // ── Acción: activar (modo demo / manual) ───────────────────────────
+    // ── Verificar suscripción PayPal al regresar ────────────────────────
+    if (action === 'capture-paypal') {
+      if (!token) return NextResponse.json({ error: 'Falta subscription_id' }, { status: 400 })
+
+      const accessToken = await getPayPalToken()
+      const res = await fetch(`${PAYPAL_BASE}/v1/billing/subscriptions/${token}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      const subscription = await res.json()
+
+      if (subscription.status === 'ACTIVE' || subscription.status === 'APPROVED') {
+        const now = new Date()
+        const end = new Date(now)
+        end.setMonth(end.getMonth() + 1)
+        await admin.from('premium_subscriptions')
+          .update({
+            status: 'active',
+            provider: 'paypal',
+            provider_ref: subscription.id,
+            amount_cents: PREMIUM_PLAN.amountCents,
+            currency: PREMIUM_PLAN.currency,
+            current_period_start: now.toISOString(),
+            current_period_end: end.toISOString(),
+          })
+          .eq('user_id', user.id)
+        return NextResponse.json({ success: true, period_end: end.toISOString() })
+      }
+      return NextResponse.json({ error: 'Suscripción no activa', status: subscription.status }, { status: 402 })
+    }
+
+    // ── Activar manualmente (demo / admin) ────────────────────────────
     if (action === 'activate') {
       const now = new Date()
       const end = new Date(now)
-      end.setMonth(end.getMonth() + 1) // mensual
-
-      const { error } = await supabase
-        .from('premium_subscriptions')
+      end.setMonth(end.getMonth() + 1)
+      await admin.from('premium_subscriptions')
         .update({
           status: 'active',
           provider: sub.provider ?? 'demo',
@@ -109,199 +160,79 @@ export async function POST(req: NextRequest) {
           current_period_end: end.toISOString(),
         })
         .eq('id', sub.id)
-        .eq('user_id', user.id)
-
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 })
-      }
-      return NextResponse.json({
-        success: true,
-        status: 'active',
-        period_end: end.toISOString(),
-      })
+      return NextResponse.json({ success: true, status: 'active', period_end: end.toISOString() })
     }
 
-    // ── Acción: capturar orden PayPal (llamada desde la página success) ──
-    if (action === 'capture-paypal') {
-      if (!token) return NextResponse.json({ error: 'Falta token de PayPal' }, { status: 400 })
-
-      const accessToken = await getPayPalToken()
-      const res = await fetch(`${PAYPAL_BASE}/v2/checkout/orders/${token}/capture`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      })
-      const capture = await res.json()
-      if (capture.status === 'COMPLETED') {
-        // Activar directamente (el webhook puede llegar tarde)
-        const now = new Date()
-        const end = new Date(now)
-        end.setMonth(end.getMonth() + 1)
-        await admin.from('premium_subscriptions')
-          .update({
-            status: 'active',
-            provider: 'paypal',
-            provider_ref: capture.id,
-            amount_cents: PREMIUM_PLAN.amountCents,
-            currency: PREMIUM_PLAN.currency,
-            current_period_start: now.toISOString(),
-            current_period_end: end.toISOString(),
-          })
-          .eq('user_id', user.id)
-        return NextResponse.json({ success: true, period_end: end.toISOString() })
-      }
-      return NextResponse.json({ error: 'La captura no se completó', detail: capture }, { status: 502 })
-    }
-
-    // ── Acción: verificar pago Mercado Pago al regresar del checkout ──────
-    if (action === 'capture-mercadopago') {
-      if (!token) return NextResponse.json({ error: 'Falta payment_id de Mercado Pago' }, { status: 400 })
-      if (!MP_ACCESS_TOKEN) return NextResponse.json({ error: 'Mercado Pago no configurado' }, { status: 500 })
-
-      const res = await fetch(`https://api.mercadopago.com/v1/payments/${token}`, {
-        headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` },
-      })
-      const payment = await res.json()
-
-      if (payment.status === 'approved') {
-        const now = new Date()
-        const end = new Date(now)
-        end.setMonth(end.getMonth() + 1)
-        await admin.from('premium_subscriptions')
-          .update({
-            status: 'active',
-            provider: 'mercadopago',
-            provider_ref: String(payment.id),
-            amount_cents: PREMIUM_PLAN.amountCents,
-            currency: PREMIUM_PLAN.currency,
-            current_period_start: now.toISOString(),
-            current_period_end: end.toISOString(),
-          })
-          .eq('user_id', user.id)
-        return NextResponse.json({ success: true, period_end: end.toISOString() })
-      }
-      return NextResponse.json({ error: 'Pago no aprobado', status: payment.status }, { status: 402 })
-    }
-
-    // ── Acción por defecto: crear sesión en pasarela alojada ────────────
+    // ── Crear suscripción ──────────────────────────────────────────────
     const successUrl = `${BASE_URL}/plan-premium/pago/?status=success`
     const cancelUrl = `${BASE_URL}/plan-premium/pago/?status=cancel`
 
-    // Si el usuario eligió PayPal explícitamente, saltar Mercado Pago
-    // 1) Mercado Pago (recomendado en MX: tarjeta, OXXO, SPEI)
-    if (MP_ACCESS_TOKEN && preferredProvider !== 'paypal') {
-      const res = await fetch('https://api.mercadopago.com/checkout/preferences', {
+    // 1) Mercado Pago — preapproval mensual
+    if (MP_ACCESS_TOKEN) {
+      const res = await fetch('https://api.mercadopago.com/preapproval', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          items: [{
-            title: `${PREMIUM_PLAN.name} — SOSecure`,
-            description: `Acceso premium por 1 ${PREMIUM_PLAN.period}`,
-            quantity: 1,
+          reason: `${PREMIUM_PLAN.name} — SOSecure`,
+          auto_recurring: {
+            frequency: 1,
+            frequency_type: 'months',
+            transaction_amount: PREMIUM_PLAN.amountCents / 100,
             currency_id: PREMIUM_PLAN.currency,
-            unit_price: PREMIUM_PLAN.amountCents / 100,
-          }],
-          back_urls: { success: successUrl, failure: cancelUrl, pending: successUrl },
-          auto_return: 'approved',
+          },
+          back_url: successUrl,
           external_reference: sub.id,
-          metadata: { subscription_id: sub.id, user_id: user.id, kind: 'premium' },
           notification_url: `${BASE_URL}/api/family/webhook`,
+          metadata: { subscription_id: sub.id, user_id: user.id, kind: 'premium' },
         }),
       })
       const data = await res.json()
-      const url = data.init_point ?? data.sandbox_init_point
-      if (!url) {
-        return NextResponse.json({ error: 'No se pudo crear la preferencia de Mercado Pago', detail: data }, { status: 502 })
-      }
+      const url = data.init_point
+      if (!url) return NextResponse.json({ error: 'No se pudo crear la suscripción de Mercado Pago', detail: data }, { status: 502 })
+
       await admin.from('premium_subscriptions')
         .update({ provider: 'mercadopago', provider_ref: data.id })
         .eq('id', sub.id)
       return NextResponse.json({ url, provider: 'mercadopago' })
     }
 
-    // 2) PayPal Orders
-    if (PAYPAL_CLIENT_ID && PAYPAL_CLIENT_SECRET && preferredProvider !== 'mercadopago') {
-      const token = await getPayPalToken()
-      const res = await fetch(`${PAYPAL_BASE}/v2/checkout/orders`, {
+    // 2) PayPal Subscriptions (requiere PAYPAL_PREMIUM_PLAN_ID)
+    if (PAYPAL_CLIENT_ID && PAYPAL_CLIENT_SECRET && PAYPAL_PREMIUM_PLAN_ID) {
+      const accessToken = await getPayPalToken()
+      const res = await fetch(`${PAYPAL_BASE}/v1/billing/subscriptions`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
-          'PayPal-Request-Id': `${sub.id}-${Date.now()}`,
+          'PayPal-Request-Id': `premium-${sub.id}-${Date.now()}`,
         },
         body: JSON.stringify({
-          intent: 'CAPTURE',
-          purchase_units: [{
-            reference_id: sub.id,
-            custom_id: sub.id,
-            description: `${PREMIUM_PLAN.name} — SOSecure`,
-            amount: {
-              currency_code: PREMIUM_PLAN.currency,
-              value: (PREMIUM_PLAN.amountCents / 100).toFixed(2),
-            },
-          }],
+          plan_id: PAYPAL_PREMIUM_PLAN_ID,
+          subscriber: { email_address: user.email },
+          custom_id: sub.id,
           application_context: {
             return_url: successUrl,
             cancel_url: cancelUrl,
             brand_name: 'SOSecure',
-            user_action: 'PAY_NOW',
+            user_action: 'SUBSCRIBE_NOW',
           },
         }),
       })
-      const order = await res.json()
-      const approveLink = order.links?.find((l: { rel: string; href: string }) => l.rel === 'approve')?.href
-      if (!approveLink) {
-        return NextResponse.json({ error: 'PayPal no devolvió URL de aprobación', detail: order }, { status: 502 })
-      }
+      const subscription = await res.json()
+      const approveLink = subscription.links?.find((l: { rel: string; href: string }) => l.rel === 'approve')?.href
+      if (!approveLink) return NextResponse.json({ error: 'PayPal no devolvió URL de aprobación', detail: subscription }, { status: 502 })
+
       await admin.from('premium_subscriptions')
-        .update({ provider: 'paypal', provider_ref: order.id })
+        .update({ provider: 'paypal', provider_ref: subscription.id })
         .eq('id', sub.id)
       return NextResponse.json({ url: approveLink, provider: 'paypal' })
     }
 
-    // 3) Stripe Checkout
-    if (STRIPE_SECRET_KEY) {
-      const params = new URLSearchParams()
-      params.append('mode', 'payment')
-      params.append('success_url', successUrl)
-      params.append('cancel_url', cancelUrl)
-      params.append('client_reference_id', sub.id)
-      params.append('metadata[subscription_id]', sub.id)
-      params.append('metadata[user_id]', user.id)
-      params.append('metadata[kind]', 'premium')
-      params.append('line_items[0][quantity]', '1')
-      params.append('line_items[0][price_data][currency]', PREMIUM_PLAN.currency.toLowerCase())
-      params.append('line_items[0][price_data][unit_amount]', String(PREMIUM_PLAN.amountCents))
-      params.append('line_items[0][price_data][product_data][name]', `${PREMIUM_PLAN.name} — SOSecure`)
-
-      const res = await fetch('https://api.stripe.com/v1/checkout/sessions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${STRIPE_SECRET_KEY}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: params.toString(),
-      })
-      const data = await res.json()
-      if (!data.url) {
-        return NextResponse.json({ error: 'No se pudo crear la sesión de Stripe', detail: data }, { status: 502 })
-      }
-      await admin.from('premium_subscriptions')
-        .update({ provider: 'stripe', provider_ref: data.id })
-        .eq('id', sub.id)
-      return NextResponse.json({ url: data.url, provider: 'stripe' })
-    }
-
-    // 4) Sin pasarela configurada → usar formulario demo de la misma página
-    return NextResponse.json({
-      url: `${BASE_URL}/plan-premium/pago/?demo=1`,
-      provider: 'demo',
-    })
+    // 3) Sin pasarela configurada → demo
+    return NextResponse.json({ url: `${BASE_URL}/plan-premium/pago/?demo=1`, provider: 'demo' })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }

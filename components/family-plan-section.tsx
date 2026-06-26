@@ -9,7 +9,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Users, Crown, Mail, Trash2, Plus, BadgeCheck, Clock } from 'lucide-react'
+import { Users, Crown, Mail, Trash2, Plus, BadgeCheck, Clock, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { FAMILY_PLAN, formatAmount } from '@/lib/plan-config'
@@ -28,6 +28,8 @@ export function FamilyPlanSection() {
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteName, setInviteName] = useState('')
   const [sending, setSending] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [confirmCancel, setConfirmCancel] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
 
@@ -74,6 +76,24 @@ export function FamilyPlanSection() {
       setErr(t('family_connectionError'))
     }
     setSending(false)
+  }
+
+  const handleCancel = async () => {
+    setCancelling(true); setErr(null); setMsg(null)
+    try {
+      const res = await fetch('/api/family/cancel', { method: 'POST' })
+      const data = await res.json()
+      if (data.success) {
+        setMsg('Suscripción cancelada.')
+        setConfirmCancel(false)
+        await refresh()
+      } else {
+        setErr(data.error ?? 'No se pudo cancelar')
+      }
+    } catch {
+      setErr('Error de conexión')
+    }
+    setCancelling(false)
   }
 
   const handleRemove = async (id: string) => {
@@ -207,6 +227,32 @@ export function FamilyPlanSection() {
               <p className="text-xs text-muted-foreground pt-1">{t('family_full')}</p>
             )}
           </>
+        )}
+
+        {/* Cancelar suscripción (solo dueño activo) */}
+        {group?.status === 'active' && (
+          <div className="pt-1 border-t border-border">
+            {!confirmCancel ? (
+              <button
+                onClick={() => setConfirmCancel(true)}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors"
+              >
+                <XCircle className="w-3.5 h-3.5" /> Cancelar suscripción
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-destructive font-medium">¿Cancelar el plan familiar? Perderás el acceso inmediatamente.</p>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="destructive" className="flex-1 h-8 text-xs" onClick={handleCancel} disabled={cancelling}>
+                    {cancelling ? 'Cancelando...' : 'Sí, cancelar'}
+                  </Button>
+                  <Button size="sm" variant="outline" className="flex-1 h-8 text-xs" onClick={() => setConfirmCancel(false)}>
+                    No, mantener
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {msg && <p className="text-xs text-primary">{msg}</p>}
