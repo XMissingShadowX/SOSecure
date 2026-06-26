@@ -169,6 +169,12 @@ export async function POST(req: NextRequest) {
 
     // 1) Mercado Pago — preapproval mensual
     if (MP_ACCESS_TOKEN && provider !== 'paypal') {
+      const emailToUse = payerEmail?.trim() || user.email
+      const emailValid = emailToUse && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailToUse)
+      if (!emailValid) {
+        return NextResponse.json({ error: 'Ingresa un correo electrónico válido en el campo de Mercado Pago para continuar.' }, { status: 400 })
+      }
+
       const res = await fetch('https://api.mercadopago.com/preapproval', {
         method: 'POST',
         headers: {
@@ -177,7 +183,7 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify({
           reason: `${PREMIUM_PLAN.name} — SOSecure`,
-          payer_email: payerEmail || user.email,
+          payer_email: emailToUse,
           auto_recurring: {
             frequency: 1,
             frequency_type: 'months',
