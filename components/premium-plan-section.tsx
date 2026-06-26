@@ -9,7 +9,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Star, BadgeCheck, Clock, Sparkles, EyeOff, Users } from 'lucide-react'
+import { Star, BadgeCheck, Clock, Sparkles, EyeOff, Users, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PREMIUM_PLAN, formatAmount } from '@/lib/plan-config'
 import { getSubscription, type PremiumSubscription } from '@/lib/premium'
@@ -21,6 +21,10 @@ export function PremiumPlanSection() {
   const [sub, setSub] = useState<PremiumSubscription | null>(null)
   const [hasFamilyPlan, setHasFamilyPlan] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [cancelling, setCancelling] = useState(false)
+  const [confirmCancel, setConfirmCancel] = useState(false)
+  const [cancelMsg, setCancelMsg] = useState<string | null>(null)
+  const [cancelErr, setCancelErr] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     const [s, owned, member] = await Promise.all([getSubscription(), getOwnedGroup(), getMemberGroup()])
@@ -32,6 +36,24 @@ export function PremiumPlanSection() {
   useEffect(() => { refresh() }, [refresh])
 
   const isActive = sub?.status === 'active' && !hasFamilyPlan
+
+  const handleCancel = async () => {
+    setCancelling(true); setCancelErr(null); setCancelMsg(null)
+    try {
+      const res = await fetch('/api/premium/cancel', { method: 'POST' })
+      const data = await res.json()
+      if (data.success) {
+        setCancelMsg('Suscripción cancelada.')
+        setConfirmCancel(false)
+        await refresh()
+      } else {
+        setCancelErr(data.error ?? 'No se pudo cancelar')
+      }
+    } catch {
+      setCancelErr('Error de conexión')
+    }
+    setCancelling(false)
+  }
 
   const goToPayment = () => {
     // Redirige a la página web de pago (misma app, sesión compartida)
@@ -114,6 +136,34 @@ export function PremiumPlanSection() {
 
         {isActive && (
           <p className="text-xs text-primary">{t('plan_premiumUnlocked')}</p>
+        )}
+
+        {/* Cancelar suscripción */}
+        {isActive && (
+          <div className="pt-1 border-t border-border">
+            {!confirmCancel ? (
+              <button
+                onClick={() => setConfirmCancel(true)}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors"
+              >
+                <XCircle className="w-3.5 h-3.5" /> Cancelar suscripción
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-destructive font-medium">¿Cancelar el plan premium? Perderás el acceso inmediatamente.</p>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="destructive" className="flex-1 h-8 text-xs" onClick={handleCancel} disabled={cancelling}>
+                    {cancelling ? 'Cancelando...' : 'Sí, cancelar'}
+                  </Button>
+                  <Button size="sm" variant="outline" className="flex-1 h-8 text-xs" onClick={() => setConfirmCancel(false)}>
+                    No, mantener
+                  </Button>
+                </div>
+              </div>
+            )}
+            {cancelMsg && <p className="text-xs text-primary mt-1">{cancelMsg}</p>}
+            {cancelErr && <p className="text-xs text-destructive mt-1">{cancelErr}</p>}
+          </div>
         )}
       </div>
     </div>

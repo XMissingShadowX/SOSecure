@@ -48,40 +48,56 @@ export default function PagoPlanFamiliarPage() {
       if (group) setMembers(await listMembers(group.id))
 
       if (statusParam === 'success') {
-        // PayPal regresa con ?token=ORDER_ID
-        const paypalToken = params.get('token')
-        if (paypalToken) {
-          const captureRes = await fetch('/api/family/checkout', {
+        // MP suscripción regresa con ?preapproval_id=xxx
+        const mpPreapprovalId = params.get('preapproval_id')
+        if (mpPreapprovalId) {
+          const res = await fetch('/api/family/checkout', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'capture-paypal', token: paypalToken }),
+            body: JSON.stringify({ action: 'capture-mercadopago', token: mpPreapprovalId }),
           })
-          const captureData = await captureRes.json()
-          if (captureData.success) {
-            setPeriodEnd(captureData.period_end ?? null)
-            setView('success')
-            return
-          }
+          const data = await res.json()
+          if (data.success) { setPeriodEnd(data.period_end ?? null); setView('success'); return }
         }
 
-        // Mercado Pago regresa con ?collection_id=PAYMENT_ID&collection_status=approved
+        // MP pago único (legado) regresa con ?collection_id=xxx&collection_status=approved
         const mpPaymentId = params.get('collection_id') ?? params.get('payment_id')
         const mpStatus = params.get('collection_status')
         if (mpPaymentId && mpStatus === 'approved') {
-          const captureRes = await fetch('/api/family/checkout', {
+          const res = await fetch('/api/family/checkout', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'capture-mercadopago', token: mpPaymentId }),
           })
-          const captureData = await captureRes.json()
-          if (captureData.success) {
-            setPeriodEnd(captureData.period_end ?? null)
-            setView('success')
-            return
-          }
+          const data = await res.json()
+          if (data.success) { setPeriodEnd(data.period_end ?? null); setView('success'); return }
         }
 
-        // Fallback: esperar webhook (Stripe u otros)
+        // PayPal suscripción regresa con ?subscription_id=xxx
+        const ppSubId = params.get('subscription_id')
+        if (ppSubId) {
+          const res = await fetch('/api/family/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'capture-paypal', token: ppSubId }),
+          })
+          const data = await res.json()
+          if (data.success) { setPeriodEnd(data.period_end ?? null); setView('success'); return }
+        }
+
+        // PayPal orden única (legado) regresa con ?token=ORDER_ID
+        const ppOrderToken = params.get('token')
+        if (ppOrderToken && !ppSubId) {
+          const res = await fetch('/api/family/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'capture-paypal', token: ppOrderToken }),
+          })
+          const data = await res.json()
+          if (data.success) { setPeriodEnd(data.period_end ?? null); setView('success'); return }
+        }
+
+        // Fallback: esperar webhook
         let active = group?.status === 'active'
         for (let i = 0; i < 5 && !active; i++) {
           await new Promise(r => setTimeout(r, 1500))

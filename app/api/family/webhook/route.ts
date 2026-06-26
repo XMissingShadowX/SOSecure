@@ -1,20 +1,14 @@
 /*
   POST /api/family/webhook
-  Recibe la confirmación de pago del proveedor y ACTIVA el plan familiar.
-  Usa SUPABASE_SERVICE_ROLE_KEY porque corre sin sesión de usuario.
+  Webhook unificado para plan familiar Y plan premium de Mercado Pago.
+  PayPal usa webhooks separados por plan (family / premium).
 
-  Soporta:
-   - Stripe:        evento checkout.session.completed
-   - Mercado Pago:  notificación de payment (topic=payment)
-   - PayPal:        evento PAYMENT.CAPTURE.COMPLETED
-
-  Configura la URL de este webhook en el panel del proveedor:
-   - Stripe:        https://sosecure.site/api/family/webhook
-   - Mercado Pago:  misma URL (se manda como notification_url al crear la preferencia)
-   - PayPal:        https://sosecure.site/api/family/webhook  (en Developer Dashboard → Webhooks)
-
-  Nota sobre seguridad: en producción verifica la firma del webhook
-  (Stripe-Signature / x-signature de Mercado Pago / PayPal-Transmission-Sig).
+  Eventos manejados:
+   - MP:     subscription_preapproval (authorized → activa, cancelled → cancela)
+   - MP:     payment (pago de renovación aprobado)
+   - PayPal: BILLING.SUBSCRIPTION.ACTIVATED / CANCELLED / SUSPENDED
+   - PayPal: PAYMENT.SALE.COMPLETED (renovación)
+   - Stripe: checkout.session.completed (legado)
 */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -30,9 +24,16 @@ const PAYPAL_BASE = process.env.PAYPAL_MODE === 'live'
   ? 'https://api-m.paypal.com'
   : 'https://api-m.sandbox.paypal.com'
 
-/** Verifica la firma de Mercado Pago usando el header x-signature */
+function admin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
+
 async function verifyMercadoPagoSignature(req: NextRequest, rawBody: string): Promise<boolean> {
-  if (!MP_WEBHOOK_SECRET) return true // sin secret configurado, aceptar (modo dev)
+  if (!MP_WEBHOOK_SECRET) return true
   const xSignature = req.headers.get('x-signature')
   const xRequestId = req.headers.get('x-request-id')
   const dataId = new URL(req.url).searchParams.get('data.id') ?? ''
@@ -53,7 +54,6 @@ async function verifyMercadoPagoSignature(req: NextRequest, rawBody: string): Pr
   return hex === v1
 }
 
-/** Verifica la firma de PayPal usando su API de verificación */
 async function verifyPayPalSignature(req: NextRequest, rawBody: string): Promise<boolean> {
   if (!PAYPAL_WEBHOOK_ID || !PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) return true
   try {
@@ -66,7 +66,6 @@ async function verifyPayPalSignature(req: NextRequest, rawBody: string): Promise
       body: 'grant_type=client_credentials',
     })
     const { access_token } = await tokenRes.json()
-
     const verifyRes = await fetch(`${PAYPAL_BASE}/v1/notifications/verify-webhook-signature`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${access_token}`, 'Content-Type': 'application/json' },
@@ -82,54 +81,40 @@ async function verifyPayPalSignature(req: NextRequest, rawBody: string): Promise
     })
     const result = await verifyRes.json()
     return result.verification_status === 'SUCCESS'
-  } catch {
-    return false
-  }
+  } catch { return false }
 }
 
-function admin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-}
-
-async function activateGroup(groupId: string, provider: string, ref?: string) {
+async function activateGroup(groupId: string, provider: string, ref: string) {
   const now = new Date()
   const end = new Date(now)
   end.setFullYear(end.getFullYear() + 1)
+  await admin().from('family_groups').update({
+    status: 'active', provider, provider_ref: ref,
+    amount_cents: FAMILY_PLAN.amountCents, currency: FAMILY_PLAN.currency,
+    current_period_start: now.toISOString(), current_period_end: end.toISOString(),
+  }).eq('id', groupId)
+}
 
-  await admin()
-    .from('family_groups')
-    .update({
-      status: 'active',
-      provider,
-      provider_ref: ref ?? null,
-      amount_cents: FAMILY_PLAN.amountCents,
-      currency: FAMILY_PLAN.currency,
-      current_period_start: now.toISOString(),
-      current_period_end: end.toISOString(),
-    })
+async function cancelGroup(groupId: string) {
+  await admin().from('family_groups')
+    .update({ status: 'cancelled' })
     .eq('id', groupId)
 }
 
-async function activateSub(subId: string, provider: string, ref?: string) {
+async function activateSub(subId: string, provider: string, ref: string) {
   const now = new Date()
   const end = new Date(now)
   end.setMonth(end.getMonth() + 1)
+  await admin().from('premium_subscriptions').update({
+    status: 'active', provider, provider_ref: ref,
+    amount_cents: PREMIUM_PLAN.amountCents, currency: PREMIUM_PLAN.currency,
+    current_period_start: now.toISOString(), current_period_end: end.toISOString(),
+  }).eq('id', subId)
+}
 
-  await admin()
-    .from('premium_subscriptions')
-    .update({
-      status: 'active',
-      provider,
-      provider_ref: ref ?? null,
-      amount_cents: PREMIUM_PLAN.amountCents,
-      currency: PREMIUM_PLAN.currency,
-      current_period_start: now.toISOString(),
-      current_period_end: end.toISOString(),
-    })
+async function cancelSub(subId: string) {
+  await admin().from('premium_subscriptions')
+    .update({ status: 'cancelled' })
     .eq('id', subId)
 }
 
@@ -138,20 +123,51 @@ export async function POST(req: NextRequest) {
     const rawBody = await req.text()
     const body = JSON.parse(rawBody || '{}')
 
-    // ── Stripe ─────────────────────────────────────────────
+    // ── Stripe (legado) ────────────────────────────────────────────────
     if (body?.type === 'checkout.session.completed') {
       const session = body.data?.object
       const groupId = session?.metadata?.group_id || session?.client_reference_id
-      if (groupId) {
-        await activateGroup(groupId, 'stripe', session?.id)
+      if (groupId) await activateGroup(groupId, 'stripe', session?.id)
+      return NextResponse.json({ received: true })
+    }
+
+    // ── Mercado Pago — suscripción (preapproval) ──────────────────────
+    if (body?.type === 'subscription_preapproval' && body?.data?.id && MP_ACCESS_TOKEN) {
+      const valid = await verifyMercadoPagoSignature(req, rawBody)
+      if (!valid) return NextResponse.json({ error: 'Firma inválida' }, { status: 401 })
+
+      const preapprovalId = body.data.id
+      const res = await fetch(`https://api.mercadopago.com/preapproval/${preapprovalId}`, {
+        headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` },
+      })
+      const preapproval = await res.json()
+      const isPremium = preapproval.metadata?.kind === 'premium'
+
+      if (preapproval.status === 'authorized') {
+        if (isPremium) {
+          const subId = preapproval.external_reference || preapproval.metadata?.subscription_id
+          if (subId) await activateSub(subId, 'mercadopago', preapprovalId)
+        } else {
+          const groupId = preapproval.external_reference
+          if (groupId) await activateGroup(groupId, 'mercadopago', preapprovalId)
+        }
+      } else if (preapproval.status === 'cancelled' || preapproval.status === 'paused') {
+        if (isPremium) {
+          const subId = preapproval.external_reference || preapproval.metadata?.subscription_id
+          if (subId) await cancelSub(subId)
+        } else {
+          const groupId = preapproval.external_reference
+          if (groupId) await cancelGroup(groupId)
+        }
       }
       return NextResponse.json({ received: true })
     }
 
-    // ── Mercado Pago ───────────────────────────────────────
+    // ── Mercado Pago — pago de renovación ─────────────────────────────
     if (body?.type === 'payment' && body?.data?.id && MP_ACCESS_TOKEN) {
       const valid = await verifyMercadoPagoSignature(req, rawBody)
       if (!valid) return NextResponse.json({ error: 'Firma inválida' }, { status: 401 })
+
       const paymentId = body.data.id
       const res = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
         headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` },
@@ -163,24 +179,43 @@ export async function POST(req: NextRequest) {
           const subId = payment.external_reference || payment.metadata?.subscription_id
           if (subId) await activateSub(subId, 'mercadopago', String(paymentId))
         } else {
-          const groupId = payment.external_reference || payment.metadata?.group_id
+          const groupId = payment.external_reference
           if (groupId) await activateGroup(groupId, 'mercadopago', String(paymentId))
         }
       }
       return NextResponse.json({ received: true })
     }
 
-    // ── PayPal ─────────────────────────────────────────────
+    // ── PayPal — suscripción activada ─────────────────────────────────
+    if (body?.event_type === 'BILLING.SUBSCRIPTION.ACTIVATED') {
+      const valid = await verifyPayPalSignature(req, rawBody)
+      if (!valid) return NextResponse.json({ error: 'Firma inválida' }, { status: 401 })
+
+      const resource = body?.resource
+      const groupId = resource?.custom_id ?? resource?.subscriber?.custom_id
+      if (groupId) await activateGroup(groupId, 'paypal', resource?.id)
+      return NextResponse.json({ received: true })
+    }
+
+    // ── PayPal — suscripción cancelada / suspendida ───────────────────
+    if (body?.event_type === 'BILLING.SUBSCRIPTION.CANCELLED' ||
+        body?.event_type === 'BILLING.SUBSCRIPTION.SUSPENDED') {
+      const valid = await verifyPayPalSignature(req, rawBody)
+      if (!valid) return NextResponse.json({ error: 'Firma inválida' }, { status: 401 })
+
+      const groupId = body?.resource?.custom_id
+      if (groupId) await cancelGroup(groupId)
+      return NextResponse.json({ received: true })
+    }
+
+    // ── PayPal — pago de renovación (legado one-time) ─────────────────
     if (body?.event_type === 'PAYMENT.CAPTURE.COMPLETED') {
       const valid = await verifyPayPalSignature(req, rawBody)
       if (!valid) return NextResponse.json({ error: 'Firma inválida' }, { status: 401 })
+
       const resource = body?.resource
-      // custom_id lo pusimos en la orden al crearla
-      const groupId = resource?.custom_id
-        ?? resource?.purchase_units?.[0]?.custom_id
-      if (groupId) {
-        await activateGroup(groupId, 'paypal', resource?.id)
-      }
+      const groupId = resource?.custom_id ?? resource?.purchase_units?.[0]?.custom_id
+      if (groupId) await activateGroup(groupId, 'paypal', resource?.id)
       return NextResponse.json({ received: true })
     }
 
@@ -190,7 +225,6 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Mercado Pago y PayPal a veces hacen GET de validación
 export async function GET() {
   return NextResponse.json({ ok: true })
 }
