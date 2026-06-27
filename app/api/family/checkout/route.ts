@@ -28,6 +28,7 @@ function adminClient() {
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://sosecure.site'
 const MP_ACCESS_TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN
+const MP_FAMILY_PLAN_ID = process.env.MERCADOPAGO_FAMILY_PLAN_ID
 const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID
 const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET
 const PAYPAL_FAMILY_PLAN_ID = process.env.PAYPAL_FAMILY_PLAN_ID
@@ -54,8 +55,8 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-    const body = (await req.json().catch(() => ({}))) as { action?: string; token?: string; provider?: string; payerEmail?: string }
-    const { action, token, provider, payerEmail } = body
+    const body = (await req.json().catch(() => ({}))) as { action?: string; token?: string; provider?: string }
+    const { action, token, provider } = body
 
     const admin = adminClient()
 
@@ -181,33 +182,10 @@ export async function POST(req: NextRequest) {
     const successUrl = `${BASE_URL}/plan-familiar/pago/?status=success`
     const cancelUrl = `${BASE_URL}/plan-familiar/pago/?status=cancel`
 
-    // 1) Mercado Pago — preapproval (suscripción recurrente)
-    if (MP_ACCESS_TOKEN && provider !== 'paypal') {
-      const emailToUse = payerEmail?.trim() || user.email
-      const emailValid = emailToUse && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailToUse)
-      if (!emailValid) {
-        return NextResponse.json({ error: 'Ingresa un correo electrónico válido en el campo de Mercado Pago para continuar.' }, { status: 400 })
-      }
-
-      const res = await fetch('https://api.mercadopago.com/preapproval', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          reason: `${FAMILY_PLAN.name} — SOSecure`,
-          payer_email: emailToUse,
-          auto_recurring: {
-            frequency: 1,
-            frequency_type: 'years',
-            transaction_amount: FAMILY_PLAN.amountCents / 100,
-            currency_id: FAMILY_PLAN.currency,
-          },
-          back_url: successUrl,
-          external_reference: group.id,
-          notification_url: `${BASE_URL}/api/family/webhook`,
-        }),
+    // 1) Mercado Pago — usar init_point del plan directamente
+    if (MP_ACCESS_TOKEN && MP_FAMILY_PLAN_ID && provider !== 'paypal') {
+      const res = await fetch(`https://api.mercadopago.com/preapproval_plan/${MP_FAMILY_PLAN_ID}`, {
+        headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` },
       })
       const data = await res.json()
       const url = data.init_point

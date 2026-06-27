@@ -46,9 +46,14 @@ export default function PagoPlanPremiumPage() {
       const sub = await ensureSubscription()
 
       // ¿Regresó del proveedor? Verificar si ya quedó activo.
-      if (statusParam === 'success') {
+      // Nota: MP puede generar URLs con doble ? (back_url?param=x?preapproval_id=y)
+      // por eso también buscamos en el href completo como fallback.
+      const rawHref = window.location.href
+      const mpPreapprovalIdFallback = rawHref.match(/preapproval_id=([^&?]+)/)?.[1]
+
+      if (statusParam === 'success' || mpPreapprovalIdFallback) {
         // MP suscripción regresa con ?preapproval_id=xxx
-        const mpPreapprovalId = params.get('preapproval_id')
+        const mpPreapprovalId = params.get('preapproval_id') || mpPreapprovalIdFallback
         if (mpPreapprovalId) {
           const res = await fetch('/api/premium/checkout', {
             method: 'POST',

@@ -141,14 +141,37 @@ export async function POST(req: NextRequest) {
         headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` },
       })
       const preapproval = await res.json()
-      const isPremium = preapproval.metadata?.kind === 'premium'
+      const payerEmail = preapproval.payer_email
+      const MP_PREMIUM_PLAN_ID = process.env.MERCADOPAGO_PREMIUM_PLAN_ID
+      const MP_FAMILY_PLAN_ID = process.env.MERCADOPAGO_FAMILY_PLAN_ID
+      const isPremium = preapproval.preapproval_plan_id === MP_PREMIUM_PLAN_ID
+                     || preapproval.metadata?.kind === 'premium'
+                     || !!preapproval.external_reference?.includes?.('premium')
+
+      const db = admin()
 
       if (preapproval.status === 'authorized') {
         if (isPremium) {
-          const subId = preapproval.external_reference || preapproval.metadata?.subscription_id
+          // Buscar sub por external_reference o por email del pagador
+          let subId = preapproval.external_reference || preapproval.metadata?.subscription_id
+          if (!subId && payerEmail) {
+            const { data: profile } = await db.from('profiles').select('id').eq('email', payerEmail).maybeSingle()
+            if (profile) {
+              const { data: sub } = await db.from('premium_subscriptions').select('id').eq('user_id', profile.id).maybeSingle()
+              subId = sub?.id
+            }
+          }
           if (subId) await activateSub(subId, 'mercadopago', preapprovalId)
         } else {
-          const groupId = preapproval.external_reference
+          // Buscar grupo por external_reference o por email del pagador
+          let groupId = preapproval.external_reference
+          if (!groupId && payerEmail) {
+            const { data: profile } = await db.from('profiles').select('id').eq('email', payerEmail).maybeSingle()
+            if (profile) {
+              const { data: group } = await db.from('family_groups').select('id').eq('owner_id', profile.id).maybeSingle()
+              groupId = group?.id
+            }
+          }
           if (groupId) await activateGroup(groupId, 'mercadopago', preapprovalId)
         }
       } else if (preapproval.status === 'cancelled' || preapproval.status === 'paused') {

@@ -28,6 +28,7 @@ function adminClient() {
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://sosecure.site'
 const MP_ACCESS_TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN
+const MP_PREMIUM_PLAN_ID = process.env.MERCADOPAGO_PREMIUM_PLAN_ID
 const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID
 const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET
 const PAYPAL_PREMIUM_PLAN_ID = process.env.PAYPAL_PREMIUM_PLAN_ID
@@ -79,10 +80,12 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-    const body = (await req.json().catch(() => ({}))) as { action?: string; token?: string; provider?: string; payerEmail?: string }
-    const { action, token, provider, payerEmail } = body
+    const body = (await req.json().catch(() => ({}))) as { action?: string; token?: string; provider?: string }
+    const { action, token, provider } = body
 
+    console.log('[premium/checkout] body:', { action, provider })
     const sub = await ensureSubRow(admin, user.id)
+    console.log('[premium/checkout] sub:', sub?.id)
     if (!sub) return NextResponse.json({ error: 'No se pudo crear la suscripción' }, { status: 500 })
 
     // ── Verificar preapproval de Mercado Pago al regresar ──────────────
@@ -167,41 +170,18 @@ export async function POST(req: NextRequest) {
     const successUrl = `${BASE_URL}/plan-premium/pago/?status=success`
     const cancelUrl = `${BASE_URL}/plan-premium/pago/?status=cancel`
 
-    // 1) Mercado Pago — preapproval mensual
-    if (MP_ACCESS_TOKEN && provider !== 'paypal') {
-      const emailToUse = payerEmail?.trim() || user.email
-      const emailValid = emailToUse && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailToUse)
-      if (!emailValid) {
-        return NextResponse.json({ error: 'Ingresa un correo electrónico válido en el campo de Mercado Pago para continuar.' }, { status: 400 })
-      }
-
-      const res = await fetch('https://api.mercadopago.com/preapproval', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          reason: `${PREMIUM_PLAN.name} — SOSecure`,
-          payer_email: emailToUse,
-          auto_recurring: {
-            frequency: 1,
-            frequency_type: 'months',
-            transaction_amount: PREMIUM_PLAN.amountCents / 100,
-            currency_id: PREMIUM_PLAN.currency,
-          },
-          back_url: successUrl,
-          external_reference: sub.id,
-          notification_url: `${BASE_URL}/api/family/webhook`,
-          metadata: { subscription_id: sub.id, user_id: user.id, kind: 'premium' },
-        }),
+    // 1) Mercado Pago — usar init_point del plan directamente
+    if (MP_ACCESS_TOKEN && MP_PREMIUM_PLAN_ID && provider !== 'paypal') {
+      const res = await fetch(`https://api.mercadopago.com/preapproval_plan/${MP_PREMIUM_PLAN_ID}`, {
+        headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` },
       })
-      const data = await res.json()
-      const url = data.init_point
-      if (!url) return NextResponse.json({ error: 'No se pudo crear la suscripción de Mercado Pago', detail: data }, { status: 502 })
+      const plan = await res.json()
+      console.log('[premium/checkout] MP plan:', JSON.stringify(plan))
+      const url = plan.init_point
+      if (!url) return NextResponse.json({ error: 'No se pudo obtener el plan de Mercado Pago', detail: plan }, { status: 502 })
 
       await admin.from('premium_subscriptions')
-        .update({ provider: 'mercadopago', provider_ref: data.id })
+        .update({ provider: 'mercadopago' })
         .eq('id', sub.id)
       return NextResponse.json({ url, provider: 'mercadopago' })
     }
