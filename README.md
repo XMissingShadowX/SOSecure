@@ -120,7 +120,7 @@
 | Geocodificación | Photon / Komoot |
 | Mobile | Capacitor 8 (Android) |
 | Email | Resend API |
-| Pagos | Mercado Pago Checkout Pro + PayPal Orders API v2 |
+| Pagos | Mercado Pago Preapproval Plans + PayPal Subscriptions API |
 | Gráficas | recharts |
 | Iconos | lucide-react |
 | Fechas | date-fns |
@@ -147,14 +147,18 @@ RESEND_API_KEY=tu-clave-resend
 # Mercado Pago (preferido en México — tarjeta, OXXO, SPEI)
 MERCADOPAGO_ACCESS_TOKEN=APP_USR-...
 NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY=APP_USR-...
-MERCADOPAGO_WEBHOOK_SECRET=   # Clave secreta del panel MP → Webhooks
+MERCADOPAGO_WEBHOOK_SECRET=        # Clave secreta del panel MP → Webhooks
+MERCADOPAGO_PREMIUM_PLAN_ID=       # ID del plan creado vía API /preapproval_plan
+MERCADOPAGO_FAMILY_PLAN_ID=        # ID del plan creado vía API /preapproval_plan
 
 # PayPal (respaldo)
 PAYPAL_CLIENT_ID=tu-client-id
 PAYPAL_CLIENT_SECRET=tu-client-secret
-PAYPAL_MODE=sandbox            # cambiar a "live" en producción
-PAYPAL_WEBHOOK_ID_FAMILY=      # ID del webhook en PayPal Developer Dashboard
-PAYPAL_WEBHOOK_ID_PREMIUM=     # ID del webhook en PayPal Developer Dashboard
+PAYPAL_MODE=sandbox                # cambiar a "live" en producción
+PAYPAL_WEBHOOK_ID_FAMILY=          # ID del webhook en PayPal Developer Dashboard
+PAYPAL_WEBHOOK_ID_PREMIUM=         # ID del webhook en PayPal Developer Dashboard
+PAYPAL_FAMILY_PLAN_ID=             # ID del billing plan en PayPal
+PAYPAL_PREMIUM_PLAN_ID=            # ID del billing plan en PayPal
 
 # URL pública de la app
 NEXT_PUBLIC_APP_URL=https://sosecure.site
@@ -166,21 +170,30 @@ NEXT_PUBLIC_APP_URL=https://sosecure.site
 
 El usuario **elige el proveedor** en la página de pago (Mercado Pago o PayPal). El API detecta automáticamente cuál usar según la variable de entorno disponible y la preferencia enviada.
 
-**Flujo de activación:**
-1. Usuario elige proveedor y hace clic en "Pagar"
-2. Se redirige al checkout del proveedor
-3. Al regresar, la app captura/verifica el pago directamente con la API del proveedor y activa el plan al instante
-4. Si el usuario cierra la pestaña antes de regresar, el webhook lo activa como respaldo
+**Flujo de suscripción (Mercado Pago):**
+1. Se usa `GET /preapproval_plan/{id}` para obtener el `init_point` del plan
+2. Usuario es redirigido al checkout de MP donde paga con tarjeta, OXXO, SPEI, etc.
+3. MP redirige de vuelta con `?preapproval_id=xxx` — la página lo captura y activa el plan
+4. Si el usuario cierra antes de regresar, el webhook activa el plan mapeando por `payer_email`
 
-**Webhooks** — configurar en los paneles de cada proveedor con evento de pago completado:
+> **Importante:** Los planes de MP deben crearse vía la API (`POST /preapproval_plan`), no desde el dashboard web — los planes del dashboard requieren `card_token_id` y no permiten el flujo de redirect.
 
-| Proveedor | URL | Evento |
-|-----------|-----|--------|
-| Mercado Pago | `https://sosecure.site/api/family/webhook` | Pagos (maneja family y premium) |
-| PayPal (family) | `https://sosecure.site/api/family/webhook` | `PAYMENT.CAPTURE.COMPLETED` |
-| PayPal (premium) | `https://sosecure.site/api/premium/webhook` | `PAYMENT.CAPTURE.COMPLETED` |
+**Flujo de suscripción (PayPal):**
+1. Se crea una suscripción con `POST /v1/billing/subscriptions` referenciando el Plan ID
+2. Usuario aprueba en PayPal y regresa con `?subscription_id=xxx`
+3. La página verifica el estado con la API de PayPal y activa el plan
 
-La verificación de firma está implementada — se activa automáticamente cuando `MERCADOPAGO_WEBHOOK_SECRET` y `PAYPAL_WEBHOOK_ID_*` están configurados.
+**Webhooks** — configurar en los paneles de cada proveedor:
+
+| Proveedor | URL | Eventos |
+|-----------|-----|---------|
+| Mercado Pago | `https://sosecure.site/api/family/webhook` | `subscription_preapproval`, `payment` (maneja family y premium) |
+| PayPal (family) | `https://sosecure.site/api/family/webhook` | `BILLING.SUBSCRIPTION.ACTIVATED/CANCELLED` |
+| PayPal (premium) | `https://sosecure.site/api/premium/webhook` | `BILLING.SUBSCRIPTION.ACTIVATED/CANCELLED` |
+
+La verificación de firma está implementada — se activa cuando `MERCADOPAGO_WEBHOOK_SECRET` y `PAYPAL_WEBHOOK_ID_*` están configurados.
+
+**Cancelación:** disponible desde Ajustes → sección del plan. Llama a `/api/family/cancel` o `/api/premium/cancel` según el plan y proveedor.
 
 **Regla de negocio:** Si el usuario tiene plan familiar activo (dueño o miembro), el plan premium individual no se ofrece — se muestra como "Incluido en tu Plan Familiar".
 
