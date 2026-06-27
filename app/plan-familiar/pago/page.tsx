@@ -34,7 +34,6 @@ export default function PagoPlanFamiliarPage() {
   const [error, setError] = useState<string | null>(null)
   const [periodEnd, setPeriodEnd] = useState<string | null>(null)
   const [provider, setProvider] = useState<Provider>('mercadopago')
-  const [payerEmail, setPayerEmail] = useState('')
 
   useEffect(() => {
     const init = async () => {
@@ -48,9 +47,12 @@ export default function PagoPlanFamiliarPage() {
       const group = await ensureOwnedGroup()
       if (group) setMembers(await listMembers(group.id))
 
-      if (statusParam === 'success') {
+      const rawHref = window.location.href
+      const mpPreapprovalIdFallback = rawHref.match(/preapproval_id=([^&?]+)/)?.[1]
+
+      if (statusParam === 'success' || mpPreapprovalIdFallback) {
         // MP suscripción regresa con ?preapproval_id=xxx
-        const mpPreapprovalId = params.get('preapproval_id')
+        const mpPreapprovalId = params.get('preapproval_id') || mpPreapprovalIdFallback
         if (mpPreapprovalId) {
           const res = await fetch('/api/family/checkout', {
             method: 'POST',
@@ -127,7 +129,7 @@ export default function PagoPlanFamiliarPage() {
       const res = await fetch('/api/family/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'create-session', provider, payerEmail: payerEmail.trim() || undefined }),
+        body: JSON.stringify({ action: 'create-session', provider }),
       })
       const data = await res.json()
       if (data.url) { window.location.href = data.url; return }
@@ -242,22 +244,6 @@ export default function PagoPlanFamiliarPage() {
             )}
             {provider === 'paypal' && (
               <p className="pf-provider-note">Tarjeta o saldo PayPal</p>
-            )}
-
-            {provider === 'mercadopago' && (
-              <div style={{marginTop:'12px'}}>
-                <label style={{display:'block',fontSize:'12px',color:'#888',marginBottom:'4px'}}>
-                  Correo de Mercado Pago <span style={{color:'#aaa'}}>(opcional, solo para pruebas)</span>
-                </label>
-                <input
-                  type="email"
-                  placeholder="otro@correo.com"
-                  value={payerEmail}
-                  onChange={e => setPayerEmail(e.target.value)}
-                  style={{width:'100%',padding:'8px 10px',borderRadius:'8px',border:'1px solid #ccc',fontSize:'14px',boxSizing:'border-box'}}
-                />
-                <p style={{fontSize:'11px',color:'#aaa',marginTop:'4px'}}>Si tu correo de la app es el mismo de MP, ingresa uno diferente para pruebas.</p>
-              </div>
             )}
 
             <button className="pf-btn pf-btn-primary" onClick={payWithProvider} disabled={processing} style={{marginTop:'14px'}}>
