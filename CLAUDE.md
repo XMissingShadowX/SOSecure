@@ -377,17 +377,30 @@ npm run cap:android  # Luego Build > Generate Signed APK en Android Studio
 ### Plan Familiar y Plan Premium — Pagos
 
 - Pasarelas activas: **Mercado Pago** (preferida) y **PayPal** (respaldo). El usuario elige en la página de pago.
-- El código detecta automáticamente el proveedor según las variables de entorno presentes. Si ambos están configurados, el usuario elige.
 - Flujo general: `FamilyPlanSection` / `PremiumPlanSection` → página de pago → `/api/family/checkout` o `/api/premium/checkout` → proveedor → captura al regresar → webhook como respaldo
 
-**Activación al regresar (sin webhook):**
-- **PayPal:** regresa con `?token=ORDER_ID` → se llama `action: 'capture-paypal'` para capturar y activar
-- **Mercado Pago:** regresa con `?collection_id=PAYMENT_ID&collection_status=approved` → se llama `action: 'capture-mercadopago'` para verificar con la API de MP y activar
+**Mercado Pago — suscripciones recurrentes (`preapproval_plan`):**
+- Los planes se crean vía API (`POST /preapproval_plan`) con `auto_recurring` y `back_url` — **NO desde el dashboard web** (los planes del dashboard requieren `card_token_id` y no permiten redirect).
+- El checkout obtiene el `init_point` del plan (`GET /preapproval_plan/{id}`) y redirige al usuario.
+- Al regresar, MP añade `?preapproval_id=xxx` a la `back_url`. La página lo captura y llama `action: 'capture-mercadopago'`.
+- El webhook mapea por `payer_email` si no hay `external_reference` (flujo de plan compartido).
+- Variables requeridas: `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_PREMIUM_PLAN_ID`, `MERCADOPAGO_FAMILY_PLAN_ID`
+
+**PayPal — suscripciones recurrentes (`Subscriptions API`):**
+- Requiere Billing Plans creados en el panel de PayPal (sandbox: sandbox.paypal.com, live: business dashboard).
+- El checkout crea una suscripción con `POST /v1/billing/subscriptions` y redirige al `approve` link.
+- Al regresar con `?subscription_id=xxx`, se verifica con `GET /v1/billing/subscriptions/{id}`.
+- Variables requeridas: `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_MODE`, `PAYPAL_FAMILY_PLAN_ID`, `PAYPAL_PREMIUM_PLAN_ID`
 
 **Webhooks (respaldo si el usuario cierra antes de regresar):**
-- MP y PayPal (family): `https://sosecure.site/api/family/webhook` — maneja ambos planes family y premium de MP
-- PayPal (premium): `https://sosecure.site/api/premium/webhook`
-- Verificación de firma habilitada cuando `MERCADOPAGO_WEBHOOK_SECRET` y `PAYPAL_WEBHOOK_ID_*` están configurados; sin ellas acepta todo (modo dev)
+- MP (family y premium): `https://sosecure.site/api/family/webhook` — eventos `subscription_preapproval` y `payment`
+- PayPal (family): `https://sosecure.site/api/family/webhook` — `BILLING.SUBSCRIPTION.ACTIVATED/CANCELLED`
+- PayPal (premium): `https://sosecure.site/api/premium/webhook` — `BILLING.SUBSCRIPTION.ACTIVATED/CANCELLED`
+- Verificación de firma habilitada cuando `MERCADOPAGO_WEBHOOK_SECRET` y `PAYPAL_WEBHOOK_ID_*` están configurados
+
+**Cancelación:**
+- Desde Ajustes → botón "Cancelar suscripción" → `POST /api/family/cancel` o `/api/premium/cancel`
+- Cancela en MP (`PATCH /preapproval/{id}`) o PayPal (`POST /subscriptions/{id}/cancel`) y actualiza Supabase
 
 **Reglas de negocio:**
 - Todos los writes a `family_groups`, `family_members` y `premium_subscriptions` usan **admin client** para evitar bloqueo RLS
