@@ -28,7 +28,6 @@ import { AfterTab } from './tabs/after-tab'
 import { Shield, Settings, LogOut, BellRing, WifiOff, Sun, Moon, UserCircle, Trash2, Lock, LockOpen, KeyRound, CheckCircle2, Delete, ShieldCheck, Volume2, Puzzle, Languages } from 'lucide-react'
 import { useTranslation, LANG_LABELS, type Lang } from '@/lib/i18n'
 import { PinLock } from './pin-lock'
-import { hashPin } from '@/lib/pin'
 import { Button } from '@/components/ui/button'
 import { FamilyPlanSection } from './family-plan-section'
 import { PremiumPlanSection } from './premium-plan-section'
@@ -81,12 +80,17 @@ export function AppShell() {
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
   // PIN state
+  // pinCheckLoading arranca en true (fail-closed): no se muestra ni el contenido
+  // principal ni el PIN lock hasta saber con certeza si hay que bloquear. Evita
+  // el "flash" donde el contenido sensible se monta antes de que resuelva el
+  // fetch de /api/pin.
+  const [pinCheckLoading, setPinCheckLoading] = useState(true)
   const [pinLocked, setPinLocked] = useState(false)
   const [pinProfile, setPinProfile] = useState<{
     pin_enabled: boolean
-    pin_hash: string | null
+    pin_configured: boolean
     pin_timeout_minutes: number
-  }>({ pin_enabled: false, pin_hash: null, pin_timeout_minutes: 5 })
+  }>({ pin_enabled: false, pin_configured: false, pin_timeout_minutes: 5 })
   const [forgotPinSent, setForgotPinSent] = useState(false)
   const [forgotPinLoading, setForgotPinLoading] = useState(false)
 
@@ -344,33 +348,34 @@ export function AppShell() {
   // Load PIN profile and check if lock screen should show
   useEffect(() => {
     if (!user) return
-    const supabase = createClient()
-    supabase
-      .from('profiles')
-      .select('pin_enabled, pin_hash, pin_timeout_minutes')
-      .eq('id', user.id)
-      .single()
-      .then(({ data }) => {
-        if (!data) return
+    fetch('/api/pin')
+      .then(res => res.json())
+      .then((data) => {
         const profile = {
           pin_enabled: data.pin_enabled ?? false,
-          pin_hash: data.pin_hash ?? null,
+          pin_configured: data.pin_configured ?? false,
           pin_timeout_minutes: data.pin_timeout_minutes ?? 5,
         }
         setPinProfile(profile)
 
-        if (!profile.pin_enabled || !profile.pin_hash) return
+        if (!profile.pin_enabled || !profile.pin_configured) {
+          setPinCheckLoading(false)
+          return
+        }
 
         const lastActive = sessionStorage.getItem('sosecure-last-active')
         if (!lastActive) {
           setPinLocked(true)
+          setPinCheckLoading(false)
           return
         }
         const elapsed = (Date.now() - parseInt(lastActive)) / 60000
         if (elapsed >= profile.pin_timeout_minutes) {
           setPinLocked(true)
         }
+        setPinCheckLoading(false)
       })
+      .catch(() => setPinCheckLoading(false))
   }, [user])
 
   // Track visibility changes to enforce PIN timeout
@@ -378,7 +383,7 @@ export function AppShell() {
     const handleVisibility = () => {
       if (document.visibilityState === 'hidden') {
         sessionStorage.setItem('sosecure-last-active', Date.now().toString())
-      } else if (document.visibilityState === 'visible' && pinProfile.pin_enabled && pinProfile.pin_hash) {
+      } else if (document.visibilityState === 'visible' && pinProfile.pin_enabled && pinProfile.pin_configured) {
         const lastActive = sessionStorage.getItem('sosecure-last-active')
         if (!lastActive) return
         const elapsed = (Date.now() - parseInt(lastActive)) / 60000
@@ -429,16 +434,36 @@ export function AppShell() {
     }
   }
 
+  // Permite escribir el PIN del asistente de configuración con el teclado físico,
+  // igual que ya funciona en la pantalla de desbloqueo (pin-lock.tsx).
+  useEffect(() => {
+    if (pinStep !== 'enter-new' && pinStep !== 'confirm-new') return
+    const stepKey = pinStep === 'enter-new' ? 'new' : 'confirm'
+    const handler = (e: KeyboardEvent) => {
+      if (e.key >= '0' && e.key <= '9') pinSetupDigit(e.key, stepKey)
+      if (e.key === 'Backspace') {
+        if (stepKey === 'new') setPinNewDigits(p => p.slice(0, -1))
+        else setPinConfirmDigits(p => p.slice(0, -1))
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [pinStep, pinNewDigits, pinConfirmDigits])
+
   const savePinSetup = async (pin: string) => {
     if (!user) return
     setPinSaving(true)
-    const hash = await hashPin(pin, user.id)
+    // El PIN viaja en texto plano por HTTPS al servidor, que es quien lo
+    // hashea con bcrypt — el cliente nunca calcula ni ve el hash.
     await fetch('/api/pin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin_hash: hash, pin_enabled: true }),
+      body: JSON.stringify({ pin, pin_enabled: true }),
     })
-    setPinProfile(prev => ({ ...prev, pin_enabled: true, pin_hash: hash }))
+    setPinProfile(prev => ({ ...prev, pin_enabled: true, pin_configured: true }))
+    // Limpiar el timestamp de "última actividad" para que la próxima carga
+    // bloquee de inmediato, en vez de heredar un timestamp de antes de activar el PIN.
+    sessionStorage.removeItem('sosecure-last-active')
     setPinStep('done')
     setPinSaving(false)
     setTimeout(() => {
@@ -458,13 +483,14 @@ export function AppShell() {
       })
       setPinProfile(prev => ({ ...prev, pin_enabled: false }))
     } else {
-      // If hash exists, just enable; otherwise start setup
-      if (pinProfile.pin_hash) {
+      // Si ya hay un PIN configurado, solo habilitar; si no, iniciar el asistente de creación.
+      if (pinProfile.pin_configured) {
         await fetch('/api/pin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ pin_enabled: true }),
         })
+        sessionStorage.removeItem('sosecure-last-active')
         setPinProfile(prev => ({ ...prev, pin_enabled: true }))
       } else {
         setPinStep('enter-new')
@@ -474,11 +500,16 @@ export function AppShell() {
 
   const changeTimeout = async (minutes: number) => {
     if (!user) return
-    await fetch('/api/pin', {
+    const res = await fetch('/api/pin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pin_timeout_minutes: minutes }),
     })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      console.error('No se pudo guardar pin_timeout_minutes:', body.error)
+      return
+    }
     setPinProfile(prev => ({ ...prev, pin_timeout_minutes: minutes }))
   }
 
@@ -501,8 +532,18 @@ export function AppShell() {
     }
   }
 
+  // Fail-closed: mientras no sabemos con certeza quién es el usuario ni si
+  // hay que bloquear, no se monta ni el contenido principal ni el PIN lock —
+  // solo una pantalla neutra. Antes esto solo se activaba cuando `user` ya
+  // existía, pero `user` arranca en null (efecto de arriba aún no resuelve),
+  // así que el contenido principal se colaba antes de saberlo. Evita el
+  // "flash" donde datos sensibles aparecen brevemente antes del PIN.
+  if (!user || pinCheckLoading) {
+    return <div className="fixed inset-0 z-[99999] bg-background" />
+  }
+
   // Render PIN lock overlay (takes over the entire screen)
-  if (pinLocked && pinProfile.pin_hash && user) {
+  if (pinLocked && pinProfile.pin_configured && user) {
     if (forgotPinSent) {
       return (
         <div className="fixed inset-0 z-[99999] bg-background flex flex-col items-center justify-center p-6 text-center gap-4">
@@ -519,7 +560,6 @@ export function AppShell() {
     return (
       <PinLock
         userId={user.id}
-        pinHash={pinProfile.pin_hash}
         onUnlock={handlePinUnlock}
         onForgotPin={handleForgotPin}
       />
@@ -684,7 +724,7 @@ export function AppShell() {
                             border: 'none',
                             cursor: 'pointer',
                             flexShrink: 0,
-                            backgroundColor: pinProfile.pin_enabled && pinProfile.pin_hash
+                            backgroundColor: pinProfile.pin_enabled && pinProfile.pin_configured
                               ? (isDark ? 'oklch(0.75 0.15 180)' : 'oklch(0.55 0.15 180)')
                               : (isDark ? 'oklch(0.35 0.02 260)' : 'oklch(0.78 0.01 260)'),
                             transition: 'background-color 0.2s',
@@ -700,13 +740,13 @@ export function AppShell() {
                             backgroundColor: 'white',
                             boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
                             transition: 'transform 0.2s',
-                            transform: pinProfile.pin_enabled && pinProfile.pin_hash ? 'translateX(24px)' : 'translateX(4px)',
+                            transform: pinProfile.pin_enabled && pinProfile.pin_configured ? 'translateX(24px)' : 'translateX(4px)',
                           }} />
                         </button>
                       </div>
 
                       {/* Configurar / Cambiar PIN */}
-                      {pinProfile.pin_enabled && pinProfile.pin_hash && pinStep === 'idle' && (
+                      {pinProfile.pin_enabled && pinProfile.pin_configured && pinStep === 'idle' && (
                         <>
                           <button
                             type="button"
@@ -734,6 +774,7 @@ export function AppShell() {
                                 borderColor: isDark ? 'oklch(0.28 0.02 260)' : 'oklch(0.90 0.01 260)',
                               }}
                             >
+                              <option value={0}>{t('settings_pinImmediate')}</option>
                               <option value={1}>{t('settings_pin1min')}</option>
                               <option value={5}>{t('settings_pin5min')}</option>
                               <option value={15}>{t('settings_pin15min')}</option>

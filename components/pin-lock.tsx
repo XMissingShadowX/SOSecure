@@ -2,38 +2,79 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { ShieldCheck, Delete, AlertCircle, Mail } from 'lucide-react'
-import { verifyPin } from '@/lib/pin'
-import { createClient } from '@/lib/supabase/client'
 import { useTranslation } from '@/lib/i18n'
 
 interface PinLockProps {
   userId: string
-  pinHash: string
   onUnlock: () => void
   onForgotPin: () => void
 }
 
 const MAX_ATTEMPTS = 5
+const LOCK_STORAGE_KEY = 'sosecure-pin-locked-until'
 
-export function PinLock({ userId, pinHash, onUnlock, onForgotPin }: PinLockProps) {
+export function PinLock({ userId, onUnlock, onForgotPin }: PinLockProps) {
   const [digits, setDigits] = useState<string[]>([])
   const [attempts, setAttempts] = useState(0)
   const [error, setError] = useState(false)
   const [shake, setShake] = useState(false)
+  const [rateLimited, setRateLimited] = useState(false)
+
+  // El bloqueo real vive en el servidor (Map en memoria), pero el estado de
+  // React se resetea al recargar la página. Persistimos el timestamp en
+  // sessionStorage para que la UI siga mostrando el bloqueo tras un reload,
+  // en vez de dejar escribir dígitos que el servidor de todas formas va a
+  // rechazar con 429.
+  useEffect(() => {
+    const stored = sessionStorage.getItem(LOCK_STORAGE_KEY)
+    if (!stored) return
+    const lockedUntil = parseInt(stored)
+    const remaining = lockedUntil - Date.now()
+    if (remaining <= 0) {
+      sessionStorage.removeItem(LOCK_STORAGE_KEY)
+      return
+    }
+    setRateLimited(true)
+    const timer = setTimeout(() => {
+      setRateLimited(false)
+      sessionStorage.removeItem(LOCK_STORAGE_KEY)
+    }, remaining)
+    return () => clearTimeout(timer)
+  }, [])
 
   const handleDigit = useCallback(async (d: string) => {
-    if (digits.length >= 4) return
+    if (digits.length >= 4 || rateLimited) return
     const next = [...digits, d]
     setDigits(next)
 
     if (next.length === 4) {
       const pin = next.join('')
-      const ok = await verifyPin(pin, userId, pinHash)
+      const res = await fetch('/api/pin/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin }),
+      })
+
+      if (res.status === 429) {
+        const retryAfter = parseInt(res.headers.get('Retry-After') ?? '300')
+        sessionStorage.setItem(LOCK_STORAGE_KEY, String(Date.now() + retryAfter * 1000))
+        setRateLimited(true)
+        setDigits([])
+        setTimeout(() => {
+          setRateLimited(false)
+          sessionStorage.removeItem(LOCK_STORAGE_KEY)
+        }, retryAfter * 1000)
+        return
+      }
+
+      const { ok } = await res.json().catch(() => ({ ok: false }))
       if (ok) {
         onUnlock()
       } else {
-        const newAttempts = attempts + 1
-        setAttempts(newAttempts)
+        // El bloqueo tras intentos fallidos lo maneja el servidor (429,
+        // más arriba) con un lockout temporal de 5 minutos — ya no se
+        // cierra sesión aquí en el cliente.
+        setAttempts(a => a + 1)
         setError(true)
         setShake(true)
         setTimeout(() => {
@@ -41,15 +82,9 @@ export function PinLock({ userId, pinHash, onUnlock, onForgotPin }: PinLockProps
           setError(false)
           setShake(false)
         }, 700)
-
-        if (newAttempts >= MAX_ATTEMPTS) {
-          const supabase = createClient()
-          await supabase.auth.signOut()
-          window.location.href = '/auth/login'
-        }
       }
     }
-  }, [digits, userId, pinHash, attempts, onUnlock])
+  }, [digits, rateLimited, onUnlock])
 
   const handleDelete = useCallback(() => {
     setDigits(prev => prev.slice(0, -1))
@@ -97,10 +132,18 @@ export function PinLock({ userId, pinHash, onUnlock, onForgotPin }: PinLockProps
         </div>
 
         {/* Error message */}
-        {error && attempts < MAX_ATTEMPTS && (
+        {error && !rateLimited && attempts < MAX_ATTEMPTS && (
           <div className="flex items-center gap-2 text-destructive text-sm -mt-4">
             <AlertCircle className="w-4 h-4 flex-shrink-0" />
             <span>{t('pin_incorrect').replace('{n}', String(remaining)).replace('{s}', remaining !== 1 ? 's' : '')}</span>
+          </div>
+        )}
+
+        {/* Rate limited message */}
+        {rateLimited && (
+          <div className="flex items-center gap-2 text-destructive text-sm -mt-4">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <span>{t('pin_rate_limited')}</span>
           </div>
         )}
 
@@ -121,7 +164,8 @@ export function PinLock({ userId, pinHash, onUnlock, onForgotPin }: PinLockProps
               <button
                 key={idx}
                 onClick={() => handleDigit(k)}
-                className="h-14 rounded-2xl text-xl font-semibold bg-muted hover:bg-muted/70 active:scale-95 transition-all"
+                disabled={rateLimited}
+                className="h-14 rounded-2xl text-xl font-semibold bg-muted hover:bg-muted/70 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"
               >
                 {k}
               </button>

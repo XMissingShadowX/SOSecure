@@ -26,6 +26,27 @@ export default function HomePage() {
   useEffect(() => {
     // Crear una instancia de Supabase para interactuar con la autenticación
     const supabase = createClient()
+
+    // El Magic Link de "olvidé mi PIN" aterriza aquí (en / con ?code=...),
+    // no siempre en /auth/callback. IMPORTANTE: la sola presencia de
+    // `?code=` en la URL NO prueba nada — cualquiera puede escribir esa
+    // URL a mano. Y el código PKCE de Supabase (a diferencia del flujo
+    // implícito con #access_token) tampoco se auto-consume solo por
+    // estar en la URL. La única prueba real de que el link del correo se
+    // usó es que `exchangeCodeForSession(code)` responda sin error —
+    // mismo patrón que ya usa app/auth/reset-password/page.tsx.
+    const code = new URLSearchParams(window.location.search).get('code')
+    if (code) {
+      // Limpiar el `code` de la URL de inmediato — de un solo uso, no debe
+      // quedar reutilizable vía historial/back-forward.
+      window.history.replaceState({}, '', window.location.pathname)
+      supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+        if (!error) {
+          fetch('/api/pin/finalize-reset', { method: 'POST' }).catch(() => {})
+        }
+      })
+    }
+
     // Verificar la sesión del usuario para determinar si está autenticado o no
     supabase.auth.getUser().then(({ data: { user } }) => {
       // Actualizar el estado de autenticación basado en la presencia de un usuario en la sesión
