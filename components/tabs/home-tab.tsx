@@ -123,11 +123,7 @@ export function HomeTab() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        const { data } = await supabase
-          .from('emergency_contacts')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('priority')
+        const { data } = await supabase.rpc('get_my_contacts')
         if (data) setContacts(data)
       }
       setLoading(false)
@@ -150,19 +146,14 @@ export function HomeTab() {
     // se actualiza el estado de los contactos para incluir el nuevo contacto, se limpia el formulario de nuevo 
     // contacto, y se cierra el diálogo de agregar contacto.
     if (user) {
-      const { data, error } = await supabase
-        .from('emergency_contacts')
-        .insert({
-          user_id:      user.id,
-          name:         newContact.name,
-          phone:        newContact.phone,
-          email:        newContact.email || null,
-          relationship: newContact.relationship || null,
-          priority:     contacts.length + 1,
-          importance:   newContact.importance,
-        })
-        .select()
-        .single()
+      const { data, error } = await supabase.rpc('add_emergency_contact', {
+        p_name:         newContact.name,
+        p_phone:        newContact.phone,
+        p_email:        newContact.email || null,
+        p_relationship: newContact.relationship || null,
+        p_priority:     contacts.length + 1,
+        p_importance:   newContact.importance,
+      })
       if (data && !error) {
         setContacts([...contacts, data])
         setNewContact({ name: '', phone: '', email: '', relationship: '', importance: 'secondary' })
@@ -192,18 +183,14 @@ export function HomeTab() {
   const saveEditContact = async () => {
     if (!editingContact || !editContact.name || !editContact.phone) return
     const supabase = createClient()
-    const { data, error } = await supabase
-      .from('emergency_contacts')
-      .update({
-        name:         editContact.name,
-        phone:        editContact.phone,
-        email:        editContact.email || null,
-        relationship: editContact.relationship || null,
-        importance:   editContact.importance,
-      })
-      .eq('id', editingContact.id)
-      .select()
-      .single()
+    const { data, error } = await supabase.rpc('update_emergency_contact', {
+      p_id:           editingContact.id,
+      p_name:         editContact.name,
+      p_phone:        editContact.phone,
+      p_email:        editContact.email || null,
+      p_relationship: editContact.relationship || null,
+      p_importance:   editContact.importance,
+    })
     if (data && !error) {
       setContacts(contacts.map(c => c.id === editingContact.id ? { ...c, ...data } : c))
       setEditingContact(null)
