@@ -22,11 +22,23 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     // Crear una instancia de Supabase para interactuar con la autenticación
     const supabase = createClient()
-    // Verificar la sesión del usuario
-    supabase.auth.getSession().then(() => {
+
+    const run = async () => {
+      // Igual que en app/page.tsx: solo confirmar el reset de PIN pendiente
+      // si `exchangeCodeForSession` realmente valida el código del Magic
+      // Link — una sesión ya existente (ambiente) NO es prueba de que el
+      // link se haya usado.
+      const code = new URLSearchParams(window.location.search).get('code')
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code)
+        if (!error) {
+          await fetch('/api/pin/finalize-reset', { method: 'POST' }).catch(() => {})
+        }
+      }
       // Redirigir al usuario a la página principal después de verificar la sesión
       router.push('/')
-    })
+    }
+    run()
   }, [router])
 
   // Mostrar un mensaje de verificación mientras se verifica la sesión del usuario
