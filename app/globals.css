@@ -47,6 +47,16 @@ soporte de modo oscuro
   --sidebar-accent-foreground: oklch(0.95 0.01 260);
   --sidebar-border: oklch(0.28 0.02 260);
   --sidebar-ring: oklch(0.75 0.15 180);
+
+  /* Liquid Glass — superficies translúcidas (modo oscuro) */
+  --glass-bg: oklch(0.19 0.015 260 / 0.55);
+  --glass-bg-strong: oklch(0.19 0.015 260 / 0.80);
+  --glass-border: oklch(1 0 0 / 0.08);
+  --glass-border-strong: oklch(1 0 0 / 0.14);
+  --glass-highlight: oklch(1 0 0 / 0.18);
+  --glass-shadow: 0 8px 32px oklch(0 0 0 / 0.35);
+  --glass-shadow-sm: 0 4px 16px oklch(0 0 0 / 0.25);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* 
@@ -90,6 +100,15 @@ html.light {
   --sidebar-accent-foreground: oklch(0.15 0.01 260);
   --sidebar-border: oklch(0.90 0.01 260);
   --sidebar-ring: oklch(0.55 0.15 180);
+
+  /* Liquid Glass — superficies translúcidas (modo claro) */
+  --glass-bg: oklch(1 0 0 / 0.55);
+  --glass-bg-strong: oklch(1 0 0 / 0.82);
+  --glass-border: oklch(0.2 0.02 260 / 0.10);
+  --glass-border-strong: oklch(0.2 0.02 260 / 0.12);
+  --glass-highlight: oklch(1 0 0 / 0.7);
+  --glass-shadow: 0 8px 32px oklch(0.2 0.02 260 / 0.14);
+  --glass-shadow-sm: 0 4px 16px oklch(0.2 0.02 260 / 0.10);
 }
 
 /*
@@ -214,6 +233,110 @@ el diseño general de la aplicación, tanto en modo oscuro como en modo claro
   animation: recording-blink 1s ease-in-out infinite;
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   Liquid Glass — superficies de vidrio translúcido inspiradas en el
+   lenguaje visual de Apple: bordes con brillo especular, blur intenso,
+   tinte que absorbe el color de fondo y sombras suaves en capas.
+   Usan !important para sobrevivir a applyTheme() en app-shell.tsx,
+   que fuerza colores inline en .bg-card/.bg-muted/header/nav.
+   ══════════════════════════════════════════════════════════════════ */
+.glass,
+.glass-strong,
+.glass-nav {
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid var(--glass-border);
+  border-top-color: var(--glass-highlight);
+}
+
+.glass {
+  background: var(--glass-bg) !important;
+  box-shadow: var(--glass-shadow-sm), inset 0 1px 0 var(--glass-highlight);
+}
+
+.glass-strong {
+  background: var(--glass-bg-strong) !important;
+  border-color: var(--glass-border-strong);
+  border-top-color: var(--glass-highlight);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+
+.glass-nav {
+  background: var(--glass-bg-strong) !important;
+  border: none;
+  border-bottom: 1px solid var(--glass-border-strong);
+  box-shadow: 0 1px 0 var(--glass-highlight);
+}
+
+/* Botones/paneles glass con tacto elástico tipo resorte */
+.glass-interactive {
+  transition: transform 260ms var(--ease-spring), box-shadow 260ms ease, background-color 260ms ease;
+}
+.glass-interactive:active {
+  transform: scale(0.96);
+}
+
+/* Melt-in / melt-out: los paneles de vidrio "se derraman" al aparecer
+   y se disuelven al salir, en vez de solo hacer fade. */
+@keyframes melt-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(6px);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes melt-out {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.95) translateY(4px);
+    filter: blur(4px);
+  }
+}
+
+.animate-melt-in {
+  animation: melt-in 320ms var(--ease-spring) both;
+}
+.animate-melt-out {
+  animation: melt-out 180ms ease-in both;
+}
+
+/* Fondo ambiental: manchas de luz difusas detrás del contenido para que
+   el vidrio tenga algo de color y profundidad que refractar. */
+.ambient-bg {
+  background-image:
+    radial-gradient(circle at 12% 18%, oklch(0.75 0.15 180 / 0.16), transparent 45%),
+    radial-gradient(circle at 88% 12%, oklch(0.55 0.25 25 / 0.10), transparent 42%),
+    radial-gradient(circle at 50% 95%, oklch(0.65 0.18 145 / 0.09), transparent 45%);
+}
+html.light .ambient-bg {
+  background-image:
+    radial-gradient(circle at 12% 18%, oklch(0.55 0.15 180 / 0.10), transparent 45%),
+    radial-gradient(circle at 88% 12%, oklch(0.55 0.25 25 / 0.07), transparent 42%),
+    radial-gradient(circle at 50% 95%, oklch(0.55 0.18 145 / 0.07), transparent 45%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Forzar uso de variables CSS en elementos clave */
 .bg-background { background-color: var(--background) !important; }
 .bg-card { background-color: var(--card) !important; }
@@ -252,7 +375,9 @@ html.light .leaflet-tile {
 /* ── Select / listbox ── */
 [role="listbox"],
 [role="combobox"] {
-  background-color: var(--popover) !important;
+  background-color: var(--glass-bg-strong) !important;
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
   color: var(--popover-foreground) !important;
 }
 
@@ -269,7 +394,9 @@ html.light .leaflet-tile {
 
 /* ── Dropdown menu ── */
 [role="menu"] {
-  background-color: var(--popover) !important;
+  background-color: var(--glass-bg-strong) !important;
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
   color: var(--popover-foreground) !important;
 }
 
@@ -297,7 +424,9 @@ html.light .leaflet-tile {
 }
 [data-radix-popper-content-wrapper] [role="menu"],
 [data-radix-popper-content-wrapper] [role="listbox"] {
-  background-color: var(--popover) !important;
+  background-color: var(--glass-bg-strong) !important;
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
   color: var(--popover-foreground) !important;
 }
 [data-radix-popper-content-wrapper] [role="menuitem"],

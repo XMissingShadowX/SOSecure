@@ -453,7 +453,7 @@ export function SOSButton() {
         />
 
         {!minimized && (
-          <div className="fixed inset-0 z-[200] bg-destructive/10 backdrop-blur-sm overflow-y-auto">
+          <div className="fixed inset-0 z-[200] bg-destructive/10 backdrop-blur-md overflow-y-auto">
             <div className="flex flex-col items-center justify-center min-h-full px-6 py-8">
               <div className="w-full max-w-sm space-y-4">
 
@@ -505,7 +505,7 @@ export function SOSButton() {
                 </div>
 
                 {coordinates && (
-                  <div className="p-3 bg-card rounded-lg border border-border">
+                  <div className="p-3 glass-strong rounded-xl">
                     <p className="text-xs text-muted-foreground mb-0.5">{t('sos_location')}</p>
                     <p className="font-mono text-sm text-foreground">
                       {coordinates.latitude.toFixed(6)}, {coordinates.longitude.toFixed(6)}
@@ -514,7 +514,7 @@ export function SOSButton() {
                 )}
 
                 {contactsNotified.length > 0 && (
-                  <div className="p-3 bg-card rounded-lg border border-border">
+                  <div className="p-3 glass-strong rounded-xl">
                     <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
                       <Bell className="w-3.5 h-3.5" />
                       {t('sos_contactsNotified')}
@@ -537,7 +537,7 @@ export function SOSButton() {
                 <button
                   onClick={handleSaveAndClose}
                   disabled={isSaving}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-card border border-border text-foreground font-medium text-sm hover:bg-muted transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl glass glass-interactive text-foreground font-medium text-sm hover:shadow-md transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {isSaving ? (
                     <>
@@ -562,7 +562,7 @@ export function SOSButton() {
                       setSosStream(null)
                       setIsRecording(false)
                     }}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border bg-card text-foreground text-sm hover:bg-muted transition-colors"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl glass glass-interactive text-foreground text-sm hover:shadow-md transition-all"
                   >
                     <StopCircle className="w-4 h-4" />
                     {t('sos_stopRec')}
@@ -608,7 +608,7 @@ export function SOSButton() {
                         }
                       } catch { /* sin permisos */ }
                     }}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border bg-card text-foreground text-sm hover:bg-muted transition-colors"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl glass glass-interactive text-foreground text-sm hover:shadow-md transition-all"
                   >
                     <Video className="w-4 h-4" />
                     {t('sos_resumeRec')}
@@ -679,8 +679,8 @@ export function SOSButton() {
         className={cn(
           "relative rounded-full bg-destructive text-destructive-foreground",
           "flex items-center justify-center flex-shrink-0",
-          "shadow-lg shadow-destructive/30",
-          "transition-transform active:scale-95",
+          "ring-4 ring-white/10 shadow-[inset_0_2px_0_rgba(255,255,255,0.25),0_8px_24px_-4px_rgba(220,38,38,0.5)]",
+          "transition-transform duration-200 ease-spring active:scale-95",
           isHolding && "sos-pulse"
         )}
         style={simpleMode ? { width: '7rem', height: '7rem', minWidth: '7rem', minHeight: '7rem' } : { width: '5rem', height: '5rem', minWidth: '5rem', minHeight: '5rem' }}
