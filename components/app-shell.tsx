@@ -568,8 +568,8 @@ export function AppShell() {
 
   return (
     <PermissionGate>
-      <div className="min-h-screen bg-background flex flex-col">
-        <header className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border safe-area-top">
+      <div className="min-h-screen bg-background ambient-bg flex flex-col">
+        <header className="sticky top-0 z-30 glass-nav safe-area-top">
           <div className="flex items-center justify-between h-14 px-4 max-w-lg mx-auto">
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-6 h-6 text-primary" />

@@ -105,8 +105,8 @@ export function PinLock({ userId, onUnlock, onForgotPin }: PinLockProps) {
   const { t } = useTranslation()
 
   return (
-    <div className="fixed inset-0 z-[99999] bg-background flex flex-col items-center justify-center p-6 select-none">
-      <div className="flex flex-col items-center gap-8 w-full max-w-xs">
+    <div className="fixed inset-0 z-[99999] bg-background ambient-bg flex flex-col items-center justify-center p-6 select-none">
+      <div className="glass-strong flex flex-col items-center gap-8 w-full max-w-xs rounded-[2rem] p-8">
 
         {/* Logo */}
         <div className="flex flex-col items-center gap-2">
@@ -155,7 +155,7 @@ export function PinLock({ userId, onUnlock, onForgotPin }: PinLockProps) {
               <button
                 key={idx}
                 onClick={handleDelete}
-                className="h-14 rounded-2xl flex items-center justify-center text-muted-foreground hover:bg-muted active:scale-95 transition-all"
+                className="h-14 rounded-2xl glass glass-interactive flex items-center justify-center text-muted-foreground hover:shadow-md transition-all"
               >
                 <Delete className="w-5 h-5" />
               </button>
@@ -165,7 +165,7 @@ export function PinLock({ userId, onUnlock, onForgotPin }: PinLockProps) {
                 key={idx}
                 onClick={() => handleDigit(k)}
                 disabled={rateLimited}
-                className="h-14 rounded-2xl text-xl font-semibold bg-muted hover:bg-muted/70 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"
+                className="h-14 rounded-2xl text-xl font-semibold glass glass-interactive hover:shadow-md transition-all disabled:opacity-40 disabled:pointer-events-none"
               >
                 {k}
               </button>
