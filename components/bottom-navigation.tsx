@@ -28,29 +28,38 @@ export function BottomNavigation() {
   ]
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-sm border-t border-border safe-area-bottom">
-      <div className={cn('flex items-center w-full max-w-lg mx-auto', simpleMode ? 'h-20' : 'h-16')}>
-        {tabs.map((tab) => {
-          const Icon = tab.icon
-          const isActive = activeTab === tab.id
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                'flex flex-1 flex-col items-center justify-center gap-1 rounded-xl transition-colors',
-                simpleMode ? 'py-3' : 'py-2',
-                isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              <Icon className={cn(simpleMode ? 'w-7 h-7' : 'w-5 h-5', isActive && 'text-primary')} />
-              <span className={cn(simpleMode ? 'text-xs font-semibold' : 'text-[10px] font-medium', isActive && 'text-primary')}>
-                {tab.label}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-    </nav>
+    <div className="fixed bottom-0 left-0 right-0 z-40 safe-area-bottom px-3 pb-3">
+      <nav className="glass-strong mx-auto flex w-full max-w-lg items-center rounded-[2rem]">
+        <div className={cn('flex items-center w-full', simpleMode ? 'h-20' : 'h-16')}>
+          {tabs.map((tab) => {
+            const Icon = tab.icon
+            const isActive = activeTab === tab.id
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  'group relative flex flex-1 flex-col items-center justify-center gap-1 transition-all duration-200 ease-spring active:scale-90',
+                  simpleMode ? 'py-3' : 'py-2',
+                  isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <span
+                  className={cn(
+                    'absolute inset-1.5 rounded-2xl bg-primary/15 transition-all duration-300 ease-spring',
+                    isActive ? 'scale-100 opacity-100' : 'scale-75 opacity-0'
+                  )}
+                  aria-hidden
+                />
+                <Icon className={cn('relative', simpleMode ? 'w-7 h-7' : 'w-5 h-5', isActive && 'text-primary')} />
+                <span className={cn('relative', simpleMode ? 'text-xs font-semibold' : 'text-[10px] font-medium', isActive && 'text-primary')}>
+                  {tab.label}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </nav>
+    </div>
   )
 }

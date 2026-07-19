@@ -58,6 +58,9 @@ const config: Config = {
         md: 'calc(0.75rem - 2px)',
         sm: 'calc(0.75rem - 4px)',
       },
+      transitionTimingFunction: {
+        spring: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+      },
     },
   },
   plugins: [],
