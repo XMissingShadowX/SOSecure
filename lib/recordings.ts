@@ -31,6 +31,26 @@ export interface RecordingMeta {
   sosAlertId?: string
 }
 
+// Mismos límites que el bucket Storage `recordings` (supabase/migrations/20240001_recordings.sql)
+// — el bucket es la barrera real (no bypasseable con un cliente modificado), esto es solo para
+// rechazar temprano en el cliente y no gastar tiempo/ancho de banda subiendo algo que el bucket
+// va a rechazar de todos modos.
+export const MAX_RECORDING_SIZE_BYTES = 50 * 1024 * 1024 // 50 MB
+export const ALLOWED_RECORDING_MIME_TYPES = ['audio/webm', 'video/webm', 'audio/mp4', 'video/mp4', 'audio/ogg']
+
+// Valida un blob de grabación antes de subirlo — MIME type contra el allowlist del bucket
+// (aceptando también variantes con parámetros, ej. 'video/webm;codecs=vp9') y tamaño máximo.
+export function validateRecordingBlob(blob: Blob, mimeType: string): { valid: true } | { valid: false; error: string } {
+  const baseMime = mimeType.split(';')[0].trim()
+  if (!ALLOWED_RECORDING_MIME_TYPES.includes(baseMime)) {
+    return { valid: false, error: `Tipo de archivo no permitido: ${baseMime}` }
+  }
+  if (blob.size > MAX_RECORDING_SIZE_BYTES) {
+    return { valid: false, error: `El archivo excede el tamaño máximo de ${MAX_RECORDING_SIZE_BYTES / (1024 * 1024)} MB` }
+  }
+  return { valid: true }
+}
+
 // Función para generar un identificador único para cada grabación utilizando la API de Crypto del navegador o una combinación
 // de la marca de tiempo y un número aleatorio como fallback.
 export function generateRecordingId(): string {
@@ -63,6 +83,9 @@ export async function sendRecordingToContacts(
   message?: string
 ): Promise<{ success: boolean; method: string }> {
   if (!contacts.length) return { success: false, method: 'none' }
+
+  const validation = validateRecordingBlob(meta.blob, meta.mimeType)
+  if (!validation.valid) { console.warn(validation.error); return { success: false, method: 'none' } }
 
   const ext = meta.mimeType.includes('mp4') ? 'mp4' : 'webm'
   const filename = `safewalk-${meta.type}-${meta.id}.${ext}`
@@ -112,6 +135,9 @@ export async function uploadRecordingToDB(meta: RecordingMeta) {
   const supabase = createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { publicUrl: null, dbRecord: null, error: 'No autenticado' }
+
+  const validation = validateRecordingBlob(meta.blob, meta.mimeType)
+  if (!validation.valid) return { publicUrl: null, dbRecord: null, error: validation.error }
 
   const ext = meta.mimeType.includes('mp4') ? 'mp4' : 'webm'
   const storagePath = `${user.id}/${meta.id}.${ext}`
