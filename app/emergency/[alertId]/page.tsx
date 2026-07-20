@@ -58,14 +58,28 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
         .eq('id', alertId)
         .single()
 
-      // Si se obtiene la alerta, actualizar el estado de la alerta y la URL del video si está disponible
+      // Si se obtiene la alerta, actualizar el estado de la alerta. El video se resuelve
+      // aparte vía /api/emergency/[alertId]/video — `video_url` guarda un storage_path
+      // (bucket privado), no una URL utilizable directamente.
       if (data) {
         setAlert(data)
-        if (data.video_url) setVideoUrl(data.video_url)
+        if (data.video_url) loadVideo()
       }
 
       // Marcar que la carga inicial ha terminado después de obtener los datos de la alerta
       setLoading(false)
+    }
+
+    // Función para pedir al servidor una URL firmada fresca del video grabado, ya que el
+    // visitante de esta página no tiene sesión y no puede generar la suya directamente
+    // contra Supabase Storage (bucket privado).
+    const loadVideo = async () => {
+      try {
+        const res = await fetch(`/api/emergency/${alertId}/video`)
+        if (!res.ok) return
+        const { url } = await res.json()
+        if (url) setVideoUrl(url)
+      } catch { /* noop — la UI ya maneja videoUrl ausente */ }
     }
 
     // Función para cargar la ubicación más reciente asociada a la alerta, actualizando el estado de la ubicación 
@@ -97,19 +111,9 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
     // intervalos al desmontar el componente
     const interval = setInterval(loadLocation, 1000)
 
-    // Configurar un intervalo para actualizar la URL del video cada 5 segundos, lo que permite mostrar el video grabado 
-    // durante la emergencia tan pronto como esté disponible o se actualice
-    const refreshVideo = setInterval(async () => {
-      const { data } = await supabase
-        .from('sos_alerts')
-        .select('video_url')
-        .eq('id', alertId)
-        .single()
-
-      // Si se obtiene la URL del video, actualizar el estado de la URL del video para mostrar el video grabado 
-      // durante la emergencia
-      if (data?.video_url) setVideoUrl(data.video_url)
-    }, 5000)
+    // Refrescar la URL firmada del video cada 30s — no cada 5s como la ubicación, ya que
+    // una URL firmada no cambia tan seguido y regenerarla de más solo agrega carga.
+    const refreshVideo = setInterval(loadVideo, 30000)
 
     // Limpiar los intervalos al desmontar el componente para evitar fugas de memoria y llamadas innecesarias a 
     // la base de datos cuando el usuario navegue fuera de esta página
