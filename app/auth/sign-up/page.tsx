@@ -54,7 +54,11 @@ export default function SignUpPage() {
       email,
       password,
       options: {
-        emailRedirectTo: undefined,
+        // Explícito en vez de `undefined` — depender del Site URL por defecto de
+        // Supabase es frágil (si el dashboard queda mal configurado, ej. apuntando
+        // a localhost, el correo de confirmación redirige ahí sin importar el
+        // dominio real). Mismo patrón que el flujo de "olvidé mi PIN".
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
         data: { full_name: fullName, phone },
       },
     })
