@@ -362,8 +362,11 @@ export function SOSButton() {
         longitude: coordinates?.longitude ?? null,
         sos_alert_id: alertId,
       })
-      const { data: { publicUrl } } = supabase.storage.from('recordings').getPublicUrl(path)
-      await supabase.from('sos_alerts').update({ video_url: publicUrl }).eq('id', alertId)
+      // `video_url` guarda el storage_path (no una URL pública — el bucket es privado).
+      // La página pública /emergency/[alertId] pide una URL firmada fresca vía
+      // /api/emergency/[alertId]/video en cada visita, porque una firmada guardada
+      // de una vez expiraría y el visitante anónimo no tiene sesión para generar la suya.
+      await supabase.from('sos_alerts').update({ video_url: path }).eq('id', alertId)
       setSavedToCloud(true)
     } catch (err) { console.error('saveRecordingToCloud failed:', err) }
   }
