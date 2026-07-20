@@ -36,6 +36,7 @@ import {
   sendRecordingToContacts,
   uploadRecordingToDB,
   generateRecordingId,
+  validateRecordingBlob,
   type RecordingMeta,
 } from '@/lib/recordings'
 import { useTranslation } from '@/lib/i18n'
@@ -394,6 +395,13 @@ export function DuringTab() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       setStatusMsg(t('during_errorChat'))
+      setRecordingStatus('idle')
+      return
+    }
+
+    const validation = validateRecordingBlob(lastRecording.blob, lastRecording.mimeType)
+    if (!validation.valid) {
+      setStatusMsg(t('during_errorUpload'))
       setRecordingStatus('idle')
       return
     }

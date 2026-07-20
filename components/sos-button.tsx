@@ -17,6 +17,7 @@ import { AlertTriangle, X, Bell, Mic, Video, StopCircle, Minimize2, ChevronUp, D
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/lib/store'
 import { createClient } from '@/lib/supabase/client'
+import { validateRecordingBlob } from '@/lib/recordings'
 import { createLiveBroadcaster, type LiveBroadcaster } from '@/lib/live-stream'
 import { sendAlarmNotification, playAlarmSound } from '@/lib/notifications'
 import { useTranslation } from '@/lib/i18n'
@@ -76,6 +77,8 @@ export function SOSButton() {
       const ext  = mime.includes('mp4') ? 'mp4' : 'webm'
       const segId = crypto.randomUUID()
       const blob  = new Blob([...chunks], { type: mime })
+      const validation = validateRecordingBlob(blob, mime)
+      if (!validation.valid) { console.warn(validation.error); return }
       const path  = `${user.id}/segments/${segId}.${ext}`
       const { error } = await supabase.storage
         .from('recordings')
@@ -348,6 +351,8 @@ export function SOSButton() {
       const ext   = mime.includes('mp4') ? 'mp4' : 'webm'
       const recId = crypto.randomUUID()
       const blob  = new Blob(chunks, { type: mime })
+      const validation = validateRecordingBlob(blob, mime)
+      if (!validation.valid) { console.error(validation.error); return }
       const path  = `${user.id}/${recId}.${ext}`
       const { error: upErr } = await supabase.storage
         .from('recordings')
