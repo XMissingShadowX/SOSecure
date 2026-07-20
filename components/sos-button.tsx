@@ -19,6 +19,7 @@ import { useAppStore } from '@/lib/store'
 import { createClient } from '@/lib/supabase/client'
 import { createLiveBroadcaster, type LiveBroadcaster } from '@/lib/live-stream'
 import { sendAlarmNotification, playAlarmSound } from '@/lib/notifications'
+import { createRecordingSignedUrl } from '@/lib/recordings'
 import { useTranslation } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 import {
@@ -81,11 +82,12 @@ export function SOSButton() {
         .from('recordings')
         .upload(path, blob, { contentType: mime, upsert: false })
       if (error) return
-      const { data: { publicUrl } } = supabase.storage.from('recordings').getPublicUrl(path)
+      const { url: signedUrl } = await createRecordingSignedUrl(supabase, path)
+      if (!signedUrl) return
       const segNum = ++segmentCountRef.current
       window.dispatchEvent(new CustomEvent('sosecure:recording-segment', {
         detail: {
-          url: publicUrl,
+          url: signedUrl,
           mimeType: mime,
           alertId,
           segmentNumber: segNum,

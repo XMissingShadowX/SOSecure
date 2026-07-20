@@ -36,6 +36,7 @@ import {
   sendRecordingToContacts,
   uploadRecordingToDB,
   generateRecordingId,
+  createRecordingSignedUrl,
   type RecordingMeta,
 } from '@/lib/recordings'
 import { useTranslation } from '@/lib/i18n'
@@ -409,9 +410,14 @@ export function DuringTab() {
       return
     }
 
-    const { data: { publicUrl } } = supabase.storage.from('recordings').getPublicUrl(path)
+    const { url: signedUrl, error: signError } = await createRecordingSignedUrl(supabase, path)
+    if (!signedUrl) {
+      setStatusMsg(`⚠️ ${signError ?? t('during_errorUpload')}`)
+      setRecordingStatus('idle')
+      return
+    }
     const prefix = lastRecording.type === 'audio' ? '🎵 Audio de emergencia' : '🎥 Video de emergencia'
-    const content = `${prefix}:\n${publicUrl}`
+    const content = `${prefix}:\n${signedUrl}`
 
     let sent = 0
     const primaryContacts = contacts.filter(c => c.importance === 'primary' || c.importance === 'secondary')

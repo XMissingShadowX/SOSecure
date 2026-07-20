@@ -5,6 +5,7 @@ import { CheckCircle, MapPin, AlertTriangle, Home, Mic, Video, Download, Trash2,
 import { useAppStore } from '@/lib/store'
 import { sendAlarmNotification } from '@/lib/notifications'
 import { createClient } from '@/lib/supabase/client'
+import { createRecordingSignedUrl } from '@/lib/recordings'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -30,11 +31,12 @@ interface SosAlertItem {
 interface StoredRecording {
   id: string
   recording_type: 'audio' | 'video'
-  public_url: string
+  storage_path: string
   duration_ms: number
   created_at: string
   latitude: number | null
   longitude: number | null
+  signedUrl?: string | null
 }
 
 export function AfterTab() {
@@ -98,11 +100,18 @@ export function AfterTab() {
       if (!user) { setLoadingRecordings(false); return }
       const { data } = await supabase
         .from('recordings')
-        .select('id, recording_type, public_url, duration_ms, created_at, latitude, longitude')
+        .select('id, recording_type, storage_path, duration_ms, created_at, latitude, longitude')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(20)
-      setRecordings(data ?? [])
+
+      const withSignedUrls = await Promise.all(
+        (data ?? []).map(async (rec) => {
+          const { url } = await createRecordingSignedUrl(supabase, rec.storage_path)
+          return { ...rec, signedUrl: url }
+        })
+      )
+      setRecordings(withSignedUrls)
       setLoadingRecordings(false)
     }
     fetchRecordings()
@@ -171,8 +180,7 @@ export function AfterTab() {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
-      const ext = rec.public_url?.split('.').pop() ?? 'webm'
-      await supabase.storage.from('recordings').remove([`${user.id}/${rec.id}.${ext}`])
+      await supabase.storage.from('recordings').remove([rec.storage_path])
       await supabase.from('recordings').delete().eq('id', rec.id)
       setRecordings(prev => prev.filter(r => r.id !== rec.id))
     }
@@ -350,8 +358,15 @@ export function AfterTab() {
                     )}
                   </div>
                   <div className="flex gap-1 shrink-0">
-                    <a href={rec.public_url} target="_blank" rel="noopener noreferrer" download>
-                      <Button variant="ghost" size="icon" className="h-7 w-7">
+                    <a
+                      href={rec.signedUrl ?? undefined}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download
+                      aria-disabled={!rec.signedUrl}
+                      onClick={(e) => { if (!rec.signedUrl) e.preventDefault() }}
+                    >
+                      <Button variant="ghost" size="icon" className="h-7 w-7" disabled={!rec.signedUrl}>
                         <Download className="w-3.5 h-3.5" />
                       </Button>
                     </a>

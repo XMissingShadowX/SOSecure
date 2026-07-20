@@ -7,10 +7,30 @@
   * rápida y efectiva por parte de sus contactos de confianza.
 */
 
-// Importar la función `createClient` del módulo de Supabase para interactuar con la base de datos y el almacenamiento 
+// Importar la función `createClient` del módulo de Supabase para interactuar con la base de datos y el almacenamiento
 // de Supabase.
 import { createClient } from '@/lib/supabase/client'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { EmergencyContact } from '@/lib/types'
+
+// El bucket 'recordings' es privado (ver supabase/migrations/20240001_recordings.sql) — cualquier
+// link compartible debe generarse con createSignedUrl, nunca getPublicUrl (que devuelve una URL
+// que responde 403 para todos excepto el dueño autenticado del archivo).
+export const RECORDING_LINK_EXPIRY_SECONDS = 60 * 60 * 48 // 48 horas
+
+export async function createRecordingSignedUrl(
+  supabase: SupabaseClient,
+  storagePath: string
+): Promise<{ url: string | null; error: string | null }> {
+  const { data, error } = await supabase.storage
+    .from('recordings')
+    .createSignedUrl(storagePath, RECORDING_LINK_EXPIRY_SECONDS)
+
+  if (error || !data?.signedUrl) {
+    return { url: null, error: error?.message ?? 'No se pudo generar el link de la grabación' }
+  }
+  return { url: data.signedUrl, error: null }
+}
 
 // Definir el tipo `RecordingType` que puede ser 'audio' o 'video', y la interfaz `RecordingMeta` que describe los 
 // metadatos de una grabación,
@@ -96,12 +116,7 @@ export async function sendRecordingToContacts(
       .upload(storagePath, meta.blob, { contentType: meta.mimeType, upsert: true })
 
     if (!uploadError) {
-      const { data: urlData } = supabase.storage.from('recordings').getPublicUrl(storagePath)
-      const publicUrl = urlData?.publicUrl
-
-      if (publicUrl) {
-        return { success: true, method: 'url' }
-      }
+      return { success: true, method: 'url' }
     }
   }
 
@@ -111,7 +126,7 @@ export async function sendRecordingToContacts(
 export async function uploadRecordingToDB(meta: RecordingMeta) {
   const supabase = createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return { publicUrl: null, dbRecord: null, error: 'No autenticado' }
+  if (authError || !user) return { dbRecord: null, error: 'No autenticado' }
 
   const ext = meta.mimeType.includes('mp4') ? 'mp4' : 'webm'
   const storagePath = `${user.id}/${meta.id}.${ext}`
@@ -120,18 +135,17 @@ export async function uploadRecordingToDB(meta: RecordingMeta) {
     .from('recordings')
     .upload(storagePath, meta.blob, { contentType: meta.mimeType, upsert: false })
 
-  if (uploadError) return { publicUrl: null, dbRecord: null, error: uploadError.message }
+  if (uploadError) return { dbRecord: null, error: uploadError.message }
 
-  const { data: urlData } = supabase.storage.from('recordings').getPublicUrl(storagePath)
-  const publicUrl = urlData?.publicUrl ?? null
-
+  // No se guarda una URL (firmada ni pública) aquí — el bucket es privado y una
+  // URL firmada guardada de una vez expiraría. after-tab.tsx genera una fresca
+  // con createRecordingSignedUrl() cada vez que el usuario ve su historial.
   const { data: dbRecord, error: dbError } = await supabase
     .from('recordings')
     .insert({
       id: meta.id,
       user_id: user.id,
       storage_path: storagePath,
-      public_url: publicUrl,
       recording_type: meta.type,
       mime_type: meta.mimeType,
       duration_ms: meta.durationMs,
@@ -143,6 +157,6 @@ export async function uploadRecordingToDB(meta: RecordingMeta) {
     .select()
     .single()
 
-  if (dbError) return { publicUrl, dbRecord: null, error: dbError.message }
-  return { publicUrl, dbRecord, error: null }
+  if (dbError) return { dbRecord: null, error: dbError.message }
+  return { dbRecord, error: null }
 }
