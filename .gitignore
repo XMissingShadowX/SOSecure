@@ -69,3 +69,8 @@ enviar_respuestas.py
 *.docx
 *.xlsx
 *.pptx
+
+# Python
+__pycache__/
+*.pyc
+

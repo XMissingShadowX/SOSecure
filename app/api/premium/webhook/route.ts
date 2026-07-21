@@ -24,7 +24,10 @@ function admin() {
 }
 
 async function verifyPayPalSignature(req: NextRequest, rawBody: string): Promise<boolean> {
-  if (!PAYPAL_WEBHOOK_ID || !PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) return true
+  if (!PAYPAL_WEBHOOK_ID || !PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) {
+    console.error('Webhook PayPal rechazado: faltan variables de entorno de verificación')
+    return false
+  }
   try {
     const tokenRes = await fetch(`${PAYPAL_BASE}/v1/oauth2/token`, {
       method: 'POST',
