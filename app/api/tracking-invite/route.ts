@@ -12,6 +12,10 @@ interface Invite {
   link: string
 }
 
+// Evita HTML injection en los campos interpolados en el correo.
+const escapeHtml = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+
 export async function POST(req: NextRequest) {
   try {
     // El flujo legítimo llama a este endpoint justo después de insertar en
@@ -36,12 +40,21 @@ export async function POST(req: NextRequest) {
     const arrErr = validateArrayLimit(invites, MAX_INVITES, 'invites')
     if (arrErr) return arrErr
 
+    // El link del correo debe apuntar a una página de tracking de este mismo origen,
+    // nunca a un dominio arbitrario controlado por el body del request.
+    const trackingPrefix = `${req.nextUrl.origin}/tracking/`
+    const validInvites = invites.filter(inv => inv.email && inv.link?.startsWith(trackingPrefix))
+    if (validInvites.length === 0) {
+      return NextResponse.json({ success: true })
+    }
+
+    const safeInitiatorName = escapeHtml(initiatorName ?? '')
+
     const timerText = securityTimerEnd
       ? `El temporizador de seguridad expira en ${Math.round((securityTimerEnd - Date.now()) / 60000)} minutos.`
       : ''
 
-    const emailsToSend = invites
-      .filter(inv => inv.email)
+    const emailsToSend = validInvites
       .map(inv =>
         fetch('https://api.resend.com/emails', {
           method: 'POST',
@@ -52,17 +65,17 @@ export async function POST(req: NextRequest) {
           body: JSON.stringify({
             from: 'SOSecure <alerts@sosecure.site>',
             to: inv.email,
-            subject: `📍 ${initiatorName} te invita a un seguimiento de seguridad`,
+            subject: `📍 ${safeInitiatorName} te invita a un seguimiento de seguridad`,
             html: `
               <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
                 <div style="background:#2563eb;color:white;padding:24px;border-radius:12px 12px 0 0;text-align:center;">
                   <h1 style="margin:0;font-size:24px;">📍 Seguimiento de seguridad</h1>
-                  <p style="margin:8px 0 0;opacity:0.9">${initiatorName} quiere que puedas ver su ubicación</p>
+                  <p style="margin:8px 0 0;opacity:0.9">${safeInitiatorName} quiere que puedas ver su ubicación</p>
                 </div>
                 <div style="background:#fff;padding:24px;border:1px solid #e5e7eb;border-top:0;">
-                  <p style="color:#374151;font-size:16px;">Hola ${inv.name},</p>
+                  <p style="color:#374151;font-size:16px;">Hola ${escapeHtml(inv.name)},</p>
                   <p style="color:#374151;">
-                    <strong>${initiatorName}</strong> ha iniciado un seguimiento de seguridad y te ha enviado este enlace para que puedas ver su ubicación en tiempo real y compartir la tuya con él/ella.
+                    <strong>${safeInitiatorName}</strong> ha iniciado un seguimiento de seguridad y te ha enviado este enlace para que puedas ver su ubicación en tiempo real y compartir la tuya con él/ella.
                   </p>
                   ${timerText ? `
                   <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:16px;margin:16px 0;">
