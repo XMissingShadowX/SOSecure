@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 import { validateJsonContentType, validateArrayLimit } from '@/lib/api-validation'
 
 const MAX_INVITES = 10
@@ -13,6 +14,16 @@ interface Invite {
 
 export async function POST(req: NextRequest) {
   try {
+    // El flujo legítimo llama a este endpoint justo después de insertar en
+    // tracking_sessions, insert que RLS ya restringe a initiator_user_id =
+    // auth.uid() (ver supabase/migrations/20240007_tracking.sql) — o sea que
+    // quien llega aquí normalmente ya tiene sesión. Sin este check, cualquiera
+    // podía pegarle al endpoint directo (sin sesión) y usar el Resend de la
+    // app para mandar correos arbitrarios a cualquier dirección.
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
     const ctErr = validateJsonContentType(req)
     if (ctErr) return ctErr
 
