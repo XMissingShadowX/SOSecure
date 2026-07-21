@@ -102,9 +102,26 @@ export function useIncomingTracking(currentUserId: string | null) {
     if (!currentUserId) return
     poll()
     pollRef.current = setInterval(poll, POLL_MS)
+
+    // Refresco inmediato vía Realtime (el polling de arriba queda como respaldo
+    // por si la replicación de Realtime no está habilitada para esta tabla).
+    let channel: ReturnType<ReturnType<typeof createClient>['channel']> | null = null
+    try {
+      const supabase = createClient()
+      channel = supabase
+        .channel(`incoming-tracking-${currentUserId}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'tracking_members', filter: `user_id=eq.${currentUserId}` },
+          () => poll()
+        )
+        .subscribe()
+    } catch { /* noop: el polling sigue funcionando igual */ }
+
     return () => {
       if (pollRef.current) clearInterval(pollRef.current)
       Object.values(locationRefs.current).forEach(clearInterval)
+      if (channel) { try { createClient().removeChannel(channel) } catch { /* noop */ } }
     }
   }, [currentUserId, poll])
 
