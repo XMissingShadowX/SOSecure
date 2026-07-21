@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
-import { createClient } from '@/lib/supabase/server'
+import { getAuthedUser } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { validateJsonContentType } from '@/lib/api-validation'
 
@@ -25,8 +25,7 @@ const attemptsByUser = new Map<string, { count: number; lockedUntil: number | nu
 const OLD_SHA256_HASH = /^[0-9a-f]{64}$/i
 
 export async function POST(req: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthedUser(req)
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const entry = attemptsByUser.get(user.id)

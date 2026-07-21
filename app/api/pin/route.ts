@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
-import { createClient } from '@/lib/supabase/server'
+import { getAuthedUser } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { validateJsonContentType } from '@/lib/api-validation'
 
@@ -17,10 +17,17 @@ function admin() {
   )
 }
 
+// Solo para signInWithOtp — no necesita la sesión del usuario, solo la anon key.
+function anon() {
+  return createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
+
 // GET /api/pin — read PIN config without ever exposing pin_hash to the client
-export async function GET() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+export async function GET(req: Request) {
+  const user = await getAuthedUser(req)
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   // admin(), no el cliente de sesión: `pin_hash` tiene SELECT revocado para
@@ -46,8 +53,7 @@ export async function GET() {
 
 // POST /api/pin — save or update PIN config
 export async function POST(req: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthedUser(req)
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const ctErr = validateJsonContentType(req)
@@ -76,9 +82,8 @@ export async function POST(req: Request) {
 // No borra el PIN todavía — solo lo marca como pendiente. El borrado real
 // ocurre en POST /api/pin/finalize-reset, cuando el usuario efectivamente
 // hace clic en el Magic Link del correo (ver app/auth/callback/page.tsx).
-export async function DELETE() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+export async function DELETE(req: Request) {
+  const user = await getAuthedUser(req)
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const { error } = await admin()
@@ -90,7 +95,7 @@ export async function DELETE() {
   // Send magic link so user can confirm the request by logging in fresh.
   // emailRedirectTo debe apuntar a /auth/callback — sin esto, Supabase usa
   // la Site URL por defecto y el link nunca pasa por finalize-reset.
-  await supabase.auth.signInWithOtp({
+  await anon().auth.signInWithOtp({
     email: user.email!,
     options: {
       shouldCreateUser: false,
