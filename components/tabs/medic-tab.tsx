@@ -26,6 +26,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { usePremium } from '@/hooks/use-premium'
 import { UpgradeBanner } from '@/components/upgrade-banner'
+import { FormattedMessage } from '@/components/formatted-message'
 import type { ChatMessage } from '@/lib/types'
 
 // Definir un objeto `offlineResponses` que contiene respuestas predefinidas para diferentes temas relacionados 
@@ -182,7 +183,7 @@ export function MedicTab() {
                 </div>
               )}
               <div className={cn('max-w-[85%] rounded-2xl px-4 py-3', message.role === 'user' ? 'bg-primary text-primary-foreground rounded-br-md' : 'bg-card border border-border rounded-bl-md')}>
-                <div className="text-sm whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: message.content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br />') }} />
+                <div className="text-sm whitespace-pre-wrap"><FormattedMessage content={message.content} /></div>
                 <p className={cn("text-xs mt-2 opacity-60", message.role === 'user' ? 'text-right' : '')}>{message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
               </div>
               {message.role === 'user' && (

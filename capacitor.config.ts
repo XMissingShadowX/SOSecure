@@ -8,9 +8,6 @@ const config: CapacitorConfig = {
     url: 'https://www.sosecure.site',
     androidScheme: 'https',
   },
-  android: {
-    allowMixedContent: true,
-  },
 };
 
 export default config;

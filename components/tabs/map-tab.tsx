@@ -154,9 +154,11 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
   // identificar qué incidentes fueron reportados por el usuario para permitir la edición y eliminación de esos incidentes.
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
       setCurrentUserId(user?.id || null)
-      setIsAdmin(user?.app_metadata?.role === 'admin')
+      if (!user) { setIsAdmin(false); return }
+      const { data: adminCheck } = await supabase.rpc('is_admin', { uid: user.id })
+      setIsAdmin(!!adminCheck)
     })
   }, [])
 

@@ -33,7 +33,10 @@ function admin() {
 }
 
 async function verifyMercadoPagoSignature(req: NextRequest, rawBody: string): Promise<boolean> {
-  if (!MP_WEBHOOK_SECRET) return true
+  if (!MP_WEBHOOK_SECRET) {
+    console.error('Webhook Mercado Pago rechazado: falta MERCADOPAGO_WEBHOOK_SECRET')
+    return false
+  }
   const xSignature = req.headers.get('x-signature')
   const xRequestId = req.headers.get('x-request-id')
   const dataId = new URL(req.url).searchParams.get('data.id') ?? ''
@@ -55,7 +58,10 @@ async function verifyMercadoPagoSignature(req: NextRequest, rawBody: string): Pr
 }
 
 async function verifyPayPalSignature(req: NextRequest, rawBody: string): Promise<boolean> {
-  if (!PAYPAL_WEBHOOK_ID || !PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) return true
+  if (!PAYPAL_WEBHOOK_ID || !PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) {
+    console.error('Webhook PayPal rechazado: faltan variables de entorno de verificación')
+    return false
+  }
   try {
     const tokenRes = await fetch(`${PAYPAL_BASE}/v1/oauth2/token`, {
       method: 'POST',
