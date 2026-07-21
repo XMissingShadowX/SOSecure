@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { validateJsonContentType } from '@/lib/api-validation'
 
 // `pin_hash` tiene SELECT revocado para authenticated/anon a nivel de
 // columna (ver migración 20240014_revoke_pin_hash_select.sql) — leerlo
@@ -33,6 +34,9 @@ export async function POST(req: Request) {
     const retryAfterSeconds = Math.ceil((entry.lockedUntil - Date.now()) / 1000)
     return NextResponse.json({ ok: false, error: 'Demasiados intentos' }, { status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } })
   }
+
+  const ctErr = validateJsonContentType(req)
+  if (ctErr) return ctErr
 
   const { pin } = await req.json()
   if (typeof pin !== 'string' || !pin) {

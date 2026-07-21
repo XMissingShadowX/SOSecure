@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { validateJsonContentType, validateArrayLimit } from '@/lib/api-validation'
 
+const MAX_INVITES = 10
 const RESEND_API_KEY = process.env.RESEND_API_KEY!
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://sosecure-ten.vercel.app'
 
@@ -11,11 +13,17 @@ interface Invite {
 
 export async function POST(req: NextRequest) {
   try {
+    const ctErr = validateJsonContentType(req)
+    if (ctErr) return ctErr
+
     const { initiatorName, invites, securityTimerEnd } = await req.json() as {
       initiatorName: string
       invites: Invite[]
       securityTimerEnd: number | null
     }
+
+    const arrErr = validateArrayLimit(invites, MAX_INVITES, 'invites')
+    if (arrErr) return arrErr
 
     const timerText = securityTimerEnd
       ? `El temporizador de seguridad expira en ${Math.round((securityTimerEnd - Date.now()) / 60000)} minutos.`
