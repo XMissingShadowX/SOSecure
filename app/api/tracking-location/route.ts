@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { validateJsonContentType } from '@/lib/api-validation'
 
 // Usa service role para saltarse RLS — el token valida la identidad del miembro
 const supabaseAdmin = createClient(
@@ -9,6 +10,9 @@ const supabaseAdmin = createClient(
 
 export async function POST(req: NextRequest) {
   try {
+    const ctErr = validateJsonContentType(req)
+    if (ctErr) return ctErr
+
     const { memberId, token, latitude, longitude, isStopping } = await req.json()
 
     if (!memberId || !token) {

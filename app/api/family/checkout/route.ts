@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { FAMILY_PLAN } from '@/lib/plan-config'
+import { validateJsonContentType } from '@/lib/api-validation'
 
 function adminClient() {
   return createAdminClient(
@@ -54,6 +55,9 @@ export async function POST(req: NextRequest) {
     const supabase = await createServerClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+    const ctErr = validateJsonContentType(req)
+    if (ctErr) return ctErr
 
     const body = (await req.json().catch(() => ({}))) as { action?: string; token?: string; provider?: string }
     const { action, token, provider } = body

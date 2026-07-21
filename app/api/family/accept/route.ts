@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { createClient } from '@supabase/supabase-js'
+import { validateJsonContentType } from '@/lib/api-validation'
 
 function admin() {
   return createClient(
@@ -26,6 +27,9 @@ export async function POST(req: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Inicia sesión para unirte', code: 'no_auth' }, { status: 401 })
     }
+
+    const ctErr = validateJsonContentType(req)
+    if (ctErr) return ctErr
 
     const { token } = (await req.json()) as { token?: string }
     if (!token) {

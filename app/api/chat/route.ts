@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest, NextResponse } from 'next/server'
+import { validateJsonContentType } from '@/lib/api-validation'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -15,6 +16,9 @@ Reglas:
 
 export async function POST(req: NextRequest) {
   try {
+    const ctErr = validateJsonContentType(req)
+    if (ctErr) return ctErr
+
     const { messages } = await req.json() as {
       messages: { role: 'user' | 'assistant'; content: string }[]
     }

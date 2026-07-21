@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { validateJsonContentType } from '@/lib/api-validation'
 
 const OLD_SHA256_HASH = /^[0-9a-f]{64}$/i
 
@@ -48,6 +49,9 @@ export async function POST(req: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+
+  const ctErr = validateJsonContentType(req)
+  if (ctErr) return ctErr
 
   const body = await req.json()
   const { pin, pin_enabled, pin_timeout_minutes } = body

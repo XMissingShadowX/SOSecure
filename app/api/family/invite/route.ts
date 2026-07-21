@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { FAMILY_PLAN } from '@/lib/plan-config'
+import { validateJsonContentType, validateArrayLimit } from '@/lib/api-validation'
 
 function adminClient() {
   return createAdminClient(
@@ -31,6 +32,9 @@ interface InviteInput {
 
 export async function POST(req: NextRequest) {
   try {
+    const ctErr = validateJsonContentType(req)
+    if (ctErr) return ctErr
+
     const supabase = await createServerClient()
     const admin = adminClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -39,9 +43,10 @@ export async function POST(req: NextRequest) {
     }
 
     const { members } = (await req.json()) as { members: InviteInput[] }
-    if (!Array.isArray(members) || members.length === 0) {
-      return NextResponse.json({ error: 'Sin miembros para invitar' }, { status: 400 })
-    }
+    // Mismo límite que el trigger de la BD (FAMILY_PLAN.maxMembers) — rechazar
+    // temprano en vez de dejar que cada fila falle una por una en el loop.
+    const arrErr = validateArrayLimit(members, FAMILY_PLAN.maxMembers, 'members')
+    if (arrErr) return arrErr
 
     // Grupo del dueño
     const { data: group } = await admin
