@@ -56,7 +56,11 @@ async function verifyPayPalSignature(req: NextRequest, rawBody: string): Promise
   } catch { return false }
 }
 
-async function activateSub(subId: string, provider: string, ref: string) {
+// matchColumn='id' cuando el valor viene de custom_id (nuestro UUID interno,
+// el que nosotros mandamos al crear la suscripción). matchColumn='provider_ref'
+// cuando el valor viene de billing_agreement_id (el ID de suscripción que
+// PayPal asigna — el que guardamos como provider_ref al activar por primera vez).
+async function activateSub(matchColumn: 'id' | 'provider_ref', matchValue: string, provider: string, ref: string) {
   const now = new Date()
   const end = new Date(now)
   end.setMonth(end.getMonth() + 1)
@@ -64,7 +68,7 @@ async function activateSub(subId: string, provider: string, ref: string) {
     status: 'active', provider, provider_ref: ref,
     amount_cents: PREMIUM_PLAN.amountCents, currency: PREMIUM_PLAN.currency,
     current_period_start: now.toISOString(), current_period_end: end.toISOString(),
-  }).eq('id', subId)
+  }).eq(matchColumn, matchValue)
 }
 
 async function cancelSub(subId: string) {
@@ -84,7 +88,7 @@ export async function POST(req: NextRequest) {
       if (!valid) return NextResponse.json({ error: 'Firma inválida' }, { status: 401 })
 
       const subId = body?.resource?.custom_id
-      if (subId) await activateSub(subId, 'paypal', body.resource.id)
+      if (subId) await activateSub('id', subId, 'paypal', body.resource.id)
       return NextResponse.json({ received: true })
     }
 
@@ -104,9 +108,16 @@ export async function POST(req: NextRequest) {
       const valid = await verifyPayPalSignature(req, rawBody)
       if (!valid) return NextResponse.json({ error: 'Firma inválida' }, { status: 401 })
 
-      const subId = body?.resource?.billing_agreement_id
-        ?? body?.resource?.custom
-      if (subId) await activateSub(subId, 'paypal', body.resource.id)
+      // billing_agreement_id es el ID de suscripción de PayPal (I-XXXXXXXX),
+      // no nuestro UUID — hay que buscarlo por provider_ref, no por id.
+      // (custom solo viene poblado en pagos únicos, no en cobros recurrentes.)
+      const billingAgreementId = body?.resource?.billing_agreement_id
+      const customId = body?.resource?.custom
+      if (billingAgreementId) {
+        await activateSub('provider_ref', billingAgreementId, 'paypal', body.resource.id)
+      } else if (customId) {
+        await activateSub('id', customId, 'paypal', body.resource.id)
+      }
       return NextResponse.json({ received: true })
     }
 
