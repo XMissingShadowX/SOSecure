@@ -10,7 +10,6 @@
    - create-session (default): crea la suscripción y devuelve { url }
    - capture-mercadopago: verifica preapproval al regresar del checkout de MP
    - capture-paypal: verifica suscripción al regresar del checkout de PayPal
-   - activate: activa manualmente (modo demo / admin)
 */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -161,25 +160,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true, period_end: end.toISOString() })
       }
       return NextResponse.json({ error: 'Suscripción no activa', status: subscription.status }, { status: 402 })
-    }
-
-    // ── Activar manualmente (demo / admin) ────────────────────────────
-    if (action === 'activate') {
-      const now = new Date()
-      const end = new Date(now)
-      end.setFullYear(end.getFullYear() + 1)
-      await admin.from('family_groups')
-        .update({
-          status: 'active',
-          provider: group.provider ?? 'demo',
-          amount_cents: FAMILY_PLAN.amountCents,
-          currency: FAMILY_PLAN.currency,
-          current_period_start: now.toISOString(),
-          current_period_end: end.toISOString(),
-        })
-        .eq('id', group.id)
-        .eq('owner_id', user.id)
-      return NextResponse.json({ success: true, status: 'active', period_end: end.toISOString() })
     }
 
     // ── Crear suscripción ──────────────────────────────────────────────

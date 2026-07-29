@@ -10,7 +10,6 @@
    - create-session (default): crea la suscripción y devuelve { url }
    - capture-mercadopago: verifica preapproval al regresar del checkout de MP
    - capture-paypal: verifica suscripción al regresar del checkout de PayPal
-   - activate: activa manualmente (modo demo / admin)
 */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -150,24 +149,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true, period_end: end.toISOString() })
       }
       return NextResponse.json({ error: 'Suscripción no activa', status: subscription.status }, { status: 402 })
-    }
-
-    // ── Activar manualmente (demo / admin) ────────────────────────────
-    if (action === 'activate') {
-      const now = new Date()
-      const end = new Date(now)
-      end.setMonth(end.getMonth() + 1)
-      await admin.from('premium_subscriptions')
-        .update({
-          status: 'active',
-          provider: sub.provider ?? 'demo',
-          amount_cents: PREMIUM_PLAN.amountCents,
-          currency: PREMIUM_PLAN.currency,
-          current_period_start: now.toISOString(),
-          current_period_end: end.toISOString(),
-        })
-        .eq('id', sub.id)
-      return NextResponse.json({ success: true, status: 'active', period_end: end.toISOString() })
     }
 
     // ── Crear suscripción ──────────────────────────────────────────────
