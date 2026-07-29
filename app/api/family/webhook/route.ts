@@ -90,7 +90,11 @@ async function verifyPayPalSignature(req: NextRequest, rawBody: string): Promise
   } catch { return false }
 }
 
-async function activateGroup(groupId: string, provider: string, ref: string) {
+// matchColumn='id' cuando el valor viene de custom_id (nuestro UUID interno,
+// el que nosotros mandamos al crear la suscripción). matchColumn='provider_ref'
+// cuando el valor viene de billing_agreement_id (el ID de suscripción que
+// PayPal asigna — el que guardamos como provider_ref al activar por primera vez).
+async function activateGroup(matchColumn: 'id' | 'provider_ref', matchValue: string, provider: string, ref: string) {
   const now = new Date()
   const end = new Date(now)
   end.setFullYear(end.getFullYear() + 1)
@@ -98,7 +102,7 @@ async function activateGroup(groupId: string, provider: string, ref: string) {
     status: 'active', provider, provider_ref: ref,
     amount_cents: FAMILY_PLAN.amountCents, currency: FAMILY_PLAN.currency,
     current_period_start: now.toISOString(), current_period_end: end.toISOString(),
-  }).eq('id', groupId)
+  }).eq(matchColumn, matchValue)
 }
 
 async function cancelGroup(groupId: string) {
@@ -133,7 +137,7 @@ export async function POST(req: NextRequest) {
     if (body?.type === 'checkout.session.completed') {
       const session = body.data?.object
       const groupId = session?.metadata?.group_id || session?.client_reference_id
-      if (groupId) await activateGroup(groupId, 'stripe', session?.id)
+      if (groupId) await activateGroup('id', groupId, 'stripe', session?.id)
       return NextResponse.json({ received: true })
     }
 
@@ -178,7 +182,7 @@ export async function POST(req: NextRequest) {
               groupId = group?.id
             }
           }
-          if (groupId) await activateGroup(groupId, 'mercadopago', preapprovalId)
+          if (groupId) await activateGroup('id', groupId, 'mercadopago', preapprovalId)
         }
       } else if (preapproval.status === 'cancelled' || preapproval.status === 'paused') {
         if (isPremium) {
@@ -209,7 +213,7 @@ export async function POST(req: NextRequest) {
           if (subId) await activateSub(subId, 'mercadopago', String(paymentId))
         } else {
           const groupId = payment.external_reference
-          if (groupId) await activateGroup(groupId, 'mercadopago', String(paymentId))
+          if (groupId) await activateGroup('id', groupId, 'mercadopago', String(paymentId))
         }
       }
       return NextResponse.json({ received: true })
@@ -222,7 +226,7 @@ export async function POST(req: NextRequest) {
 
       const resource = body?.resource
       const groupId = resource?.custom_id ?? resource?.subscriber?.custom_id
-      if (groupId) await activateGroup(groupId, 'paypal', resource?.id)
+      if (groupId) await activateGroup('id', groupId, 'paypal', resource?.id)
       return NextResponse.json({ received: true })
     }
 
@@ -244,7 +248,24 @@ export async function POST(req: NextRequest) {
 
       const resource = body?.resource
       const groupId = resource?.custom_id ?? resource?.purchase_units?.[0]?.custom_id
-      if (groupId) await activateGroup(groupId, 'paypal', resource?.id)
+      if (groupId) await activateGroup('id', groupId, 'paypal', resource?.id)
+      return NextResponse.json({ received: true })
+    }
+
+    // ── PayPal — pago de renovación (suscripción anual) ────────────────
+    // billing_agreement_id es el ID de suscripción de PayPal (I-XXXXXXXX),
+    // no nuestro UUID — hay que buscarlo por provider_ref, no por id.
+    if (body?.event_type === 'PAYMENT.SALE.COMPLETED') {
+      const valid = await verifyPayPalSignature(req, rawBody)
+      if (!valid) return NextResponse.json({ error: 'Firma inválida' }, { status: 401 })
+
+      const billingAgreementId = body?.resource?.billing_agreement_id
+      const customId = body?.resource?.custom
+      if (billingAgreementId) {
+        await activateGroup('provider_ref', billingAgreementId, 'paypal', body.resource.id)
+      } else if (customId) {
+        await activateGroup('id', customId, 'paypal', body.resource.id)
+      }
       return NextResponse.json({ received: true })
     }
 
