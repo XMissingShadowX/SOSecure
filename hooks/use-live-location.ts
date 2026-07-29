@@ -73,7 +73,22 @@ export function useLiveLocation(options: {
     if (!currentUserId || contactUserIds.length === 0) return
     pollContacts()
     pollRef.current = setInterval(pollContacts, POLL_MS)
-    return () => { if (pollRef.current) clearInterval(pollRef.current) }
+
+    // Refresco inmediato vía Realtime (el polling de arriba queda como respaldo
+    // por si la replicación de Realtime no está habilitada para esta tabla).
+    let channel: ReturnType<ReturnType<typeof createClient>['channel']> | null = null
+    try {
+      const supabase = createClient()
+      channel = supabase
+        .channel(`live-location-contacts-${currentUserId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'user_locations' }, () => pollContacts())
+        .subscribe()
+    } catch { /* noop: el polling sigue funcionando igual */ }
+
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current)
+      if (channel) { try { createClient().removeChannel(channel) } catch { /* noop */ } }
+    }
   }, [currentUserId, pollContacts, contactUserIds.length])
 
   return { isSharingMyLocation: isLiveSharing, toggleSharing, contacts, myLocation }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { TrackingSession, TrackingMember } from '@/lib/types'
 
 const LOCATION_INTERVAL_MS = 30_000
@@ -22,12 +23,17 @@ export function useTracking() {
   const [error, setError] = useState<string | null>(null)
   const locationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const realtimeChannelRef = useRef<RealtimeChannel | null>(null)
 
   const stopIntervals = useCallback(() => {
     if (locationIntervalRef.current) clearInterval(locationIntervalRef.current)
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
     locationIntervalRef.current = null
     pollIntervalRef.current = null
+    if (realtimeChannelRef.current) {
+      try { createClient().removeChannel(realtimeChannelRef.current) } catch { /* noop */ }
+      realtimeChannelRef.current = null
+    }
   }, [])
 
   // Sube la ubicación del iniciador vía API server-side (mismo camino que el contacto)
@@ -151,6 +157,19 @@ export function useTracking() {
 
       pollMembers(sess.id)
       pollIntervalRef.current = setInterval(() => pollMembers(sess.id), LOCATION_INTERVAL_MS)
+
+      // Refresco inmediato vía Realtime (el polling de arriba queda como respaldo
+      // por si la replicación de Realtime no está habilitada para esta tabla).
+      try {
+        realtimeChannelRef.current = supabase
+          .channel(`tracking-members-${sess.id}`)
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'tracking_members', filter: `session_id=eq.${sess.id}` },
+            () => pollMembers(sess.id)
+          )
+          .subscribe()
+      } catch { /* noop: el polling sigue funcionando igual */ }
 
     } catch (err: any) {
       setError(err.message ?? 'Error desconocido')
