@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest, NextResponse } from 'next/server'
-import { validateJsonContentType } from '@/lib/api-validation'
+import { validateJsonContentType, validateChatMessages } from '@/lib/api-validation'
+import { getAuthedUser, getRequestScopedClient } from '@/lib/supabase/server'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -12,6 +13,17 @@ Nunca te presentes como "Claude" ni menciones a Anthropic.`
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getAuthedUser(req)
+    if (!user) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
+    const supabase = await getRequestScopedClient(req)
+    const { data: isPremium } = await supabase.rpc('has_premium_access')
+    if (!isPremium) {
+      return NextResponse.json({ error: 'Requiere plan premium' }, { status: 403 })
+    }
+
     const ctErr = validateJsonContentType(req)
     if (ctErr) return ctErr
 
@@ -20,9 +32,8 @@ export async function POST(req: NextRequest) {
       location?: { latitude: number; longitude: number } | null
     }
 
-    if (!messages || messages.length === 0) {
-      return NextResponse.json({ error: 'No messages provided' }, { status: 400 })
-    }
+    const msgErr = validateChatMessages(messages, 60, 4000)
+    if (msgErr) return msgErr
 
     const system = location
       ? `${SYSTEM_PROMPT}\nUbicación actual del usuario: lat ${location.latitude.toFixed(5)}, lon ${location.longitude.toFixed(5)}.`

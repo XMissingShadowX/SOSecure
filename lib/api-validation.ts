@@ -26,3 +26,23 @@ export function validateArrayLimit(arr: unknown, max: number, fieldName: string)
   }
   return null
 }
+
+// Para endpoints de chat (Anthropic): limita cantidad de mensajes y longitud
+// de cada uno, para no reenviar payloads arbitrariamente grandes al modelo.
+export function validateChatMessages(
+  messages: unknown,
+  maxCount: number,
+  maxContentLength: number
+): NextResponse | null {
+  const arrErr = validateArrayLimit(messages, maxCount, 'messages')
+  if (arrErr) return arrErr
+  for (const m of messages as { content?: unknown }[]) {
+    if (typeof m.content !== 'string' || m.content.length === 0 || m.content.length > maxContentLength) {
+      return NextResponse.json(
+        { error: `Cada mensaje debe ser texto de máximo ${maxContentLength} caracteres` },
+        { status: 400 }
+      )
+    }
+  }
+  return null
+}

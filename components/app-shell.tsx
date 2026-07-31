@@ -539,14 +539,14 @@ export function AppShell() {
   // así que el contenido principal se colaba antes de saberlo. Evita el
   // "flash" donde datos sensibles aparecen brevemente antes del PIN.
   if (!user || pinCheckLoading) {
-    return <div className="fixed inset-0 z-[99999] bg-background" />
+    return <div className="fixed inset-0 z-[var(--z-pin-lock)] bg-background" />
   }
 
   // Render PIN lock overlay (takes over the entire screen)
   if (pinLocked && pinProfile.pin_configured && user) {
     if (forgotPinSent) {
       return (
-        <div className="fixed inset-0 z-[99999] bg-background flex flex-col items-center justify-center p-6 text-center gap-4">
+        <div className="fixed inset-0 z-[var(--z-pin-lock)] bg-background flex flex-col items-center justify-center p-6 text-center gap-4">
           <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center">
             <ShieldCheck className="w-9 h-9 text-primary" />
           </div>
@@ -569,7 +569,7 @@ export function AppShell() {
   return (
     <PermissionGate>
       <div className="min-h-screen bg-background ambient-bg flex flex-col">
-        <header className="sticky top-0 z-30 glass-nav safe-area-top">
+        <header className="sticky top-0 z-[var(--z-header)] glass-nav safe-area-top">
           <div className="flex items-center justify-between h-14 px-4 max-w-lg mx-auto">
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-6 h-6 text-primary" />
@@ -595,7 +595,7 @@ export function AppShell() {
                     <UserCircle className="w-5 h-5" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="z-[9999] bg-popover text-popover-foreground">
+                <DropdownMenuContent align="end" className="z-[var(--z-popover)] bg-popover text-popover-foreground">
                   {user && (
                     <>
                       <DropdownMenuItem className="text-xs text-muted-foreground cursor-default select-none">

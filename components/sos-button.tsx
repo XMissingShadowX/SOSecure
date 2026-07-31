@@ -13,7 +13,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useVolumeSOS } from '@/hooks/use-volume-sos'
-import { AlertTriangle, X, Bell, Mic, Video, StopCircle, Minimize2, ChevronUp, Download } from 'lucide-react'
+import { AlertTriangle, X, Bell, Mic, Video, StopCircle, ChevronUp, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/lib/store'
 import { createClient } from '@/lib/supabase/client'
@@ -461,7 +461,7 @@ export function SOSButton() {
         />
 
         {!minimized && (
-          <div className="fixed inset-0 z-[200] bg-destructive/10 backdrop-blur-md overflow-y-auto">
+          <div className="fixed inset-0 z-[var(--z-sos-active)] bg-destructive/10 backdrop-blur-md overflow-y-auto">
             <div className="flex flex-col items-center justify-center min-h-full px-6 py-8">
               <div className="w-full max-w-sm space-y-4">
 
@@ -470,12 +470,10 @@ export function SOSButton() {
                     <div className="w-3 h-3 rounded-full bg-destructive animate-pulse" />
                     <span className="font-semibold">{t('sos_active')}</span>
                   </div>
-                  <button
-                    onClick={() => setMinimized(true)}
-                    className="opacity-0 pointer-events-none flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs"
-                  >
-                    <Minimize2 className="w-3.5 h-3.5" />
-                  </button>
+                  {/* Espaciador para balancear el justify-between contra el indicador
+                      de SOS activo a la izquierda — minimizar ya se hace desde el
+                      botón "Ver mapa" más abajo. */}
+                  <div className="w-9" />
                 </div>
 
                 <div className="relative aspect-video bg-black rounded-lg overflow-hidden border-2 border-destructive">
@@ -537,7 +535,7 @@ export function SOSButton() {
 
                 <button
                   onClick={() => { setMinimized(true); setActiveTab('before') }}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-primary font-medium text-sm hover:bg-primary/90 transition-colors !text-black dark:!text-white"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors"
                 >
                   {t('sos_viewMap')}
                 </button>
@@ -639,7 +637,7 @@ export function SOSButton() {
         {minimized && (
           <button
             onClick={() => setMinimized(false)}
-            className="fixed bottom-24 right-4 z-[200] flex items-center gap-2 pl-3 pr-4 py-2.5 rounded-full bg-destructive text-destructive-foreground shadow-lg shadow-destructive/40 animate-pulse"
+            className="fixed bottom-24 right-4 z-[var(--z-sos-active)] flex items-center gap-2 pl-3 pr-4 py-2.5 rounded-full bg-destructive text-destructive-foreground shadow-lg shadow-destructive/40 animate-pulse"
           >
             <div className="w-2.5 h-2.5 rounded-full bg-destructive-foreground animate-ping" />
             <ChevronUp className="w-4 h-4" />
@@ -648,7 +646,7 @@ export function SOSButton() {
         )}
 
         <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
-          <AlertDialogContent className="z-[300]">
+          <AlertDialogContent className="z-[var(--z-sos-cancel)]">
             <AlertDialogHeader>
               <AlertDialogTitle>{t('sos_falseAlarmTitle')}</AlertDialogTitle>
               <AlertDialogDescription>
@@ -669,7 +667,7 @@ export function SOSButton() {
 
   return (
     <div className={cn(
-      "fixed left-1/2 -translate-x-1/2 z-50 safe-area-bottom flex flex-col items-center gap-2",
+      "fixed left-1/2 -translate-x-1/2 z-[var(--z-overlay)] safe-area-bottom flex flex-col items-center gap-2",
       simpleMode ? "bottom-24" : "bottom-20"
     )}>
       <div
@@ -711,10 +709,7 @@ export function SOSButton() {
         </div>
       </button>
 
-      <p
-        className="whitespace-nowrap text-sm font-medium px-3 py-1 rounded-full -mt-1"
-        style={{ backgroundColor: 'rgba(220, 38, 38, 0.2)', color: '#991b1b' }}
-      >
+      <p className="whitespace-nowrap text-sm font-medium px-3 py-1 rounded-full -mt-1 bg-destructive/20 text-destructive">
         {isHolding ? t('sos_holding') : t('sos_press')}
       </p>
     </div>

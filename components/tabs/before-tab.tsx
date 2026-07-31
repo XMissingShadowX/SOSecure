@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import dynamic from 'next/dynamic'
-import { Shield, ShieldCheck, Clock, Users, Timer, AlertTriangle, Map, Navigation, ChevronDown, ChevronUp, Radio, UserCheck, UserX, RefreshCw, Mic, TriangleAlert, MapPinCheck, MapPinCheckInside, CircleAlert } from 'lucide-react'
+import { Shield, ShieldCheck, Clock, Users, Timer, AlertTriangle, Map, Navigation, ChevronDown, ChevronUp, Radio, UserCheck, UserX, RefreshCw, Mic, TriangleAlert, MapPinCheck, MapPinCheckInside, CircleAlert, Link2 } from 'lucide-react'
 import { RoutesTab, calculateSafetyScore } from './routes-tab'
 import { MapTab } from './map-tab'
 import { useAppStore } from '@/lib/store'
@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import { FieldGroup, Field, FieldLabel } from '@/components/ui/field'
 import {
   Dialog,
@@ -48,10 +49,10 @@ const RouteMap = dynamic(
 
 
 const SAFE_ZONE_TYPES = [
-  { type: 'pharmacy', label: '💊 Farmacia', color: 'text-green-400' },
-  { type: 'police', label: '👮 Policía', color: 'text-blue-400' },
-  { type: 'hospital', label: '🏥 Hospital', color: 'text-red-400' },
-  { type: 'store', label: '🏪 Tienda', color: 'text-yellow-400' },
+  { type: 'pharmacy', label: '💊 Farmacia', color: 'text-safe' },
+  { type: 'police', label: '👮 Policía', color: 'text-primary' },
+  { type: 'hospital', label: '🏥 Hospital', color: 'text-destructive' },
+  { type: 'store', label: '🏪 Tienda', color: 'text-warning' },
 ]
 
 function formatCountdown(ms: number) {
@@ -213,7 +214,24 @@ export function BeforeTab() {
   const [keywordDraft, setKeywordDraft] = useState('')
 
   const { incoming, shareLocation, stopShare } = useIncomingTracking(currentUser?.id ?? null)
-  const { contactUserIds, nameFor } = useContactUserIds(contacts)
+  const { contactUserIds, nameFor, idMap } = useContactUserIds(contacts)
+  const [selectedLinkContacts, setSelectedLinkContacts] = useState<string[]>([])
+  // Contactos con correo que NO tienen cuenta SOSecure — únicos elegibles para
+  // el rastreo por enlace (el sistema de Seguimiento en Vivo ya cubre a los que sí tienen cuenta).
+  const linkableContacts = contacts.filter(c => c.email && !idMap[c.email])
+
+  const handleStartTrackByLink = async () => {
+    if (!currentUser) return
+    const picked = contacts.filter(c => selectedLinkContacts.includes(c.id))
+    if (picked.length === 0) return
+    await startTracking({
+      initiatorName: currentUser.name,
+      initiatorUserId: currentUser.id,
+      contacts: picked.map(c => ({ id: c.id, name: c.name, email: c.email, phone: c.phone })),
+      securityTimerEnd: securityTimerActive ? (securityTimerEnd ?? null) : null,
+    })
+    setSelectedLinkContacts([])
+  }
   const { isSharingMyLocation, toggleSharing, contacts: liveContacts, myLocation } = useLiveLocation({
     currentUserId: currentUser?.id ?? null,
     currentUserName: currentUser?.name ?? null,
@@ -279,7 +297,7 @@ export function BeforeTab() {
   }, [setSecurityTimer])
 
   return (
-    <div className="flex flex-col gap-6 pb-60">
+    <div className="flex flex-col gap-6 pb-40">
       <Card className="border-primary/30 bg-primary/5">
         <CardContent className="flex items-center justify-center gap-3 py-2 px-3">
           <TriangleAlert className="w-5 h-5 shrink-0 text-primary" />
@@ -447,6 +465,106 @@ export function BeforeTab() {
         </CardContent>
       </Card>
 
+      {/* Rastreo compartido por otra persona conmigo — no requiere premium para aceptar */}
+      {incoming.length > 0 && (
+        <Card>
+          <CardHeader className="pb-0">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Users className="w-5 h-5 text-primary" />
+              {t('before_incomingTracking')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {incoming.map(inc => (
+              <div key={inc.session.id} className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-muted/50">
+                <p className="text-sm min-w-0 flex-1 truncate">
+                  {t('before_incomingTrackingFrom').replace('{name}', inc.session.initiator_name)}
+                </p>
+                <Button
+                  size="sm"
+                  variant={inc.myMember.is_sharing ? 'outline' : 'default'}
+                  className="shrink-0"
+                  onClick={() => inc.myMember.is_sharing
+                    ? stopShare(inc.myMember.id, inc.myMember.external_token)
+                    : shareLocation(inc.myMember.id, inc.myMember.external_token)}
+                >
+                  {inc.myMember.is_sharing ? t('before_incomingTrackingStop') : t('before_incomingTrackingShare')}
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Rastreo por Enlace — compartir con contactos sin cuenta SOSecure, solo premium */}
+      {isPremium && (
+        <Card>
+          <CardHeader className="pb-0">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Link2 className="w-5 h-5 text-primary" />
+              {t('before_trackByLink')}
+              {session && (
+                <span className="ml-auto flex items-center gap-1 text-xs font-normal text-safe">
+                  <Radio className="w-3 h-3 animate-pulse" />
+                  {t('before_trackByLinkActive')}
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">{t('before_trackByLinkDesc')}</p>
+
+            {session ? (
+              <>
+                <div className="space-y-2">
+                  {members.map((m: TrackingMember) => (
+                    <div key={m.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/50">
+                      <div className="w-8 h-8 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
+                        {m.display_name[0]?.toUpperCase()}
+                      </div>
+                      <p className="text-sm font-medium truncate flex-1 min-w-0">{m.display_name}</p>
+                      <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${m.is_sharing ? 'bg-safe' : 'bg-muted-foreground/40'}`} />
+                    </div>
+                  ))}
+                </div>
+                <Button className="w-full" variant="outline" onClick={stopTracking} disabled={trackingLoading}>
+                  {t('before_trackByLinkStop')}
+                </Button>
+              </>
+            ) : linkableContacts.length === 0 ? (
+              <p className="text-xs text-muted-foreground">{t('before_trackByLinkNoContacts')}</p>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  {linkableContacts.map(c => (
+                    <label key={c.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/50 cursor-pointer">
+                      <Checkbox
+                        checked={selectedLinkContacts.includes(c.id)}
+                        onCheckedChange={(checked) => {
+                          setSelectedLinkContacts(prev =>
+                            checked === true ? [...prev, c.id] : prev.filter(id => id !== c.id)
+                          )
+                        }}
+                      />
+                      <span className="text-sm">{c.name}</span>
+                    </label>
+                  ))}
+                </div>
+                {trackingError && <p className="text-xs text-destructive">{trackingError}</p>}
+                <Button
+                  className="w-full"
+                  disabled={selectedLinkContacts.length === 0 || trackingLoading}
+                  onClick={handleStartTrackByLink}
+                >
+                  <Link2 className="w-4 h-4 mr-2" />
+                  {t('before_trackByLinkStart')}
+                </Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Zonas Seguras */}
       <Card>
         <CardHeader className="pb-0">
@@ -508,7 +626,7 @@ export function BeforeTab() {
             <Users className="w-5 h-5 text-primary" />
             {t('before_liveLocations')}
             {isSharingMyLocation && (
-              <span className="ml-auto flex items-center gap-1 text-xs font-normal text-green-600">
+              <span className="ml-auto flex items-center gap-1 text-xs font-normal text-safe">
                 <Radio className="w-3 h-3 animate-pulse" />
                 {t('before_sharing')}
               </span>
@@ -528,14 +646,14 @@ export function BeforeTab() {
                 onClick={toggleSharing}
                 className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-colors
                   ${isSharingMyLocation
-                    ? 'border-green-300 bg-green-50 dark:bg-green-950/30'
+                    ? 'border-safe/40 bg-safe/10'
                     : 'border-border bg-muted/30 hover:bg-muted/60'}`}
               >
                 {isSharingMyLocation
-                  ? <UserCheck className="w-5 h-5 text-green-600 flex-shrink-0" />
+                  ? <UserCheck className="w-5 h-5 text-safe flex-shrink-0" />
                   : <UserX className="w-5 h-5 text-muted-foreground flex-shrink-0" />}
                 <div className="text-left flex-1">
-                  <p className={`text-sm font-medium ${isSharingMyLocation ? 'text-green-700 dark:text-green-400' : ''}`}>
+                  <p className={`text-sm font-medium ${isSharingMyLocation ? 'text-safe' : ''}`}>
                     {isSharingMyLocation ? t('before_shareMyLocation') : t('before_shareMyLocation')}
                   </p>
                   <p className="text-xs text-muted-foreground">
@@ -543,7 +661,7 @@ export function BeforeTab() {
                   </p>
                 </div>
                 <div className={`w-10 h-6 rounded-full transition-colors flex items-center px-0.5
-                  ${isSharingMyLocation ? 'bg-green-500 justify-end' : 'bg-muted-foreground/30 justify-start'}`}>
+                  ${isSharingMyLocation ? 'bg-safe justify-end' : 'bg-muted-foreground/30 justify-start'}`}>
                   <div className="w-5 h-5 rounded-full bg-white shadow-sm" />
                 </div>
               </button>
@@ -568,7 +686,7 @@ export function BeforeTab() {
                         className={`w-full flex items-center gap-3 p-2.5 rounded-lg transition-colors text-left
                           ${isFocused ? 'bg-primary/15 ring-1 ring-primary/40' : 'bg-muted/50 hover:bg-muted/80'}`}
                       >
-                        <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                        <div className="w-10 h-10 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
                           {name[0].toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -578,8 +696,8 @@ export function BeforeTab() {
                           </p>
                         </div>
                         <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
-                          status === 'active' ? 'bg-green-400' :
-                          status === 'stale' ? 'bg-yellow-400' : 'bg-gray-300'}`} />
+                          status === 'active' ? 'bg-safe' :
+                          status === 'stale' ? 'bg-warning' : 'bg-muted-foreground/40'}`} />
                       </button>
                     )
                   })
@@ -645,7 +763,7 @@ export function BeforeTab() {
             {sosActive ? (
               <span className="text-xs text-muted-foreground">{t('before_voiceKeywordSosActive')}</span>
             ) : (
-              <span className="flex items-center gap-1 text-xs text-green-600">
+              <span className="flex items-center gap-1 text-xs text-safe">
                 <Mic className="w-3 h-3 animate-pulse" />
                 {t('before_voiceKeywordListening')}
               </span>
@@ -710,7 +828,7 @@ export function BeforeTab() {
           ) : (
             <div className="flex flex-wrap gap-2">
               {contacts.map((c) => (
-                <Badge key={c.id} variant="secondary" className="text-sm !text-black dark:!text-white">
+                <Badge key={c.id} variant="secondary" className="text-sm">
                   {c.name} · {c.importance === 'primary' ? '🔴' : c.importance === 'secondary' ? '🟡' : '🔵'}
                 </Badge>
               ))}

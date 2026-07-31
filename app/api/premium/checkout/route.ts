@@ -62,9 +62,7 @@ export async function POST(req: NextRequest) {
     const body = (await req.json().catch(() => ({}))) as { action?: string; token?: string; provider?: string }
     const { action, token, provider } = body
 
-    console.log('[premium/checkout] body:', { action, provider })
     const sub = await ensureSubRow(admin, user.id)
-    console.log('[premium/checkout] sub:', sub?.id)
     if (!sub) return NextResponse.json({ error: 'No se pudo crear la suscripción' }, { status: 500 })
 
     // ── Verificar preapproval de Mercado Pago al regresar ──────────────
@@ -137,7 +135,6 @@ export async function POST(req: NextRequest) {
         headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` },
       })
       const plan = await res.json()
-      console.log('[premium/checkout] MP plan:', JSON.stringify(plan))
       const url = plan.init_point
       if (!url) return NextResponse.json({ error: 'No se pudo obtener el plan de Mercado Pago', detail: plan }, { status: 502 })
 

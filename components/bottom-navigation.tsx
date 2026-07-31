@@ -28,7 +28,7 @@ export function BottomNavigation() {
   ]
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 safe-area-bottom px-3 pb-3">
+    <div className="fixed bottom-0 left-0 right-0 z-[var(--z-bottom-nav)] safe-area-bottom px-3 pb-3">
       <nav className="glass-strong mx-auto flex w-full max-w-lg items-center rounded-[2rem]">
         <div className={cn('flex items-center w-full', simpleMode ? 'h-20' : 'h-16')}>
           {tabs.map((tab) => {

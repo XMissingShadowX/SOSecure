@@ -722,8 +722,8 @@ export function DuringTab() {
                 )}
               </div>
               {voiceKeyword && !sosActive && (
-                <span className="flex items-center gap-1 text-[10px] text-green-600 font-medium">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                <span className="flex items-center gap-1 text-[10px] text-safe font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-safe animate-pulse" />
                   {t('during_listening')}
                 </span>
               )}

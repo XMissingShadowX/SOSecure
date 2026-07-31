@@ -64,3 +64,20 @@ export async function getAuthedUser(req: Request): Promise<User | null> {
   const { data: { user } } = await supabase.auth.getUser()
   return user
 }
+
+// Igual que getAuthedUser pero devuelve el cliente en vez del user — para rutas
+// que necesitan hacer un .rpc()/.from() que dependa de auth.uid() (RLS, RPCs
+// security definer como has_premium_access) en nombre de quien llama, sea web
+// (cookies) o Flutter (Bearer). El cliente admin() con service role NO sirve
+// para esto: auth.uid() dentro del RPC resolvería a null.
+export async function getRequestScopedClient(req: Request) {
+  const authHeader = req.headers.get('authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    return createAnonClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { global: { headers: { Authorization: authHeader } } }
+    )
+  }
+  return createClient()
+}

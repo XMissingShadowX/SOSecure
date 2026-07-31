@@ -16,11 +16,7 @@ function admin() {
 }
 
 const MAX_ATTEMPTS = 5
-const LOCKOUT_MS = 1 * 60 * 1000
-
-// Placeholder de rate limiting en memoria — NO persiste entre instancias serverless.
-// En producción reemplazar por Redis/Upstash (o similar) compartido entre instancias.
-const attemptsByUser = new Map<string, { count: number; lockedUntil: number | null }>()
+const LOCKOUT_SECONDS = 60
 
 const OLD_SHA256_HASH = /^[0-9a-f]{64}$/i
 
@@ -28,10 +24,13 @@ export async function POST(req: Request) {
   const user = await getAuthedUser(req)
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
-  const entry = attemptsByUser.get(user.id)
-  if (entry?.lockedUntil && Date.now() < entry.lockedUntil) {
-    const retryAfterSeconds = Math.ceil((entry.lockedUntil - Date.now()) / 1000)
-    return NextResponse.json({ ok: false, error: 'Demasiados intentos' }, { status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } })
+  // Persistido en Postgres (tabla pin_attempts, ver supabase-pin-rate-limit.sql)
+  // en vez de un Map en memoria, para que el bloqueo sea real entre instancias
+  // serverless y no solo por instancia.
+  const { data: lockoutRows } = await admin().rpc('check_pin_lockout', { p_user_id: user.id })
+  const lockout = lockoutRows?.[0]
+  if (lockout?.locked) {
+    return NextResponse.json({ ok: false, error: 'Demasiados intentos' }, { status: 429, headers: { 'Retry-After': String(lockout.retry_after_seconds) } })
   }
 
   const ctErr = validateJsonContentType(req)
@@ -59,15 +58,16 @@ export async function POST(req: Request) {
 
   const match = await bcrypt.compare(pin, profile.pin_hash)
 
+  await admin().rpc('record_pin_attempt', {
+    p_user_id: user.id,
+    p_success: match,
+    p_max_attempts: MAX_ATTEMPTS,
+    p_lockout_seconds: LOCKOUT_SECONDS,
+  })
+
   if (!match) {
-    const next = { count: (entry?.count ?? 0) + 1, lockedUntil: null as number | null }
-    if (next.count >= MAX_ATTEMPTS) {
-      next.lockedUntil = Date.now() + LOCKOUT_MS
-    }
-    attemptsByUser.set(user.id, next)
     return NextResponse.json({ ok: false }, { status: 200 })
   }
 
-  attemptsByUser.delete(user.id)
   return NextResponse.json({ ok: true })
 }

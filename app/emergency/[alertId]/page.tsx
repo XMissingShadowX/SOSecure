@@ -296,9 +296,9 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
   // Si la alerta aún se está cargando, mostrar una pantalla de carga con un mensaje y un indicador visual para 
   // informar al usuario que los datos de la alerta están siendo obtenidos
   if (loading) return (
-    <div className="min-h-screen bg-red-50 flex items-center justify-center">
-      <div className="flex items-center gap-3 text-red-600">
-        <div className="w-6 h-6 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="flex items-center gap-3 text-destructive">
+        <div className="w-6 h-6 border-2 border-destructive border-t-transparent rounded-full animate-spin" />
         <span className="font-medium">Cargando alerta de emergencia...</span>
       </div>
     </div>
@@ -307,11 +307,11 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
   // Si no se encuentra la alerta después de cargar, mostrar una pantalla de error indicando que la alerta 
   // no existe o ya fue eliminada del sistema, para informar al usuario de manera clara y evitar confusiones
   if (!alert) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="text-center">
-        <Shield className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-        <h1 className="text-xl font-bold text-gray-700">Alerta no encontrada</h1>
-        <p className="text-gray-500 mt-2">Esta alerta no existe o ya fue eliminada del sistema.</p>
+        <Shield className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+        <h1 className="text-xl font-bold text-foreground">Alerta no encontrada</h1>
+        <p className="text-muted-foreground mt-2">Esta alerta no existe o ya fue eliminada del sistema.</p>
       </div>
     </div>
   )
@@ -322,7 +322,7 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
   // ubicación en Google Maps, proporcionando una experiencia informativa y útil para los usuarios que 
   // necesitan acceder a esta información durante una emergencia o después de que haya sido resuelta.
   return (
-    <div className="min-h-screen bg-red-50">
+    <div className="min-h-screen bg-background">
       <style>{`
         @keyframes pulse {
           0%, 100% { box-shadow: 0 0 0 4px rgba(239,68,68,0.3), 0 2px 8px rgba(0,0,0,0.3); }
@@ -330,35 +330,35 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
         }
       `}</style>
 
-      <div className="bg-red-600 text-white px-4 py-6">
+      <div className="bg-destructive text-destructive-foreground px-4 py-6">
         <div className="max-w-lg mx-auto">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-3 h-3 rounded-full bg-white animate-pulse" />
+            <div className="w-3 h-3 rounded-full bg-destructive-foreground animate-pulse" />
             <h1 className="text-2xl font-bold">
               {alert.status === 'active' ? '🚨 ALERTA SOS ACTIVA' : '📋 ALERTA SOS — RESUELTA'}
             </h1>
           </div>
-          <p className="text-red-100 text-sm">
+          <p className="text-destructive-foreground/80 text-sm">
             Activada el {new Date(alert.created_at).toLocaleString('es-MX')}
           </p>
         </div>
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
-        <div className="bg-white rounded-xl border-2 border-red-200 p-4">
+        <div className="bg-card rounded-xl border-2 border-destructive/30 p-4">
           <div className="flex items-center gap-3">
-            <AlertTriangle className="w-6 h-6 text-red-500 flex-shrink-0" />
+            <AlertTriangle className="w-6 h-6 text-destructive flex-shrink-0" />
             <div>
-              <p className="font-semibold text-gray-800">
+              <p className="font-semibold text-foreground">
                 {alert.status === 'active' ? 'Esta persona necesita ayuda' : 'Esta alerta ya fue resuelta'}
               </p>
-              <p className="text-sm text-gray-500">
-                Estado: <span className={`font-medium ${alert.status === 'active' ? 'text-red-600' : 'text-green-600'}`}>
+              <p className="text-sm text-muted-foreground">
+                Estado: <span className={`font-medium ${alert.status === 'active' ? 'text-destructive' : 'text-safe'}`}>
                   {alert.status === 'active' ? 'Alerta activa' : 'Resuelta'}
                 </span>
               </p>
               {alert.status !== 'active' && (
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   Puedes ver la última ubicación registrada y el video grabado durante la emergencia.
                 </p>
               )}
@@ -367,23 +367,23 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
         </div>
 
         {lastUpdate && (
-          <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
-            <Clock className="w-5 h-5 text-gray-400 flex-shrink-0" />
+          <div className="bg-card rounded-xl border border-border p-4 flex items-center gap-3">
+            <Clock className="w-5 h-5 text-muted-foreground flex-shrink-0" />
             <div>
-              <p className="text-sm text-gray-500">Última ubicación recibida</p>
-              <p className="font-medium text-gray-800">{lastUpdate.toLocaleTimeString('es-MX')}</p>
+              <p className="text-sm text-muted-foreground">Última ubicación recibida</p>
+              <p className="font-medium text-foreground">{lastUpdate.toLocaleTimeString('es-MX')}</p>
             </div>
           </div>
         )}
 
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-red-500" />
-            <p className="font-medium text-gray-800">
+        <div className="bg-card rounded-xl border border-border overflow-hidden">
+          <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-destructive" />
+            <p className="font-medium text-foreground">
               {alert.status === 'active' ? 'Ubicación en tiempo real' : 'Última ubicación registrada'}
             </p>
             {location && (
-              <span className="ml-auto text-xs text-gray-400 font-mono">
+              <span className="ml-auto text-xs text-muted-foreground font-mono">
                 {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}
               </span>
             )}
@@ -391,7 +391,7 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
           {location ? (
             <div ref={mapRef} style={{ height: '320px', width: '100%' }} />
           ) : (
-            <div className="h-64 flex items-center justify-center text-gray-400">
+            <div className="h-64 flex items-center justify-center text-muted-foreground">
               <div className="text-center">
                 <MapPin className="w-10 h-10 mx-auto mb-2 opacity-40" />
                 <p className="text-sm">Esperando ubicación...</p>
@@ -401,19 +401,19 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
         </div>
 
         {alert.status === 'active' && (
-          <div className="bg-white rounded-xl border-2 border-red-300 overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+          <div className="bg-card rounded-xl border-2 border-destructive/40 overflow-hidden">
+            <div className="px-4 py-3 border-b border-border flex items-center gap-2">
               <span className="relative flex h-3 w-3">
                 {liveIsFresh && (
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75" />
                 )}
-                <span className={`relative inline-flex rounded-full h-3 w-3 ${liveIsFresh ? 'bg-red-600' : 'bg-gray-300'}`} />
+                <span className={`relative inline-flex rounded-full h-3 w-3 ${liveIsFresh ? 'bg-destructive' : 'bg-muted-foreground/40'}`} />
               </span>
-              <p className="font-medium text-gray-800">
+              <p className="font-medium text-foreground">
                 {liveIsFresh ? '🔴 Video EN VIVO' : 'Video en vivo'}
               </p>
               {liveIsFresh && liveSecondsAgo !== null && (
-                <span className="ml-auto text-xs text-gray-400">
+                <span className="ml-auto text-xs text-muted-foreground">
                   {liveSecondsAgo <= 1 ? 'ahora mismo' : `hace ${liveSecondsAgo}s`}
                 </span>
               )}
@@ -438,10 +438,10 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
                   style={{ maxHeight: '360px' }}
                 />
               ) : liveMode !== 'video' || !liveIsFresh ? (
-                <div className="h-56 flex flex-col items-center justify-center gap-3 text-gray-300">
-                  <div className="w-6 h-6 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                <div className="h-56 flex flex-col items-center justify-center gap-3 text-muted-foreground">
+                  <div className="w-6 h-6 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
                   <p className="text-sm">Conectando con la cámara en vivo…</p>
-                  <p className="text-xs text-gray-500 px-6 text-center">
+                  <p className="text-xs text-muted-foreground px-6 text-center">
                     Verás el video en cuanto la persona active su cámara.
                   </p>
                 </div>
@@ -451,10 +451,10 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
         )}
 
         {videoUrl && (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+          <div className="bg-card rounded-xl border border-border overflow-hidden">
+            <div className="px-4 py-3 border-b border-border flex items-center gap-2">
               <span className="text-lg">🎥</span>
-              <p className="font-medium text-gray-800">Video grabado durante la alerta</p>
+              <p className="font-medium text-foreground">Video grabado durante la alerta</p>
             </div>
             <div className="p-4">
               <video
@@ -473,13 +473,13 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
             href={`https://maps.google.com/?q=${location.latitude},${location.longitude}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="block w-full bg-blue-600 text-white text-center py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+            className="block w-full bg-primary text-primary-foreground text-center py-3 rounded-xl font-semibold hover:bg-primary/90 transition-colors"
           >
             🗺️ Abrir en Google Maps
           </a>
         )}
 
-        <p className="text-xs text-center text-gray-400 pb-4">
+        <p className="text-xs text-center text-muted-foreground pb-4">
           Página generada por SOSecure · La ubicación se actualiza automáticamente
         </p>
       </div>

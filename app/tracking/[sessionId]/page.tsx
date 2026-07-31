@@ -218,30 +218,30 @@ export default function TrackingPage({ params }: { params: Promise<{ sessionId: 
   }, [members])
 
   if (loading) return (
-    <div className="min-h-screen bg-blue-50 flex items-center justify-center">
-      <div className="flex items-center gap-3 text-blue-600">
-        <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="flex items-center gap-3 text-primary">
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         <span className="font-medium">Cargando sesión de seguimiento...</span>
       </div>
     </div>
   )
 
   if (!session) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="text-center">
-        <Shield className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-        <h1 className="text-xl font-bold text-gray-700">Sesión no encontrada</h1>
-        <p className="text-gray-500 mt-2">Este enlace no es válido o la sesión ya terminó.</p>
+        <Shield className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+        <h1 className="text-xl font-bold text-foreground">Sesión no encontrada</h1>
+        <p className="text-muted-foreground mt-2">Este enlace no es válido o la sesión ya terminó.</p>
       </div>
     </div>
   )
 
   if (!tokenValid) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="text-center">
-        <Shield className="w-16 h-16 mx-auto text-red-400 mb-4" />
-        <h1 className="text-xl font-bold text-gray-700">Enlace inválido</h1>
-        <p className="text-gray-500 mt-2">El token de acceso no es correcto.</p>
+        <Shield className="w-16 h-16 mx-auto text-destructive/70 mb-4" />
+        <h1 className="text-xl font-bold text-foreground">Enlace inválido</h1>
+        <p className="text-muted-foreground mt-2">El token de acceso no es correcto.</p>
       </div>
     </div>
   )
@@ -250,7 +250,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sessionId: 
   const otherMembers = members.filter(m => !m.is_initiator)
 
   return (
-    <div className="min-h-screen bg-blue-50">
+    <div className="min-h-screen bg-background">
       <style>{`
         @keyframes pulse-blue {
           0%, 100% { box-shadow: 0 0 0 3px rgba(59,130,246,0.3); }
@@ -259,15 +259,15 @@ export default function TrackingPage({ params }: { params: Promise<{ sessionId: 
       `}</style>
 
       {/* Header */}
-      <div className="bg-blue-600 text-white px-4 py-5">
+      <div className="bg-primary text-primary-foreground px-4 py-5">
         <div className="max-w-lg mx-auto">
           <div className="flex items-center gap-3 mb-1">
-            <div className="w-3 h-3 rounded-full bg-white animate-pulse" />
+            <div className="w-3 h-3 rounded-full bg-primary-foreground animate-pulse" />
             <h1 className="text-xl font-bold">
               {session.status === 'stopped' ? '📋 Seguimiento finalizado' : '📍 Seguimiento activo'}
             </h1>
           </div>
-          <p className="text-blue-100 text-sm">
+          <p className="text-primary-foreground/80 text-sm">
             {session.initiator_name} compartió este enlace contigo
           </p>
         </div>
@@ -277,15 +277,15 @@ export default function TrackingPage({ params }: { params: Promise<{ sessionId: 
 
         {/* Temporizador de seguridad */}
         {countdown !== null && session.status === 'active' && (
-          <div className={`rounded-xl border-2 p-4 ${countdown < 5 * 60 * 1000 ? 'bg-red-50 border-red-200' : 'bg-white border-blue-200'}`}>
+          <div className={`rounded-xl border-2 p-4 ${countdown < 5 * 60 * 1000 ? 'bg-destructive/10 border-destructive/30' : 'bg-card border-primary/30'}`}>
             <div className="flex items-center gap-3">
-              <Clock className={`w-5 h-5 ${countdown < 5 * 60 * 1000 ? 'text-red-500' : 'text-blue-500'}`} />
+              <Clock className={`w-5 h-5 ${countdown < 5 * 60 * 1000 ? 'text-destructive' : 'text-primary'}`} />
               <div>
-                <p className="font-semibold text-gray-800 text-sm">Temporizador de seguridad</p>
-                <p className={`text-2xl font-mono font-bold ${countdown < 5 * 60 * 1000 ? 'text-red-600' : 'text-blue-600'}`}>
+                <p className="font-semibold text-foreground text-sm">Temporizador de seguridad</p>
+                <p className={`text-2xl font-mono font-bold ${countdown < 5 * 60 * 1000 ? 'text-destructive' : 'text-primary'}`}>
                   {formatCountdown(countdown)}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-muted-foreground">
                   {countdown === 0
                     ? '⚠️ El tiempo expiró — puede necesitar ayuda'
                     : `${session.initiator_name} tiene este tiempo para llegar`}
@@ -296,21 +296,21 @@ export default function TrackingPage({ params }: { params: Promise<{ sessionId: 
         )}
 
         {/* Estado de mi sharing */}
-        <div className={`rounded-xl border-2 p-4 ${sharing ? 'bg-white border-blue-200' : 'bg-gray-50 border-gray-200'}`}>
+        <div className={`rounded-xl border-2 p-4 ${sharing ? 'bg-card border-primary/30' : 'bg-muted/30 border-border'}`}>
           <div className="flex items-center gap-3">
             {sharing
-              ? <UserCheck className="w-5 h-5 text-blue-500 flex-shrink-0" />
-              : <UserX className="w-5 h-5 text-gray-400 flex-shrink-0" />}
+              ? <UserCheck className="w-5 h-5 text-primary flex-shrink-0" />
+              : <UserX className="w-5 h-5 text-muted-foreground flex-shrink-0" />}
             <div className="flex-1">
-              <p className="font-semibold text-gray-800 text-sm">Tu ubicación</p>
-              <p className="text-xs text-gray-500">
+              <p className="font-semibold text-foreground text-sm">Tu ubicación</p>
+              <p className="text-xs text-muted-foreground">
                 {sharing ? `Compartiéndola con ${session.initiator_name}` : 'No estás compartiendo'}
               </p>
             </div>
             {sharing && session.status === 'active' && (
               <button
                 onClick={stopSharing}
-                className="px-3 py-1.5 bg-red-100 text-red-600 text-xs font-medium rounded-lg hover:bg-red-200 transition-colors"
+                className="px-3 py-1.5 bg-destructive/15 text-destructive text-xs font-medium rounded-lg hover:bg-destructive/25 transition-colors"
               >
                 Detener
               </button>
@@ -319,17 +319,17 @@ export default function TrackingPage({ params }: { params: Promise<{ sessionId: 
         </div>
 
         {/* Mapa */}
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-blue-500" />
-            <p className="font-medium text-gray-800 text-sm">Ubicaciones en tiempo real</p>
-            <div className="ml-auto flex items-center gap-3 text-xs text-gray-500">
+        <div className="bg-card rounded-xl border border-border overflow-hidden">
+          <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-primary" />
+            <p className="font-medium text-foreground text-sm">Ubicaciones en tiempo real</p>
+            <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-orange-400 inline-block" />
+                <span className="w-2.5 h-2.5 rounded-full bg-warning inline-block" />
                 {session.initiator_name}
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-blue-400 inline-block" />
+                <span className="w-2.5 h-2.5 rounded-full bg-primary inline-block" />
                 Tú
               </span>
             </div>
@@ -337,7 +337,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sessionId: 
           {members.some(m => m.latitude) ? (
             <div ref={mapRef} style={{ height: '300px', width: '100%' }} />
           ) : (
-            <div className="h-48 flex items-center justify-center text-gray-400">
+            <div className="h-48 flex items-center justify-center text-muted-foreground">
               <div className="text-center">
                 <MapPin className="w-8 h-8 mx-auto mb-2 opacity-40" />
                 <p className="text-sm">Esperando ubicaciones...</p>
@@ -347,34 +347,34 @@ export default function TrackingPage({ params }: { params: Promise<{ sessionId: 
         </div>
 
         {/* Lista de participantes */}
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
-            <Eye className="w-4 h-4 text-gray-500" />
-            <p className="font-medium text-gray-800 text-sm">Participantes ({members.length})</p>
+        <div className="bg-card rounded-xl border border-border overflow-hidden">
+          <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+            <Eye className="w-4 h-4 text-muted-foreground" />
+            <p className="font-medium text-foreground text-sm">Participantes ({members.length})</p>
           </div>
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-border">
             {initiator && (
               <div className="px-4 py-3 flex items-center gap-3">
-                <span className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-sm font-bold text-orange-600">
+                <span className="w-8 h-8 rounded-full bg-warning/20 flex items-center justify-center text-sm font-bold text-warning">
                   {initiator.display_name[0].toUpperCase()}
                 </span>
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-800">{initiator.display_name} <span className="text-xs text-gray-400">(organizador)</span></p>
-                  <p className="text-xs text-gray-500">{formatRelativeTime(initiator.updated_at)}</p>
+                  <p className="text-sm font-medium text-foreground">{initiator.display_name} <span className="text-xs text-muted-foreground">(organizador)</span></p>
+                  <p className="text-xs text-muted-foreground">{formatRelativeTime(initiator.updated_at)}</p>
                 </div>
-                <span className={`w-2 h-2 rounded-full ${initiator.is_sharing ? 'bg-green-400' : 'bg-gray-300'}`} />
+                <span className={`w-2 h-2 rounded-full ${initiator.is_sharing ? 'bg-safe' : 'bg-muted-foreground/40'}`} />
               </div>
             )}
             {otherMembers.map(m => (
               <div key={m.id} className="px-4 py-3 flex items-center gap-3">
-                <span className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-sm font-bold text-blue-600">
+                <span className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center text-sm font-bold text-primary">
                   {m.display_name[0].toUpperCase()}
                 </span>
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-800">{m.display_name}</p>
-                  <p className="text-xs text-gray-500">{formatRelativeTime(m.updated_at)}</p>
+                  <p className="text-sm font-medium text-foreground">{m.display_name}</p>
+                  <p className="text-xs text-muted-foreground">{formatRelativeTime(m.updated_at)}</p>
                 </div>
-                <span className={`w-2 h-2 rounded-full ${m.is_sharing ? 'bg-green-400' : 'bg-gray-300'}`} />
+                <span className={`w-2 h-2 rounded-full ${m.is_sharing ? 'bg-safe' : 'bg-muted-foreground/40'}`} />
               </div>
             ))}
           </div>
@@ -386,13 +386,13 @@ export default function TrackingPage({ params }: { params: Promise<{ sessionId: 
             href={`https://maps.google.com/?q=${initiator.latitude},${initiator.longitude}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="block w-full bg-blue-600 text-white text-center py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+            className="block w-full bg-primary text-primary-foreground text-center py-3 rounded-xl font-semibold hover:bg-primary/90 transition-colors"
           >
             🗺️ Ver a {session.initiator_name} en Google Maps
           </a>
         )}
 
-        <p className="text-xs text-center text-gray-400 pb-4">
+        <p className="text-xs text-center text-muted-foreground pb-4">
           SOSecure · Ubicación actualizada cada 30 segundos
         </p>
       </div>

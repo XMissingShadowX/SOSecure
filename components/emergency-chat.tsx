@@ -325,9 +325,14 @@ Nunca te presentes como "Claude".`
     setLoading(true)
     const newHistory = [...history, { role: 'user' as const, content: userText }]
     try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch('/api/emergency-chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ messages: newHistory, location: currentLocation }),
       })
       const data = await res.json()
@@ -683,10 +688,9 @@ export function EmergencyChat() {
       <button
         onClick={() => setOpen(true)}
         className={cn(
-          "fixed bottom-28 right-4 z-50 rounded-full bg-primary shadow-lg flex items-center justify-center active:scale-95 transition-transform",
-          simpleMode ? "w-18 h-18" : "w-14 h-14"
+          "fixed bottom-28 right-4 z-[var(--z-overlay)] rounded-full bg-primary shadow-lg flex items-center justify-center active:scale-95 transition-transform",
+          simpleMode ? "w-[4.5rem] h-[4.5rem]" : "w-14 h-14"
         )}
-        style={simpleMode ? { width: '4.5rem', height: '4.5rem' } : undefined}
         aria-label={t('chat_open')}
       >
         <MessageCircle className={simpleMode ? "w-8 h-8 text-primary-foreground" : "w-6 h-6 text-primary-foreground"} />
@@ -700,8 +704,8 @@ export function EmergencyChat() {
   }
 
   return (
-    <div className="fixed bottom-20 right-0 left-0 mx-auto max-w-lg z-50 px-2">
-      <div className="bg-card border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden" style={{ height: '75vh' }}>
+    <div className="fixed bottom-20 right-0 left-0 mx-auto max-w-lg z-[var(--z-overlay)] px-2">
+      <div className="bg-card border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden" style={{ height: '75dvh' }}>
 
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-primary/10 flex-shrink-0">

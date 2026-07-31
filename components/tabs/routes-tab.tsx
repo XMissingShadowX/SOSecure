@@ -131,7 +131,10 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
     if (isPremium) return true
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return true
+    if (!user) {
+      setSearchLimitReached(true)
+      return false
+    }
     const { data: count } = await supabase.rpc('count_route_searches_today', { p_user_id: user.id })
     if ((count ?? 0) >= 1) {
       setSearchLimitReached(true)
@@ -320,7 +323,7 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
                     className="w-full text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground"
                   />
                   {originSuggestions.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-[var(--z-overlay)] max-h-48 overflow-y-auto">
                       {searchingOrigin && <p className="text-xs text-muted-foreground p-2">Buscando...</p>}
                       {originSuggestions.map((s, i) => (
                         <button
@@ -393,7 +396,7 @@ export function RoutesTab({ hideMap = false }: { hideMap?: boolean }) {
                 className="border-0 bg-transparent p-0 h-auto focus-visible:ring-0"
               />
               {suggestions.length > 0 && (
-                <div className="absolute top-6 left-0 right-0 bg-card border border-border rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
+                <div className="absolute top-6 left-0 right-0 bg-card border border-border rounded-lg shadow-lg z-[var(--z-overlay)] max-h-48 overflow-y-auto">
                   {searching && <p className="text-xs text-muted-foreground p-2">{t('routes_searching')}</p>}
                   {suggestions.map((s, i) => (
                     <button

@@ -34,5 +34,5 @@ export function useContactUserIds(contacts: EmergencyContact[]) {
     return contacts.find(c => (c as any).email === email)?.name ?? 'Contacto'
   }
 
-  return { contactUserIds, nameFor }
+  return { contactUserIds, nameFor, idMap }
 }

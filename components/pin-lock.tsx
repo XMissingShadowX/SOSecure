@@ -105,7 +105,7 @@ export function PinLock({ userId, onUnlock, onForgotPin }: PinLockProps) {
   const { t } = useTranslation()
 
   return (
-    <div className="fixed inset-0 z-[99999] bg-background ambient-bg flex flex-col items-center justify-center p-6 select-none">
+    <div className="fixed inset-0 z-[var(--z-pin-lock)] bg-background ambient-bg flex flex-col items-center justify-center p-6 select-none">
       <div className="glass-strong flex flex-col items-center gap-8 w-full max-w-xs rounded-[2rem] p-8">
 
         {/* Logo */}
