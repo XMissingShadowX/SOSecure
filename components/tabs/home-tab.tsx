@@ -445,7 +445,7 @@ export function HomeTab() {
                       }}
                     />
                     {placeSuggestions.length > 0 && (
-                      <div className="absolute top-10 left-0 right-0 bg-card border border-border rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
+                      <div className="absolute top-10 left-0 right-0 bg-card border border-border rounded-lg shadow-lg z-[var(--z-overlay)] max-h-48 overflow-y-auto">
                         {placeSuggestions.map((s, i) => (
                           <button
                             key={i}
@@ -509,21 +509,21 @@ export function HomeTab() {
             <div className="space-y-2 bg-muted">
               {contacts.map((contact, index) => (
                 <div key={contact.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold shrink-0">
                       {index + 1}
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="font-medium">{contact.name}</p>
+                        <p className="font-medium truncate">{contact.name}</p>
                         {!simpleMode && (
-                          <Badge className={cn('text-xs px-1.5 py-0', importanceColor(contact.importance || 'secondary'))}>
+                          <Badge className={cn('text-xs px-1.5 py-0 shrink-0', importanceColor(contact.importance || 'secondary'))}>
                             {importanceLevels.find(i => i.value === (contact.importance || 'secondary'))?.label}
                           </Badge>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground">{contact.phone}</p>
-                      {contact.relationship && <p className="text-xs text-muted-foreground">{contact.relationship}</p>}
+                      <p className="text-sm text-muted-foreground truncate">{contact.phone}</p>
+                      {contact.relationship && <p className="text-xs text-muted-foreground truncate">{contact.relationship}</p>}
                     </div>
                   </div>
                   {/* Botones editar + eliminar */}

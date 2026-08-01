@@ -87,11 +87,11 @@ export function PremiumPlanSection() {
           </div>
           {isActive ? (
             <span className="flex items-center gap-1 text-xs text-primary font-medium bg-primary/15 px-2 py-1 rounded-full">
-              <BadgeCheck className="w-3.5 h-3.5" /> {t('family_active')}
+              <BadgeCheck className="w-4 h-4" /> {t('family_active')}
             </span>
           ) : (
             <span className="flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
-              <Clock className="w-3.5 h-3.5" /> {t('family_inactive')}
+              <Clock className="w-4 h-4" /> {t('family_inactive')}
             </span>
           )}
         </div>
@@ -99,15 +99,15 @@ export function PremiumPlanSection() {
         {/* Funciones que desbloquea */}
         <div className="space-y-1.5 pt-0.5">
           <div className="flex items-center gap-2 text-xs">
-            <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
+            <Sparkles className="w-4 h-4 text-primary shrink-0" />
             <span>{t('plan_premiumFeature1')}</span>
           </div>
           <div className="flex items-center gap-2 text-xs">
-            <EyeOff className="w-3.5 h-3.5 text-primary shrink-0" />
+            <EyeOff className="w-4 h-4 text-primary shrink-0" />
             <span>{t('plan_premiumFeature2')}</span>
           </div>
           <div className="flex items-center gap-2 text-xs">
-            <Users className="w-3.5 h-3.5 text-primary shrink-0" />
+            <Users className="w-4 h-4 text-primary shrink-0" />
             <span>{t('plan_premiumFeature3').replace('{n}', String(PREMIUM_PLAN.features.maxContacts))}</span>
           </div>
         </div>
@@ -129,7 +129,7 @@ export function PremiumPlanSection() {
         {/* Si NO está activo y no tiene plan familiar: mostrar botón de compra */}
         {!isActive && !hasFamilyPlan && (
           <Button className="w-full" size="sm" onClick={goToPayment}>
-            <Star className="w-3.5 h-3.5 mr-1" />
+            <Star className="w-4 h-4 mr-1" />
             {t('plan_premiumActivateBtn').replace('{amount}', formatAmount(PREMIUM_PLAN.amountCents)).replace('{period}', t('plan_premiumPeriod'))}
           </Button>
         )}
@@ -146,7 +146,7 @@ export function PremiumPlanSection() {
                 onClick={() => setConfirmCancel(true)}
                 className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors"
               >
-                <XCircle className="w-3.5 h-3.5" /> Cancelar suscripción
+                <XCircle className="w-4 h-4" /> Cancelar suscripción
               </button>
             ) : (
               <div className="space-y-2">

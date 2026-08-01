@@ -382,7 +382,7 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
   // para reportar nuevos incidentes y editar incidentes existentes, con formularios para ingresar los detalles del 
   // incidente a reportar o editar.
   return (
-    <div className={embedded ? "flex flex-col gap-2" : "flex flex-col h-[calc(100vh-4rem)] pb-24 gap-2"}>
+    <div className={embedded ? "flex flex-col gap-2" : "flex flex-col h-[calc(100dvh-4rem)] pb-24 gap-2"}>
 
       {/* Banner offline — solo aparece si no hay internet, altura fija */}
       {!isOnline && (
@@ -467,7 +467,7 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
                 {t('map_report')}
               </Button>
             </DialogTrigger>
-            <DialogContent className="z-[2000]">
+            <DialogContent className="z-[var(--z-overlay)]">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <AlertTriangle className="w-5 h-5 text-warning" />
@@ -585,7 +585,7 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
         <CardHeader className="pb-0">
           <CardTitle className="text-sm flex items-center justify-between">
             {t('map_recentIncidents')}
-            <Badge variant="secondary" className="!text-black dark:!text-white">{filteredIncidents.length}</Badge>
+            <Badge variant="secondary">{filteredIncidents.length}</Badge>
           </CardTitle>
         </CardHeader>
         <CardContent className="max-h-[130px] overflow-y-auto space-y-2 pb-3">
@@ -620,7 +620,7 @@ export function MapTab({ embedded = false, customMap }: { embedded?: boolean; cu
 
       {/* Dialog de edición */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="z-[2000]">
+        <DialogContent className="z-[var(--z-overlay)]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="w-5 h-5" />

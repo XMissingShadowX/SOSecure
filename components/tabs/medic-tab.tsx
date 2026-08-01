@@ -27,6 +27,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { usePremium } from '@/hooks/use-premium'
 import { UpgradeBanner } from '@/components/upgrade-banner'
 import { FormattedMessage } from '@/components/formatted-message'
+import { createClient } from '@/lib/supabase/client'
 import type { ChatMessage } from '@/lib/types'
 
 // Definir un objeto `offlineResponses` que contiene respuestas predefinidas para diferentes temas relacionados 
@@ -107,9 +108,14 @@ export function MedicTab() {
     setIsLoading(true)
 
     try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({
           messages: [...apiHistory, { role: 'user', content: messageText }],
         }),
@@ -149,7 +155,7 @@ export function MedicTab() {
   // desactiva si la entrada está vacía o si se está cargando una respuesta del asistente.
   if (!premiumLoading && !isPremium) {
     return (
-      <div className="flex flex-col h-[calc(100vh-8rem)] pb-36 items-center justify-center p-4">
+      <div className="flex flex-col h-[calc(100dvh-8rem)] pb-36 items-center justify-center p-4">
         <UpgradeBanner
           title="Chat de Apoyo Psicológico"
           description="El acompañante de bienestar con IA está disponible solo en planes Premium y Familiar."
@@ -159,7 +165,7 @@ export function MedicTab() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] pb-36">
+    <div className="flex flex-col h-[calc(100dvh-8rem)] pb-36">
       <Card className="mb-4 border-primary/30 bg-primary/5">
         <CardContent className="flex items-center justify-center gap-3 py-2 px-3">
           <AlertCircle className="w-5 h-5 text-primary shrink-0" />

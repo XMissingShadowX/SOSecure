@@ -398,6 +398,16 @@ create table premium_subscriptions (
   created_at timestamptz default now(),
   expires_at timestamptz
 );
+
+-- Rate limiting de PIN, persistente entre instancias serverless
+create table pin_attempts (
+  user_id       uuid primary key references auth.users(id) on delete cascade,
+  attempt_count int not null default 0,
+  locked_until  timestamptz,
+  updated_at    timestamptz not null default now()
+);
+alter table pin_attempts enable row level security;
+-- Sin policies para authenticated/anon a propósito: solo el service role la toca.
 ```
 
 ### RPCs necesarias
@@ -448,6 +458,52 @@ $$;
 create or replace function insert_route_search(p_user_id uuid)
 returns void language sql security definer as $$
   insert into route_searches (user_id) values (p_user_id);
+$$;
+
+-- Verifica si el usuario está bloqueado ahora mismo por intentos fallidos de PIN
+create or replace function check_pin_lockout(p_user_id uuid)
+returns table(locked boolean, retry_after_seconds int)
+language plpgsql security definer as $$
+declare
+  v_locked_until timestamptz;
+begin
+  select locked_until into v_locked_until from pin_attempts where user_id = p_user_id;
+  if v_locked_until is not null and v_locked_until > now() then
+    return query select true, ceil(extract(epoch from (v_locked_until - now())))::int;
+  end if;
+  return query select false, 0;
+end;
+$$;
+
+-- Registra un intento de PIN de forma atómica; un intento exitoso resetea el contador
+create or replace function record_pin_attempt(
+  p_user_id uuid, p_success boolean, p_max_attempts int, p_lockout_seconds int
+)
+returns table(locked boolean, retry_after_seconds int)
+language plpgsql security definer as $$
+declare
+  v_count int;
+  v_locked_until timestamptz;
+begin
+  if p_success then
+    delete from pin_attempts where user_id = p_user_id;
+    return query select false, 0;
+  end if;
+
+  insert into pin_attempts (user_id, attempt_count, updated_at)
+  values (p_user_id, 1, now())
+  on conflict (user_id) do update
+    set attempt_count = pin_attempts.attempt_count + 1, updated_at = now()
+  returning attempt_count into v_count;
+
+  if v_count >= p_max_attempts then
+    v_locked_until := now() + make_interval(secs => p_lockout_seconds);
+    update pin_attempts set locked_until = v_locked_until where user_id = p_user_id;
+    return query select true, p_lockout_seconds;
+  end if;
+
+  return query select false, 0;
+end;
 $$;
 ```
 

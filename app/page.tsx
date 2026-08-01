@@ -84,8 +84,8 @@ export default function HomePage() {
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
         <div className="w-full max-w-sm space-y-6 text-center">
           <div className="flex flex-col items-center gap-2 mb-8">
-            <div className="w-20 h-20 rounded-3xl bg-primary/20 flex items-center justify-center">
-              <ShieldCheck className="w-12 h-12 text-primary" />
+            <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center">
+              <ShieldCheck className="w-10 h-10 text-primary" />
             </div>
             <h1 className="text-3xl font-bold">SOSecure</h1>
             <p className="text-muted-foreground">{t('app_tagline')}</p>

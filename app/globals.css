@@ -10,29 +10,29 @@ Definir variables CSS para colores y estilos, utilizando la función oklch para 
 soporte de modo oscuro
 */
 :root {
-  --background: oklch(0.13 0.01 260);
-  --foreground: oklch(0.95 0.01 260);
-  --card: oklch(0.17 0.01 260);
-  --card-foreground: oklch(0.95 0.01 260);
-  --popover: oklch(0.17 0.01 260);
-  --popover-foreground: oklch(0.95 0.01 260);
-  --primary: oklch(0.75 0.15 180);
-  --primary-foreground: oklch(0.13 0.01 260);
-  --secondary: oklch(0.25 0.02 260);
-  --secondary-foreground: oklch(0.95 0.01 260);
-  --muted: oklch(0.22 0.02 260);
-  --muted-foreground: oklch(0.65 0.02 260);
-  --accent: oklch(0.25 0.02 260);
-  --accent-foreground: oklch(0.95 0.01 260);
-  --destructive: oklch(0.55 0.25 25);
-  --destructive-foreground: oklch(0.98 0.01 0);
-  --warning: oklch(0.75 0.18 75);
-  --warning-foreground: oklch(0.15 0.02 75);
-  --safe: oklch(0.65 0.18 145);
-  --safe-foreground: oklch(0.15 0.02 145);
-  --border: oklch(0.28 0.02 260);
-  --input: oklch(0.22 0.02 260);
-  --ring: oklch(0.75 0.15 180);
+  --background: 0.13 0.01 260;
+  --foreground: 0.95 0.01 260;
+  --card: 0.17 0.01 260;
+  --card-foreground: 0.95 0.01 260;
+  --popover: 0.17 0.01 260;
+  --popover-foreground: 0.95 0.01 260;
+  --primary: 0.75 0.15 180;
+  --primary-foreground: 0.13 0.01 260;
+  --secondary: 0.25 0.02 260;
+  --secondary-foreground: 0.95 0.01 260;
+  --muted: 0.22 0.02 260;
+  --muted-foreground: 0.65 0.02 260;
+  --accent: 0.25 0.02 260;
+  --accent-foreground: 0.95 0.01 260;
+  --destructive: 0.55 0.25 25;
+  --destructive-foreground: 0.98 0.01 0;
+  --warning: 0.75 0.18 75;
+  --warning-foreground: 0.15 0.02 75;
+  --safe: 0.65 0.18 145;
+  --safe-foreground: 0.15 0.02 145;
+  --border: 0.28 0.02 260;
+  --input: 0.22 0.02 260;
+  --ring: 0.75 0.15 180;
   --chart-1: oklch(0.55 0.25 25);
   --chart-2: oklch(0.75 0.18 75);
   --chart-3: oklch(0.65 0.18 145);
@@ -57,6 +57,20 @@ soporte de modo oscuro
   --glass-shadow: 0 8px 32px oklch(0 0 0 / 0.35);
   --glass-shadow-sm: 0 4px 16px oklch(0 0 0 / 0.25);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Escala de z-index para la capa "app-chrome" (header, nav, overlays,
+     diálogos/portales). Los z-index locales de Leaflet (1000/1999) viven en
+     su propio stacking context aislado (style="isolation: isolate") y son
+     intencionalmente independientes de esta escala — no deben mezclarse. */
+  --z-header: 30;
+  --z-bottom-nav: 40;
+  --z-overlay: 50;
+  --z-popover: 9999;
+  --z-sos-active: 200;
+  --z-sos-cancel: 300;
+  /* Debe seguir siendo mayor que cualquier otro valor de esta lista: es la
+     pantalla de bloqueo fail-closed y tiene que ganar siempre. */
+  --z-pin-lock: 99999;
 }
 
 /* 
@@ -64,29 +78,29 @@ Definir variables CSS para el modo claro, utilizando la función oklch para mant
 y estilos, y asegurando que los colores sean adecuados para un fondo claro
 */
 html.light {
-  --background: oklch(0.98 0.005 260);
-  --foreground: oklch(0.15 0.01 260);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.15 0.01 260);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.15 0.01 260);
-  --primary: oklch(0.55 0.15 180);
-  --primary-foreground: oklch(0.98 0.005 260);
-  --secondary: oklch(0.95 0.01 260);
-  --secondary-foreground: oklch(0.15 0.01 260);
-  --muted: oklch(0.95 0.01 260);
-  --muted-foreground: oklch(0.45 0.02 260);
-  --accent: oklch(0.95 0.01 260);
-  --accent-foreground: oklch(0.15 0.01 260);
-  --destructive: oklch(0.55 0.25 25);
-  --destructive-foreground: oklch(0.98 0.01 0);
-  --warning: oklch(0.75 0.18 75);
-  --warning-foreground: oklch(0.15 0.02 75);
-  --safe: oklch(0.55 0.18 145);
-  --safe-foreground: oklch(0.98 0.01 0);
-  --border: oklch(0.90 0.01 260);
-  --input: oklch(0.90 0.01 260);
-  --ring: oklch(0.55 0.15 180);
+  --background: 0.98 0.005 260;
+  --foreground: 0.15 0.01 260;
+  --card: 1 0 0;
+  --card-foreground: 0.15 0.01 260;
+  --popover: 1 0 0;
+  --popover-foreground: 0.15 0.01 260;
+  --primary: 0.55 0.15 180;
+  --primary-foreground: 0.98 0.005 260;
+  --secondary: 0.95 0.01 260;
+  --secondary-foreground: 0.15 0.01 260;
+  --muted: 0.95 0.01 260;
+  --muted-foreground: 0.45 0.02 260;
+  --accent: 0.95 0.01 260;
+  --accent-foreground: 0.15 0.01 260;
+  --destructive: 0.55 0.25 25;
+  --destructive-foreground: 0.98 0.01 0;
+  --warning: 0.75 0.18 75;
+  --warning-foreground: 0.15 0.02 75;
+  --safe: 0.55 0.18 145;
+  --safe-foreground: 0.98 0.01 0;
+  --border: 0.90 0.01 260;
+  --input: 0.90 0.01 260;
+  --ring: 0.55 0.15 180;
   --chart-1: oklch(0.55 0.25 25);
   --chart-2: oklch(0.75 0.18 75);
   --chart-3: oklch(0.65 0.18 145);
@@ -194,18 +208,18 @@ consistencia de colores y estilos, y asegurando que el mapa y los popups se inte
 el diseño general de la aplicación, tanto en modo oscuro como en modo claro
 */
 .leaflet-container {
-  background: var(--background) !important;
+  background: oklch(var(--background)) !important;
   font-family: var(--font-sans) !important;
 }
 
 .leaflet-popup-content-wrapper {
-  background: var(--card) !important;
-  color: var(--card-foreground) !important;
+  background: oklch(var(--card)) !important;
+  color: oklch(var(--card-foreground)) !important;
   border-radius: var(--radius) !important;
 }
 
 .leaflet-popup-tip {
-  background: var(--card) !important;
+  background: oklch(var(--card)) !important;
 }
 
 /* */
@@ -338,16 +352,16 @@ html.light .ambient-bg {
 }
 
 /* Forzar uso de variables CSS en elementos clave */
-.bg-background { background-color: var(--background) !important; }
-.bg-card { background-color: var(--card) !important; }
-.bg-muted { background-color: var(--muted) !important; }
-.bg-popover { background-color: var(--popover) !important; }
-.bg-secondary { background-color: var(--secondary) !important; }
-.bg-accent { background-color: var(--accent) !important; }
-.text-foreground { color: var(--foreground) !important; }
-.text-card-foreground { color: var(--card-foreground) !important; }
-.text-muted-foreground { color: var(--muted-foreground) !important; }
-.border-border { border-color: var(--border) !important; }
+.bg-background { background-color: oklch(var(--background)) !important; }
+.bg-card { background-color: oklch(var(--card)) !important; }
+.bg-muted { background-color: oklch(var(--muted)) !important; }
+.bg-popover { background-color: oklch(var(--popover)) !important; }
+.bg-secondary { background-color: oklch(var(--secondary)) !important; }
+.bg-accent { background-color: oklch(var(--accent)) !important; }
+.text-foreground { color: oklch(var(--foreground)) !important; }
+.text-card-foreground { color: oklch(var(--card-foreground)) !important; }
+.text-muted-foreground { color: oklch(var(--muted-foreground)) !important; }
+.border-border { border-color: oklch(var(--border)) !important; }
 
 /* Mapa modo claro — tiles naturales */
 html.light .leaflet-container img,
@@ -364,12 +378,12 @@ html.light .leaflet-tile {
 }
 
 .text-primary {
-  color: var(--primary) !important;
+  color: oklch(var(--primary)) !important;
 }
 
 /* ── Radix popper wrapper ── */
 [data-radix-popper-content-wrapper] {
-  z-index: 9999 !important;
+  z-index: var(--z-popover) !important;
 }
 
 /* ── Select / listbox ── */
@@ -378,18 +392,18 @@ html.light .leaflet-tile {
   background-color: var(--glass-bg-strong) !important;
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
-  color: var(--popover-foreground) !important;
+  color: oklch(var(--popover-foreground)) !important;
 }
 
 [role="option"] {
-  color: var(--popover-foreground) !important;
+  color: oklch(var(--popover-foreground)) !important;
   background-color: transparent !important;
 }
 
 [role="option"][data-highlighted],
 [role="option"]:hover {
-  background-color: var(--accent) !important;
-  color: var(--accent-foreground) !important;
+  background-color: oklch(var(--accent)) !important;
+  color: oklch(var(--accent-foreground)) !important;
 }
 
 /* ── Dropdown menu ── */
@@ -397,13 +411,13 @@ html.light .leaflet-tile {
   background-color: var(--glass-bg-strong) !important;
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
-  color: var(--popover-foreground) !important;
+  color: oklch(var(--popover-foreground)) !important;
 }
 
 [role="menuitem"],
 [role="menuitemcheckbox"],
 [role="menuitemradio"] {
-  color: var(--popover-foreground) !important;
+  color: oklch(var(--popover-foreground)) !important;
   background-color: transparent !important;
 }
 
@@ -413,8 +427,8 @@ html.light .leaflet-tile {
 [role="menuitem"]:hover,
 [role="menuitemcheckbox"]:hover,
 [role="menuitemradio"]:hover {
-  background-color: var(--accent) !important;
-  color: var(--accent-foreground) !important;
+  background-color: oklch(var(--accent)) !important;
+  color: oklch(var(--accent-foreground)) !important;
 }
 
 /* Reset inline overrides that applyTheme may have set on popover content */
@@ -427,15 +441,15 @@ html.light .leaflet-tile {
   background-color: var(--glass-bg-strong) !important;
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
-  color: var(--popover-foreground) !important;
+  color: oklch(var(--popover-foreground)) !important;
 }
 [data-radix-popper-content-wrapper] [role="menuitem"],
 [data-radix-popper-content-wrapper] [role="option"] {
-  color: var(--popover-foreground) !important;
+  color: oklch(var(--popover-foreground)) !important;
   background-color: transparent !important;
 }
 [data-radix-popper-content-wrapper] [role="menuitem"][data-highlighted],
 [data-radix-popper-content-wrapper] [role="option"][data-highlighted] {
-  background-color: var(--accent) !important;
-  color: var(--accent-foreground) !important;
+  background-color: oklch(var(--accent)) !important;
+  color: oklch(var(--accent-foreground)) !important;
 }

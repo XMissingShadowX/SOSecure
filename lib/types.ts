@@ -48,6 +48,7 @@ export interface EmergencyContact {
   user_id: string
   name: string
   phone: string
+  email?: string
   relationship: string | null
   priority: number
   importance: 'primary' | 'secondary' | 'tertiary'

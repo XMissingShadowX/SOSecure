@@ -129,11 +129,11 @@ export function FamilyPlanSection() {
           </div>
           {isActive ? (
             <span className="flex items-center gap-1 text-xs text-primary font-medium bg-primary/15 px-2 py-1 rounded-full">
-              <BadgeCheck className="w-3.5 h-3.5" /> {t('family_active')}
+              <BadgeCheck className="w-4 h-4" /> {t('family_active')}
             </span>
           ) : (
             <span className="flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
-              <Clock className="w-3.5 h-3.5" /> {t('family_inactive')}
+              <Clock className="w-4 h-4" /> {t('family_inactive')}
             </span>
           )}
         </div>
@@ -177,8 +177,8 @@ export function FamilyPlanSection() {
                   <div key={m.id} className="flex items-center justify-between gap-2 p-2 rounded-md bg-muted">
                     <div className="flex items-center gap-2 min-w-0">
                       {m.role === 'owner'
-                        ? <Crown className="w-3.5 h-3.5 text-primary shrink-0" />
-                        : <Mail className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
+                        ? <Crown className="w-4 h-4 text-primary shrink-0" />
+                        : <Mail className="w-4 h-4 text-muted-foreground shrink-0" />}
                       <div className="min-w-0">
                         <p className="text-xs font-medium truncate">{m.name || m.email}</p>
                         <p className="text-[11px] text-muted-foreground truncate">
@@ -193,7 +193,7 @@ export function FamilyPlanSection() {
                         className="text-muted-foreground hover:text-destructive shrink-0"
                         aria-label="Quitar miembro"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     )}
                   </div>
@@ -219,7 +219,7 @@ export function FamilyPlanSection() {
                   className="h-9 text-sm"
                 />
                 <Button className="w-full" size="sm" variant="outline" onClick={handleInvite} disabled={sending}>
-                  <Plus className="w-3.5 h-3.5 mr-1" />
+                  <Plus className="w-4 h-4 mr-1" />
                   {sending ? t('family_inviteSending') : t('family_inviteSend')}
                 </Button>
               </div>
@@ -237,7 +237,7 @@ export function FamilyPlanSection() {
                 onClick={() => setConfirmCancel(true)}
                 className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors"
               >
-                <XCircle className="w-3.5 h-3.5" /> Cancelar suscripción
+                <XCircle className="w-4 h-4" /> Cancelar suscripción
               </button>
             ) : (
               <div className="space-y-2">
