@@ -84,3 +84,24 @@ premium. No se verificó línea por línea contra `lib/plan-config.ts` / `usePre
 **Por qué importa:** documentos de este tipo tienden a desincronizarse del código con el
 tiempo. Vale la pena un repaso rápido para confirmar que el doc sigue siendo la fuente de
 verdad correcta, sobre todo antes de usarlo para decisiones de producto o marketing.
+
+---
+
+## 6. Confirmación de correo de registro debería volver a la app Flutter, no al navegador
+
+**Qué hay:** al registrarse desde la app Flutter, Supabase manda el correo de confirmación con
+un link que hoy abre `${NEXT_PUBLIC_APP_URL}/auth/callback` en el navegador (mismo
+`emailRedirectTo` que usa la web, documentado en CLAUDE.md). Para un usuario que se registró
+desde el APK, lo esperable es que ese link regrese a la propia app, no a la página web, como
+primera opción.
+
+**Por qué importa:** confirmar la cuenta y terminar en el navegador (con la sesión que arrancó
+en la app) es una fricción de UX evidente para el flujo mobile-first que se está construyendo en
+`SOSecure_Flutter`.
+
+**Qué falta investigar/decidir:** requiere configurar Android App Links (o un esquema custom
+`sosecure://`) en el proyecto Flutter para capturar ese link de confirmación, y decidir si se
+sigue usando el mismo `emailRedirectTo` para ambos clientes (web y Flutter) con lógica de
+fallback, o si Flutter necesita su propio flujo de confirmación (ej. detectar `app_links` en
+`main.dart`, ya que el paquete `app_links` aparece en las dependencias generadas del proyecto
+Flutter). No implementado todavía — pendiente de una sesión dedicada a esto.

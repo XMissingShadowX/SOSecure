@@ -135,8 +135,14 @@ export async function POST(req: NextRequest) {
         headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` },
       })
       const plan = await res.json()
-      const url = plan.init_point
-      if (!url) return NextResponse.json({ error: 'No se pudo obtener el plan de Mercado Pago', detail: plan }, { status: 502 })
+      console.log('[premium/checkout] MP plan:', JSON.stringify(plan))
+      const initPoint = plan.init_point
+      if (!initPoint) return NextResponse.json({ error: 'No se pudo obtener el plan de Mercado Pago', detail: plan }, { status: 502 })
+
+      // external_reference vincula la preapproval (y sus pagos de renovación)
+      // con esta fila de premium_subscriptions — sin esto, el webhook de
+      // renovación ('payment') no puede saber a quién activar.
+      const url = `${initPoint}${initPoint.includes('?') ? '&' : '?'}external_reference=${encodeURIComponent(sub.id)}`
 
       await admin.from('premium_subscriptions')
         .update({ provider: 'mercadopago' })
