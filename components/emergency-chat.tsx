@@ -110,7 +110,7 @@ function LiveStreamViewer({ alertId }: { alertId: string }) {
   const objectUrlRef = useRef<string | null>(null)
 
   const [isLive,   setIsLive]   = useState(false)
-  const [mode,     setMode]     = useState<'video' | 'jpeg' | null>(null)
+  const [mode,     setMode]     = useState<'video' | 'jpeg' | 'segment' | null>(null)
   const [jpgFrame, setJpgFrame] = useState<string | null>(null)
   const [waiting,  setWaiting]  = useState(true)
 
@@ -203,6 +203,30 @@ function LiveStreamViewer({ alertId }: { alertId: string }) {
       } catch { /* noop */ }
     }
 
+    // ── clips segmentados (emisor Flutter, ver lib/live_stream_repository.dart) ──
+    // A diferencia de los chunks WebM crudos de arriba, el emisor Flutter no
+    // puede producir un stream continuo apendable (el paquete `camera` no
+    // tiene equivalente a MediaRecorder.ondataavailable) — en su lugar sube
+    // clips mp4 cortos y completos a Storage y manda la URL firmada por este
+    // mismo canal. Cada uno es reproducible por sí solo: se encolan y se
+    // reproducen en secuencia con <video src=...> normal, sin MediaSource.
+    const segmentQueueRef: { current: string[] } = { current: [] }
+    const playNextSegment = () => {
+      const video = videoRef.current
+      if (!video || video.dataset.playingSegment === '1') return
+      const url = segmentQueueRef.current.shift()
+      if (!url) return
+      video.dataset.playingSegment = '1'
+      video.src = url
+      video.play().catch(() => { video.dataset.playingSegment = '0' })
+    }
+    const onSegmentEnded = () => {
+      const video = videoRef.current
+      if (video) video.dataset.playingSegment = '0'
+      playNextSegment()
+    }
+    videoRef.current?.addEventListener('ended', onSegmentEnded)
+
     // ── suscripción al canal ─────────────────────────────────────────────────
     const channel = supabase
       .channel(liveChannelName(alertId), { config: { broadcast: { ack: false } } })
@@ -240,6 +264,15 @@ function LiveStreamViewer({ alertId }: { alertId: string }) {
           appendChunk(p.chunk)
         }
       })
+      .on('broadcast', { event: 'video_segment' }, ({ payload }) => {
+        const p = payload as { url: string; seq: number; ts: number }
+        setIsLive(true)
+        setWaiting(false)
+        setMode('segment')
+        segmentQueueRef.current.push(p.url)
+        if (segmentQueueRef.current.length > 3) segmentQueueRef.current.shift()
+        playNextSegment()
+      })
       .on('broadcast', { event: 'frame' }, ({ payload }) => {
         const p = payload as LiveFramePayload
         setIsLive(true)
@@ -256,8 +289,12 @@ function LiveStreamViewer({ alertId }: { alertId: string }) {
       if (ms && ms.readyState === 'open') { try { ms.endOfStream() } catch { /* noop */ } }
       if (objectUrlRef.current) { URL.revokeObjectURL(objectUrlRef.current); objectUrlRef.current = null }
       const video = videoRef.current
-      if (video) { video.pause(); video.playbackRate = 1; video.src = '' }
+      if (video) {
+        video.pause(); video.playbackRate = 1; video.src = ''
+        video.removeEventListener('ended', onSegmentEnded)
+      }
       msRef.current = null; sbRef.current = null; queueRef.current = []; mimeRef.current = null
+      segmentQueueRef.current = []
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alertId])
@@ -291,7 +328,7 @@ function LiveStreamViewer({ alertId }: { alertId: string }) {
           autoPlay
           muted
           playsInline
-          className={`w-full rounded-xl object-cover max-h-72 ${mode === 'video' ? 'block' : 'hidden'}`}
+          className={`w-full rounded-xl object-cover max-h-72 ${mode === 'video' || mode === 'segment' ? 'block' : 'hidden'}`}
           style={{ background: '#000' }}
         />
 
@@ -522,10 +559,15 @@ export function EmergencyChat() {
   }, [])
 
   useEffect(() => {
-    if (!sosActive || !myId) return
+    if (!sosActive || !myId || !sosAlert) return
+    // El link a /emergency/[alertId] es lo único que le permite al contacto
+    // ver la transmisión en vivo — antes solo se mandaba el link de Google
+    // Maps, así que no había forma de llegar a la página de emergencia desde
+    // el chat (el correo de notify-contacts sí la incluye, pero el chat no).
+    const emergencyUrl = `${process.env.NEXT_PUBLIC_APP_URL}/emergency/${sosAlert.id}`
     const sosText = currentLocation
-      ? `🚨 ALERTA SOS — Estoy en peligro.\n📍 https://maps.google.com/?q=${currentLocation.latitude},${currentLocation.longitude}`
-      : '🚨 ALERTA SOS — Estoy en peligro. No tengo ubicación disponible.'
+      ? `🚨 ALERTA SOS — Estoy en peligro.\n📍 https://maps.google.com/?q=${currentLocation.latitude},${currentLocation.longitude}\n🎥 Ver en vivo: ${emergencyUrl}`
+      : `🚨 ALERTA SOS — Estoy en peligro. No tengo ubicación disponible.\n🎥 Ver en vivo: ${emergencyUrl}`
 
     contactsRef.current.forEach(async (c) => {
       const email = (c as any).email as string | undefined

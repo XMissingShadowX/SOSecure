@@ -190,6 +190,24 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
       } catch { /* noop */ }
     }
 
+    // Clips segmentados (emisor Flutter) — ver la misma nota en emergency-chat.tsx.
+    const liveSegmentQueueRef: { current: string[] } = { current: [] }
+    const playNextLiveSegment = () => {
+      const video = liveVideoRef.current
+      if (!video || video.dataset.playingSegment === '1') return
+      const url = liveSegmentQueueRef.current.shift()
+      if (!url) return
+      video.dataset.playingSegment = '1'
+      video.src = url
+      video.play().catch(() => { video.dataset.playingSegment = '0' })
+    }
+    const onLiveSegmentEnded = () => {
+      const video = liveVideoRef.current
+      if (video) video.dataset.playingSegment = '0'
+      playNextLiveSegment()
+    }
+    liveVideoRef.current?.addEventListener('ended', onLiveSegmentEnded)
+
     const channel = supabase
       .channel(liveChannelName(alertId), { config: { broadcast: { self: false } } })
       .on('broadcast', { event: 'status' }, ({ payload }) => {
@@ -215,6 +233,15 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
           appendChunk(p.chunk)
         }
       })
+      .on('broadcast', { event: 'video_segment' }, ({ payload }) => {
+        const p = payload as { url: string; seq: number; ts: number }
+        if (!p?.url) return
+        setLiveLastTs(Date.now())
+        setLiveMode('video')
+        liveSegmentQueueRef.current.push(p.url)
+        if (liveSegmentQueueRef.current.length > 3) liveSegmentQueueRef.current.shift()
+        playNextLiveSegment()
+      })
       .on('broadcast', { event: 'frame' }, ({ payload }) => {
         const p = payload as LiveFramePayload
         if (p?.img) {
@@ -235,8 +262,12 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
       if (ms && ms.readyState === 'open') { try { ms.endOfStream() } catch { /* noop */ } }
       if (liveObjUrlRef.current) { URL.revokeObjectURL(liveObjUrlRef.current); liveObjUrlRef.current = null }
       const video = liveVideoRef.current
-      if (video) { video.pause(); video.src = '' }
+      if (video) {
+        video.pause(); video.src = ''
+        video.removeEventListener('ended', onLiveSegmentEnded)
+      }
       liveMsRef.current = null; liveSbRef.current = null; liveQueueRef.current = []; liveMimeRef.current = null
+      liveSegmentQueueRef.current = []
     }
   }, [alertId])
 
