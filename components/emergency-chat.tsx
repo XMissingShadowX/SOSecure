@@ -56,6 +56,30 @@ const LIVE_ID = '__live_sos__'
 
 // ─── Renderizador de mensajes multimedia ──────────────────────────────────────
 
+// Convierte URLs sueltas en links clickeables — antes el texto del mensaje se
+// renderizaba plano, así que el link a /emergency/[alertId] (agregado para
+// poder ver la transmisión en vivo desde el chat) no se podía tocar, solo
+// copiar a mano. También oculta el sufijo `sosecure-live:{id}` que manda el
+// emisor Flutter (ver emergency_chat_provider.dart) — es solo para que ese
+// lado detecte el botón "Ver transmisión", no debe verse como texto crudo acá.
+function LinkifiedText({ text }: { text: string }) {
+  const clean = text.replace(/\nsosecure-live:.+$/, '')
+  const parts = clean.split(/(https?:\/\/\S+)/g)
+  return (
+    <span style={{ whiteSpace: 'pre-line' }}>
+      {parts.map((part, i) =>
+        /^https?:\/\//.test(part) ? (
+          <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="underline break-all">
+            {part}
+          </a>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </span>
+  )
+}
+
 function MediaMessage({ text, isMe, timestamp }: { text: string; isMe: boolean; timestamp: number }) {
   const lines = text.split('\n')
   const label = lines[0] ?? ''
@@ -880,7 +904,7 @@ export function EmergencyChat() {
                       <>
                         {msg.type === 'sos' && <AlertTriangle className="w-3 h-3 inline mr-1" />}
                         {msg.type === 'location' && <MapPin className="w-3 h-3 inline mr-1" />}
-                        <span style={{ whiteSpace: 'pre-line' }}>{msg.text}</span>
+                        <LinkifiedText text={msg.text} />
                         <p className={`text-xs mt-1 ${msg.isMe ? 'text-primary-foreground/60' : 'text-muted-foreground'}`}>
                           {new Date(msg.timestamp).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
                         </p>
