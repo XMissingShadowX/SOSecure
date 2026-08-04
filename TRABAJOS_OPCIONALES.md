@@ -27,39 +27,18 @@ en `before-tab.tsx` que llame a `startTracking(...)`.
 
 ---
 
-## 2. Carpeta `lib/app/` — copia vieja y muerta del flujo de plan familiar
+## 2. ~~Carpeta `lib/app/` — copia vieja y muerta del flujo de plan familiar~~ (resuelto)
 
-**Qué hay:** `lib/app/plan-familiar/aceptar/page.tsx`, `lib/app/plan-familiar/pago/page.tsx` y
-`lib/app/api/family/{accept,checkout,invite,webhook}/route.ts` — una copia completa y paralela
-del flujo de plan familiar, viviendo fuera de `app/`, por lo que Next.js nunca la enruta.
-Comparado con las versiones reales en `app/plan-familiar/*` y `app/api/family/*`, la copia en
-`lib/app/` es una versión más vieja — le falta i18n (`useTranslation`) y el montaje seguro para
-hidratación.
-
-**Por qué importa:** no representa un riesgo funcional (nunca se ejecuta), pero es ruido que
-puede llevar a alguien a editar la copia equivocada por error, y aumenta la superficie de
-código a mantener sin necesidad.
-
-**Sugerencia:** confirmar que nada la referencia y eliminarla.
+Ya no existe en el árbol actual — se eliminó en el commit `2a67a0f` ("fix: seguridad de
+/api/chat y /api/emergency-chat, rate-limit del PIN en Postgres, y limpieza integral de UI").
+Confirmado sin referencias colgantes.
 
 ---
 
-## 3. `app/api/plan-premium/pago/page.tsx` — página de UI mal ubicada en el árbol de rutas de API
+## 3. ~~`app/api/plan-premium/pago/page.tsx` — página de UI mal ubicada~~ (resuelto)
 
-**Qué hay:** un `page.tsx` de 305 líneas viviendo dentro de `app/api/plan-premium/pago/` —
-mezclando la convención de rutas de API con la de páginas. Es una versión más vieja de
-`app/plan-premium/pago/page.tsx` (319 líneas, la que sí está enlazada desde
-`PremiumPlanSection`), a la que le falta i18n y el ícono `ShieldCheck`.
-
-**Por qué importa:** bajo riesgo funcional (la página real está en la ruta correcta y es la que
-se usa), pero es el mismo tipo de duplicado confuso que el punto 2 — vale la pena limpiarlo en
-el mismo barrido.
-
-**Nota relacionada:** esta página (y su gemela en `lib/app/plan-familiar/pago/page.tsx`)
-también tienen campos de tarjeta (`4242 4242 4242 4242`, `MM/AA`, `CVC`) que ya no están
-conectados a ningún submit handler real — son restos visuales de antes de adoptar el checkout
-por redirect a Mercado Pago/PayPal. No amerita línea aparte si de todos modos se borran estos
-archivos.
+También eliminada en el mismo commit `2a67a0f`. La versión real (`app/plan-premium/pago/page.tsx`)
+sigue siendo la única y está correctamente enlazada desde `PremiumPlanSection`.
 
 ---
 
@@ -87,21 +66,25 @@ verdad correcta, sobre todo antes de usarlo para decisiones de producto o market
 
 ---
 
-## 6. Confirmación de correo de registro debería volver a la app Flutter, no al navegador
+## 6. ~~Confirmación de correo de registro debería volver a la app Flutter~~ (implementado, falta 1 paso manual)
 
-**Qué hay:** al registrarse desde la app Flutter, Supabase manda el correo de confirmación con
-un link que hoy abre `${NEXT_PUBLIC_APP_URL}/auth/callback` en el navegador (mismo
-`emailRedirectTo` que usa la web, documentado en CLAUDE.md). Para un usuario que se registró
-desde el APK, lo esperable es que ese link regrese a la propia app, no a la página web, como
-primera opción.
+**Qué se hizo (repo `SOSecure_Flutter`):**
+- `android/app/src/main/AndroidManifest.xml`: se agregó un segundo `<intent-filter>` en
+  `MainActivity` para el esquema custom `sosecure://login-callback` (`action.VIEW` +
+  categorías `DEFAULT`/`BROWSABLE`). No requiere verificación de dominio como los App Links
+  `https` — es un esquema propio, `autoVerify="false"`.
+- `lib/features/onboarding/sign_up_screen.dart`: el `signUp()` ahora manda
+  `emailRedirectTo: 'sosecure://login-callback'` en vez de dejar que Supabase use el
+  `emailRedirectTo` por defecto (la web).
+- No hizo falta código de manejo del deep link — `supabase_flutter` ya escucha deep links
+  automáticamente (flujo PKCE) y completa la sesión al recibir esa URI; `core/router.dart` ya
+  reacciona a cambios de sesión vía `GoRouterRefreshStream(supabase.auth.onAuthStateChange)`
+  y redirige fuera de `/login` en cuanto la sesión queda activa.
 
-**Por qué importa:** confirmar la cuenta y terminar en el navegador (con la sesión que arrancó
-en la app) es una fricción de UX evidente para el flujo mobile-first que se está construyendo en
-`SOSecure_Flutter`.
+**Falta (paso manual, no versionado):** agregar `sosecure://login-callback` a
+**Authentication → URL Configuration → Redirect URLs** en el dashboard de Supabase. Sin esto,
+Supabase ignora el `emailRedirectTo` pedido y cae de vuelta a la Site URL (la web) — mismo
+mecanismo de allowlist que ya aplica al flujo de "olvidé mi PIN" documentado en `CLAUDE.md`.
 
-**Qué falta investigar/decidir:** requiere configurar Android App Links (o un esquema custom
-`sosecure://`) en el proyecto Flutter para capturar ese link de confirmación, y decidir si se
-sigue usando el mismo `emailRedirectTo` para ambos clientes (web y Flutter) con lógica de
-fallback, o si Flutter necesita su propio flujo de confirmación (ej. detectar `app_links` en
-`main.dart`, ya que el paquete `app_links` aparece en las dependencias generadas del proyecto
-Flutter). No implementado todavía — pendiente de una sesión dedicada a esto.
+**Pendiente de probar:** flujo end-to-end en dispositivo físico (registrarse desde el APK,
+confirmar que el correo abre la app y no el navegador, y que aterriza logueado en el shell).
