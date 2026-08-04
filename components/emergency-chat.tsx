@@ -236,6 +236,7 @@ function LiveStreamViewer({ alertId }: { alertId: string }) {
     // reproducen en secuencia con <video src=...> normal, sin MediaSource.
     const segmentQueueRef: { current: string[] } = { current: [] }
     let segmentAdvanceTimer: ReturnType<typeof setTimeout> | null = null
+    let segmentStarted = false
     const playNextSegment = () => {
       const video = videoRef.current
       if (!video || video.dataset.playingSegment === '1') return
@@ -310,7 +311,11 @@ function LiveStreamViewer({ alertId }: { alertId: string }) {
         setMode('segment')
         segmentQueueRef.current.push(p.url)
         if (segmentQueueRef.current.length > 3) segmentQueueRef.current.shift()
-        playNextSegment()
+        // Jitter buffer mínimo — ver la misma nota en app/emergency/[alertId]/page.tsx.
+        if (segmentStarted || segmentQueueRef.current.length >= 2) {
+          segmentStarted = true
+          playNextSegment()
+        }
       })
       .on('broadcast', { event: 'frame' }, ({ payload }) => {
         const p = payload as LiveFramePayload
