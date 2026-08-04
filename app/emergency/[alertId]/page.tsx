@@ -193,6 +193,7 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
     // Clips segmentados (emisor Flutter) — ver la misma nota en emergency-chat.tsx.
     const liveSegmentQueueRef: { current: string[] } = { current: [] }
     let liveSegmentAdvanceTimer: ReturnType<typeof setTimeout> | null = null
+    let liveSegmentStarted = false
     const playNextLiveSegment = () => {
       const video = liveVideoRef.current
       if (!video || video.dataset.playingSegment === '1') return
@@ -257,7 +258,15 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
         setLiveMode('video')
         liveSegmentQueueRef.current.push(p.url)
         if (liveSegmentQueueRef.current.length > 3) liveSegmentQueueRef.current.shift()
-        playNextLiveSegment()
+        // Jitter buffer mínimo: si la conexión del emisor es inestable (WiFi
+        // con cortes intermitentes), esperar a tener 2 clips en cola antes
+        // de arrancar suaviza los baches iniciales — cuesta ~2s más de
+        // latencia al empezar, a cambio de menos pausas visibles después.
+        // Una vez arrancada la reproducción, ya no se vuelve a esperar.
+        if (liveSegmentStarted || liveSegmentQueueRef.current.length >= 2) {
+          liveSegmentStarted = true
+          playNextLiveSegment()
+        }
       })
       .on('broadcast', { event: 'frame' }, ({ payload }) => {
         const p = payload as LiveFramePayload
