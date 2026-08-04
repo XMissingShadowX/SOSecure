@@ -192,6 +192,7 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
 
     // Clips segmentados (emisor Flutter) — ver la misma nota en emergency-chat.tsx.
     const liveSegmentQueueRef: { current: string[] } = { current: [] }
+    let liveSegmentAdvanceTimer: ReturnType<typeof setTimeout> | null = null
     const playNextLiveSegment = () => {
       const video = liveVideoRef.current
       if (!video || video.dataset.playingSegment === '1') return
@@ -199,10 +200,22 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
       if (!url) return
       video.dataset.playingSegment = '1'
       video.src = url
+      // Respaldo: los clips que manda Flutter (cortados vía
+      // stopVideoRecording()/startVideoRecording() de CameraX) a veces traen
+      // metadata de duración que el navegador no interpreta como "fin de
+      // reproducción" — el evento `ended` nunca dispara y el visor se queda
+      // congelado en el primer frame para siempre. Este timer fuerza avanzar
+      // a la cola aunque `ended` no llegue.
+      if (liveSegmentAdvanceTimer) clearTimeout(liveSegmentAdvanceTimer)
+      liveSegmentAdvanceTimer = setTimeout(() => {
+        video.dataset.playingSegment = '0'
+        playNextLiveSegment()
+      }, 2500)
       video.play().catch(() => { video.dataset.playingSegment = '0' })
     }
     const onLiveSegmentEnded = () => {
       const video = liveVideoRef.current
+      if (liveSegmentAdvanceTimer) { clearTimeout(liveSegmentAdvanceTimer); liveSegmentAdvanceTimer = null }
       if (video) video.dataset.playingSegment = '0'
       playNextLiveSegment()
     }
@@ -261,6 +274,7 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
     return () => {
       destroyed = true
       clearInterval(freshness)
+      if (liveSegmentAdvanceTimer) clearTimeout(liveSegmentAdvanceTimer)
       try { supabase.removeChannel(channel) } catch { /* noop */ }
       const ms = liveMsRef.current
       if (ms && ms.readyState === 'open') { try { ms.endOfStream() } catch { /* noop */ } }

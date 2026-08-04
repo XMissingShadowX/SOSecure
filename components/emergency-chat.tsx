@@ -235,6 +235,7 @@ function LiveStreamViewer({ alertId }: { alertId: string }) {
     // mismo canal. Cada uno es reproducible por sí solo: se encolan y se
     // reproducen en secuencia con <video src=...> normal, sin MediaSource.
     const segmentQueueRef: { current: string[] } = { current: [] }
+    let segmentAdvanceTimer: ReturnType<typeof setTimeout> | null = null
     const playNextSegment = () => {
       const video = videoRef.current
       if (!video || video.dataset.playingSegment === '1') return
@@ -242,10 +243,20 @@ function LiveStreamViewer({ alertId }: { alertId: string }) {
       if (!url) return
       video.dataset.playingSegment = '1'
       video.src = url
+      // Respaldo: los clips de Flutter a veces traen metadata de duración que
+      // el navegador no interpreta como "fin" — `ended` nunca dispara y el
+      // visor se queda congelado en el primer frame. Ver la misma nota en
+      // app/emergency/[alertId]/page.tsx.
+      if (segmentAdvanceTimer) clearTimeout(segmentAdvanceTimer)
+      segmentAdvanceTimer = setTimeout(() => {
+        video.dataset.playingSegment = '0'
+        playNextSegment()
+      }, 2500)
       video.play().catch(() => { video.dataset.playingSegment = '0' })
     }
     const onSegmentEnded = () => {
       const video = videoRef.current
+      if (segmentAdvanceTimer) { clearTimeout(segmentAdvanceTimer); segmentAdvanceTimer = null }
       if (video) video.dataset.playingSegment = '0'
       playNextSegment()
     }
@@ -312,6 +323,7 @@ function LiveStreamViewer({ alertId }: { alertId: string }) {
 
     return () => {
       destroyed = true
+      if (segmentAdvanceTimer) clearTimeout(segmentAdvanceTimer)
       supabase.removeChannel(channel)
       const ms = msRef.current
       if (ms && ms.readyState === 'open') { try { ms.endOfStream() } catch { /* noop */ } }
