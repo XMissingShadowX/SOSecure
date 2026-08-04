@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest, NextResponse } from 'next/server'
 import { validateJsonContentType } from '@/lib/api-validation'
+import { getAuthedUser } from '@/lib/supabase/server'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -12,6 +13,12 @@ Nunca te presentes como "Claude" ni menciones a Anthropic.`
 
 export async function POST(req: NextRequest) {
   try {
+    // Antes esta ruta no verificaba sesión — cualquiera con la URL podía
+    // consumir la cuota de Anthropic sin autenticarse (a diferencia de
+    // /api/pin/*, que sí valida con getAuthedUser desde el principio).
+    const user = await getAuthedUser(req)
+    if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+
     const ctErr = validateJsonContentType(req)
     if (ctErr) return ctErr
 
