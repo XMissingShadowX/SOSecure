@@ -254,8 +254,11 @@ function LiveStreamViewer({ alertId }: { alertId: string }) {
     // ── suscripción al canal ─────────────────────────────────────────────────
     const channel = supabase
       .channel(liveChannelName(alertId), { config: { broadcast: { ack: false } } })
-      .on('broadcast', { event: 'status' }, ({ payload }) => {
-        const p = payload as LiveStatusPayload
+      .on('broadcast', { event: 'status' }, (msg: any) => {
+        // El cliente Dart de supabase_flutter manda los campos del payload
+        // aplanados en el mensaje (sin envolver en `payload`), a diferencia
+        // del cliente JS — ver la misma nota en app/emergency/[alertId]/page.tsx.
+        const p = (msg?.payload?.live !== undefined ? msg.payload : msg) as LiveStatusPayload
         setIsLive(p.live)
         if (!p.live) return
         setWaiting(false)
@@ -288,8 +291,9 @@ function LiveStreamViewer({ alertId }: { alertId: string }) {
           appendChunk(p.chunk)
         }
       })
-      .on('broadcast', { event: 'video_segment' }, ({ payload }) => {
-        const p = payload as { url: string; seq: number; ts: number }
+      .on('broadcast', { event: 'video_segment' }, (msg: any) => {
+        const p = (msg?.payload?.url !== undefined ? msg.payload : msg) as { url: string; seq: number; ts: number }
+        if (!p?.url) return
         setIsLive(true)
         setWaiting(false)
         setMode('segment')

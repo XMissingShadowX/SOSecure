@@ -210,8 +210,12 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
 
     const channel = supabase
       .channel(liveChannelName(alertId), { config: { broadcast: { self: false } } })
-      .on('broadcast', { event: 'status' }, ({ payload }) => {
-        const p = payload as LiveStatusPayload
+      .on('broadcast', { event: 'status' }, (msg: any) => {
+        // El cliente Dart de supabase_flutter manda los campos del payload
+        // aplanados en el mensaje (sin envolver en `payload`), a diferencia
+        // del cliente JS. Se cae a `msg` completo si `msg.payload` no trae
+        // los campos esperados.
+        const p = (msg?.payload?.live !== undefined ? msg.payload : msg) as LiveStatusPayload
         if (!p) return
         if (p.live === false) { setLiveLastTs(0); return }
         setLiveLastTs(Date.now())
@@ -233,8 +237,8 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
           appendChunk(p.chunk)
         }
       })
-      .on('broadcast', { event: 'video_segment' }, ({ payload }) => {
-        const p = payload as { url: string; seq: number; ts: number }
+      .on('broadcast', { event: 'video_segment' }, (msg: any) => {
+        const p = (msg?.payload?.url !== undefined ? msg.payload : msg) as { url: string; seq: number; ts: number }
         if (!p?.url) return
         setLiveLastTs(Date.now())
         setLiveMode('video')
