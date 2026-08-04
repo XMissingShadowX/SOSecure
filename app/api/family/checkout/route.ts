@@ -148,8 +148,13 @@ export async function POST(req: NextRequest) {
         headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` },
       })
       const data = await res.json()
-      const url = data.init_point
-      if (!url) return NextResponse.json({ error: 'No se pudo crear la suscripción de Mercado Pago', detail: data }, { status: 502 })
+      const initPoint = data.init_point
+      if (!initPoint) return NextResponse.json({ error: 'No se pudo crear la suscripción de Mercado Pago', detail: data }, { status: 502 })
+
+      // external_reference vincula la preapproval (y sus pagos de renovación)
+      // con este grupo — sin esto, el webhook de renovación ('payment') no
+      // puede saber a qué grupo activar.
+      const url = `${initPoint}${initPoint.includes('?') ? '&' : '?'}external_reference=${encodeURIComponent(group.id)}`
 
       await admin.from('family_groups')
         .update({ provider: 'mercadopago', provider_ref: data.id })

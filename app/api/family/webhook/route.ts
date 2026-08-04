@@ -207,13 +207,19 @@ export async function POST(req: NextRequest) {
       })
       const payment = await res.json()
       if (payment?.status === 'approved') {
-        const isPremium = payment.metadata?.kind === 'premium'
-        if (isPremium) {
-          const subId = payment.external_reference || payment.metadata?.subscription_id
-          if (subId) await activateSub(subId, 'mercadopago', String(paymentId))
-        } else {
-          const groupId = payment.external_reference
-          if (groupId) await activateGroup('id', groupId, 'mercadopago', String(paymentId))
+        // El external_reference apunta al id de premium_subscriptions o de
+        // family_groups (seteado al crear la preapproval) — no confiar en
+        // metadata.kind, que MP no propaga en pagos de suscripción.
+        const extRef = payment.external_reference
+        if (extRef) {
+          const db = admin()
+          const { data: subRow } = await db.from('premium_subscriptions').select('id').eq('id', extRef).maybeSingle()
+          if (subRow) {
+            await activateSub(extRef, 'mercadopago', String(paymentId))
+          } else {
+            const { data: groupRow } = await db.from('family_groups').select('id').eq('id', extRef).maybeSingle()
+            if (groupRow) await activateGroup('id', extRef, 'mercadopago', String(paymentId))
+          }
         }
       }
       return NextResponse.json({ received: true })
