@@ -4,7 +4,7 @@
 */
 
 import { NextResponse } from 'next/server'
-import { createClient as createServerClient } from '@/lib/supabase/server'
+import { getAuthedUser } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 
 function admin() {
@@ -35,10 +35,9 @@ async function getPayPalToken(): Promise<string> {
   return data.access_token
 }
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
-    const supabase = await createServerClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getAuthedUser(req)
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     const db = admin()

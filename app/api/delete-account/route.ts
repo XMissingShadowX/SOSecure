@@ -1,9 +1,8 @@
-import { createClient as createServerClient } from '@/lib/supabase/server'
+import { getAuthedUser } from '@/lib/supabase/server'
 import { createClient } from '@supabase/supabase-js'
 
-export async function POST() {
-  const supabase = await createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
+export async function POST(req: Request) {
+  const user = await getAuthedUser(req)
 
   if (!user) {
     return Response.json({ error: 'No autenticado' }, { status: 401 })
