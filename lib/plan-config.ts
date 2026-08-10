@@ -6,19 +6,19 @@
 */
 
 // ───────────────────────────────────────────────────────────────
-// PLAN FAMILIAR (suscripción anual, hasta 5 usuarios)
+// PLAN FAMILIAR (suscripción mensual, hasta 5 usuarios)
 // ───────────────────────────────────────────────────────────────
 export const FAMILY_PLAN = {
-  id: 'family_annual',
-  name: 'Plan Familiar Anual',
+  id: 'family_monthly',
+  name: 'Plan Familiar',
   // Hasta 5 usuarios EN TOTAL (incluye al titular)
   maxMembers: 5,
-  // Precio anual. Cambia ambos valores juntos: el de centavos es el que
+  // Precio mensual. Cambia ambos valores juntos: el de centavos es el que
   // se cobra/registra, el formateado es solo para mostrar.
   currency: 'MXN',
-  amountCents: 49900, // $499.00 MXN / año
-  priceLabel: '$499 MXN',
-  period: 'año',
+  amountCents: 29500, // $295.00 MXN / mes
+  priceLabel: '$295 MXN',
+  period: 'mes',
   // Slogan de marca
   tagline: 'La tecnología que te cuida desde tu bolsillo',
   // Lista de beneficios mostrada en la página de pago
@@ -26,7 +26,7 @@ export const FAMILY_PLAN = {
     'Protege hasta 5 personas con una sola suscripción',
     'Botón SOS, video en vivo y ubicación en tiempo real para todos',
     'Contactos de emergencia y asistente médico para cada miembro',
-    'Un solo pago al año, sin renovaciones sorpresa',
+    'Un solo pago al mes, sin renovaciones sorpresa',
   ],
 } as const
 

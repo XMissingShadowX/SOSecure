@@ -1,6 +1,6 @@
 # Plan Familiar — SOSecure
 
-Función para vender una **suscripción anual** que protege a **5 usuarios** (titular + 4 invitados). Incluye la gestión de miembros, un apartado en **Ajustes**, y una **página web de pago** a la que se redirige al usuario.
+Función para vender una **suscripción mensual** que protege a **5 usuarios** (titular + 4 invitados). Incluye la gestión de miembros, un apartado en **Ajustes**, y una **página web de pago** a la que se redirige al usuario.
 
 ---
 
@@ -8,10 +8,10 @@ Función para vender una **suscripción anual** que protege a **5 usuarios** (ti
 
 | Concepto | Valor |
 |---|---|
-| Plan | Anual |
+| Plan | Mensual |
 | Usuarios | 5 en total (incluye al titular) |
-| Precio sugerido | $499 MXN / año *(configurable)* |
-| Cobro | 1 pago al año |
+| Precio sugerido | $295 MXN / mes *(configurable)* |
+| Cobro | 1 pago al mes |
 
 El precio, el número de cupos y los textos se cambian en **un solo lugar**: `lib/plan-config.ts`.
 
