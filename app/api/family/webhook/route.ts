@@ -97,7 +97,7 @@ async function verifyPayPalSignature(req: NextRequest, rawBody: string): Promise
 async function activateGroup(matchColumn: 'id' | 'provider_ref', matchValue: string, provider: string, ref: string) {
   const now = new Date()
   const end = new Date(now)
-  end.setFullYear(end.getFullYear() + 1)
+  end.setMonth(end.getMonth() + 1)
   await admin().from('family_groups').update({
     status: 'active', provider, provider_ref: ref,
     amount_cents: FAMILY_PLAN.amountCents, currency: FAMILY_PLAN.currency,
@@ -258,7 +258,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true })
     }
 
-    // ── PayPal — pago de renovación (suscripción anual) ────────────────
+    // ── PayPal — pago de renovación (suscripción mensual) ──────────────
     // billing_agreement_id es el ID de suscripción de PayPal (I-XXXXXXXX),
     // no nuestro UUID — hay que buscarlo por provider_ref, no por id.
     if (body?.event_type === 'PAYMENT.SALE.COMPLETED') {

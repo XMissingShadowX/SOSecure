@@ -3,7 +3,7 @@
   Maneja la suscripción recurrente del Plan Familiar.
 
   Proveedores:
-   - Mercado Pago: usa preapproval (suscripción anual automática)
+   - Mercado Pago: usa preapproval (suscripción mensual automática)
    - PayPal: usa Subscriptions API (requiere PAYPAL_FAMILY_PLAN_ID en env)
 
   Acciones:
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
       if (preapproval.status === 'authorized') {
         const now = new Date()
         const end = new Date(now)
-        end.setFullYear(end.getFullYear() + 1)
+        end.setMonth(end.getMonth() + 1)
         await admin.from('family_groups')
           .update({
             status: 'active',
@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
       if (subscription.status === 'ACTIVE' || subscription.status === 'APPROVED') {
         const now = new Date()
         const end = new Date(now)
-        end.setFullYear(end.getFullYear() + 1)
+        end.setMonth(end.getMonth() + 1)
         await admin.from('family_groups')
           .update({
             status: 'active',
