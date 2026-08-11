@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import { getAuthedUser } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { validateJsonContentType } from '@/lib/api-validation'
+import { APP_URL } from '@/lib/app-url'
 
 const OLD_SHA256_HASH = /^[0-9a-f]{64}$/i
 
@@ -99,7 +100,7 @@ export async function DELETE(req: Request) {
     email: user.email!,
     options: {
       shouldCreateUser: false,
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+      emailRedirectTo: `${APP_URL}/auth/callback`,
     },
   })
 

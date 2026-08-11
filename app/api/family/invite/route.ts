@@ -23,7 +23,7 @@ function adminClient() {
 }
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://sosecure.site'
+import { APP_URL as BASE_URL } from '@/lib/app-url'
 
 interface InviteInput {
   name?: string

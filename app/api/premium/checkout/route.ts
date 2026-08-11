@@ -18,7 +18,7 @@ import { PREMIUM_PLAN } from '@/lib/plan-config'
 import { validateJsonContentType } from '@/lib/api-validation'
 import { adminClient, getPayPalToken, PAYPAL_BASE } from '@/lib/checkout-provider'
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://sosecure.site'
+import { APP_URL as BASE_URL } from '@/lib/app-url'
 const MP_ACCESS_TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN
 const MP_PREMIUM_PLAN_ID = process.env.MERCADOPAGO_PREMIUM_PLAN_ID
 const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID
