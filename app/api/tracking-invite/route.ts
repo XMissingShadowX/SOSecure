@@ -4,7 +4,7 @@ import { validateJsonContentType, validateArrayLimit } from '@/lib/api-validatio
 
 const MAX_INVITES = 10
 const RESEND_API_KEY = process.env.RESEND_API_KEY!
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://sosecure-ten.vercel.app'
+import { APP_URL as BASE_URL } from '@/lib/app-url'
 
 interface Invite {
   name: string

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ShieldCheck, Mail, Lock, Eye, EyeOff, User, Phone, AlertCircle, Languages } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { clientAppUrl } from '@/lib/app-url'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { FieldGroup, Field, FieldLabel } from '@/components/ui/field'
@@ -58,7 +59,7 @@ export default function SignUpPage() {
         // Supabase es frágil (si el dashboard queda mal configurado, ej. apuntando
         // a localhost, el correo de confirmación redirige ahí sin importar el
         // dominio real). Mismo patrón que el flujo de "olvidé mi PIN".
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+        emailRedirectTo: `${clientAppUrl()}/auth/callback`,
         data: { full_name: fullName, phone },
       },
     })

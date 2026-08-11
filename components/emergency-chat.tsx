@@ -22,6 +22,7 @@ import { UpgradeBanner } from '@/components/upgrade-banner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/lib/supabase/client'
+import { clientAppUrl } from '@/lib/app-url'
 import { liveChannelName } from '@/lib/live-stream'
 import type { LiveFramePayload, LiveStatusPayload, VideoChunkPayload } from '@/lib/live-stream'
 import { useTranslation } from '@/lib/i18n'
@@ -609,7 +610,10 @@ export function EmergencyChat() {
     // ver la transmisión en vivo — antes solo se mandaba el link de Google
     // Maps, así que no había forma de llegar a la página de emergencia desde
     // el chat (el correo de notify-contacts sí la incluye, pero el chat no).
-    const emergencyUrl = `${process.env.NEXT_PUBLIC_APP_URL}/emergency/${sosAlert.id}`
+    // clientAppUrl() y no process.env directo: si NEXT_PUBLIC_APP_URL falta en
+    // el build, la interpolación producía "undefined/emergency/<id>" y el
+    // contacto recibía un link inservible en plena alerta SOS.
+    const emergencyUrl = `${clientAppUrl()}/emergency/${sosAlert.id}`
     const sosText = currentLocation
       ? `🚨 ALERTA SOS — Estoy en peligro.\n📍 https://maps.google.com/?q=${currentLocation.latitude},${currentLocation.longitude}\n🎥 Ver en vivo: ${emergencyUrl}`
       : `🚨 ALERTA SOS — Estoy en peligro. No tengo ubicación disponible.\n🎥 Ver en vivo: ${emergencyUrl}`
