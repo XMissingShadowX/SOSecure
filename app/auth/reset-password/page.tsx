@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, useEffect, useRef, Suspense } from 'react'
+import { useRouter } from 'next/navigation'
 import { ShieldCheck, Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -14,7 +14,6 @@ function ResetPasswordContent() {
   const { t } = useTranslation()
   const [mounted, setMounted] = useState(false)
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -22,16 +21,31 @@ function ResetPasswordContent() {
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
   const [sessionReady, setSessionReady] = useState(false)
+  // El código del correo es de UN SOLO USO. Sin este guard el efecto se
+  // reejecutaba —`t` de useTranslation es una función nueva en cada render, y
+  // estaba en las dependencias—, así que el primer canje consumía el código y
+  // el segundo fallaba: el usuario veía "el enlace ha expirado o ya fue usado"
+  // aunque la sesión sí se hubiera establecido.
+  const exchangeStarted = useRef(false)
 
   useEffect(() => { setMounted(true) }, [])
 
   useEffect(() => {
-    if (!mounted) return
-    const code = searchParams.get('code')
+    if (!mounted || exchangeStarted.current) return
+    exchangeStarted.current = true
+
+    // Leer de window.location y no de useSearchParams: así no depende de la
+    // identidad del objeto de searchParams entre renders.
+    const code = new URLSearchParams(window.location.search).get('code')
     if (!code) {
       setError(t('auth_resetInvalidLink'))
       return
     }
+
+    // Quitar el código de la URL en cuanto se lee, igual que app/page.tsx —
+    // de un solo uso, no debe quedar reutilizable vía historial o recarga.
+    window.history.replaceState({}, '', window.location.pathname)
+
     const supabase = createClient()
     supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
       if (error) {
@@ -40,7 +54,9 @@ function ResetPasswordContent() {
         setSessionReady(true)
       }
     })
-  }, [mounted, searchParams, t])
+    // `t` se omite a propósito: incluirlo reejecuta el efecto en cada render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted])
 
   if (!mounted) return null
 
