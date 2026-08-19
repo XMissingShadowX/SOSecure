@@ -2708,6 +2708,32 @@ const tze: typeof es = {
 // ─── Mapa de idiomas ───────────────────────────────────────────────────────────
 export const translations: Record<Lang, typeof es> = { es, en, nah, myn, tze }
 
+// ─── Reconocimiento de voz (SOS por palabra) ──────────────────────────────────
+// El navegador (Web Speech API) no tiene modelo para náhuatl, maya ni tseltal,
+// así que esos tres caen a español — mismo criterio que la app Flutter.
+export const SPEECH_RECOGNITION_LANG: Record<Lang, string> = {
+  es: 'es-MX',
+  en: 'en-US',
+  nah: 'es-MX',
+  myn: 'es-MX',
+  tze: 'es-MX',
+}
+
+// Palabra que se ofrece a quien nunca configuró una propia, según el idioma
+// elegido en la app. Antes 'socorro' era el único valor posible en el store:
+// con la app en inglés, la persona veía "socorro" como su palabra, decía
+// "help" en voz alta, y nunca coincidía con nada. Esto NO debe usarse para
+// sobrescribir lo que alguien ya guardó a propósito — solo para decidir qué
+// mostrar/escuchar cuando el valor guardado sigue siendo el default de
+// fábrica sin que la persona lo haya tocado.
+const DEFAULT_VOICE_KEYWORD = 'socorro'
+const VOICE_KEYWORD_BY_LANG: Partial<Record<Lang, string>> = { en: 'help' }
+
+export function effectiveVoiceKeyword(voiceKeyword: string, language: Lang): string {
+  if (voiceKeyword !== DEFAULT_VOICE_KEYWORD) return voiceKeyword
+  return VOICE_KEYWORD_BY_LANG[language] ?? voiceKeyword
+}
+
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 export function useTranslation() {
   const language = useAppStore(s => s.language)

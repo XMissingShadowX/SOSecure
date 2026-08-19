@@ -39,7 +39,7 @@ import {
   validateRecordingBlob,
   type RecordingMeta,
 } from '@/lib/recordings'
-import { useTranslation } from '@/lib/i18n'
+import { useTranslation, effectiveVoiceKeyword } from '@/lib/i18n'
 
 // Array construido dentro del componente para acceder a t() — ver DuringTab
 
@@ -176,7 +176,7 @@ export function DuringTab() {
   }
 
   const { isPremium } = usePremium()
-  const { sosActive, setSosActive, contacts, locationHistory, voiceKeyword, currentLocation: coordinates, sosStream, simpleMode } = useAppStore()
+  const { sosActive, setSosActive, contacts, locationHistory, voiceKeyword, language, currentLocation: coordinates, sosStream, simpleMode } = useAppStore()
   const [isOnline, setIsOnline] = useState(true)
   const [isRecordingAudio, setIsRecordingAudio] = useState(false)
   const [isRecordingVideo, setIsRecordingVideo] = useState(false)
@@ -713,7 +713,7 @@ export function DuringTab() {
                 <p className="text-sm font-medium">{t('during_voiceActivation')}</p>
                 {voiceKeyword ? (
                   <p className="text-xs text-muted-foreground">
-                    {t('during_voiceSayKeyword').replace('{kw}', voiceKeyword)}
+                    {t('during_voiceSayKeyword').replace('{kw}', effectiveVoiceKeyword(voiceKeyword, language))}
                   </p>
                 ) : (
                   <p className="text-xs text-muted-foreground">

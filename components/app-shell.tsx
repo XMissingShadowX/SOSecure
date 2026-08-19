@@ -26,7 +26,8 @@ import { BeforeTab } from './tabs/before-tab'
 import { DuringTab } from './tabs/during-tab'
 import { AfterTab } from './tabs/after-tab'
 import { Shield, Settings, LogOut, BellRing, WifiOff, Sun, Moon, UserCircle, Trash2, Lock, LockOpen, KeyRound, CheckCircle2, Delete, ShieldCheck, Volume2, Puzzle, Languages } from 'lucide-react'
-import { useTranslation, LANG_LABELS, type Lang } from '@/lib/i18n'
+import { useTranslation, LANG_LABELS, type Lang, SPEECH_RECOGNITION_LANG, effectiveVoiceKeyword } from '@/lib/i18n'
+import { matchesVoiceKeyword } from '@/lib/voice-match'
 import { PinLock } from './pin-lock'
 import { Button } from '@/components/ui/button'
 import { FamilyPlanSection } from './family-plan-section'
@@ -279,7 +280,16 @@ export function AppShell() {
   }, [sosActive])
 
   // Reconocimiento de voz global — activo en todas las pestañas mientras haya palabra clave configurada.
-  // Solo se recrea cuando cambia la palabra clave; sosActive se lee desde la ref para evitar closures stale.
+  // Se recrea cuando cambia la palabra clave O el idioma elegido en la app; sosActive se lee desde la ref
+  // para evitar closures stale.
+  //
+  // Antes `recognition.lang` se armaba como
+  // `navigator.language.startsWith('es') ? navigator.language : 'es'` — es decir, SIEMPRE terminaba en
+  // español (el idioma del navegador si empezaba con "es", si no "es" a secas). No existía ninguna rama
+  // que terminara en inglés, sin importar qué idioma tuviera el navegador NI qué idioma hubiera elegido
+  // la persona dentro de la app. Con la app en inglés, el motor de reconocimiento seguía escuchando en
+  // español, así que ninguna palabra en inglés coincidía jamás. Ahora usa el idioma que la persona eligió
+  // en SOSecure (`language`, no `navigator.language`), vía SPEECH_RECOGNITION_LANG.
   useEffect(() => {
     if (typeof window === 'undefined') return
     if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) return
@@ -291,16 +301,27 @@ export function AppShell() {
 
     if (!voiceKeyword) return
 
+    // Si voiceKeyword sigue en el default de fábrica ("socorro") y la app está
+    // en un idioma que tiene su propia palabra por defecto, se escucha esa en
+    // vez de forzar a la persona a decir una palabra en español que nunca
+    // configuró a propósito. No toca lo que alguien sí haya guardado a mano.
+    const keyword = effectiveVoiceKeyword(voiceKeyword, language)
+
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     const recognition = new SR()
     recognition.continuous = true
-    recognition.lang = navigator.language.startsWith('es') ? navigator.language : 'es'
+    recognition.lang = SPEECH_RECOGNITION_LANG[language] ?? 'es-MX'
     recognition.interimResults = false
 
     recognition.onresult = (event: any) => {
       if (sosActiveRef.current) return
-      const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase()
-      if (transcript.includes(voiceKeyword)) {
+      const transcript = event.results[event.results.length - 1][0].transcript
+      // Antes era `transcript.includes(voiceKeyword)`: una palabra clave corta
+      // ("ya") disparaba un SOS real con solo decir "playa", y un acento en la
+      // transcripción ("ayúdame") nunca coincidía con la palabra guardada sin
+      // tilde ("ayudame"). matchesVoiceKeyword exige palabra completa y
+      // normaliza acentos en los dos lados antes de comparar.
+      if (matchesVoiceKeyword(transcript, keyword)) {
         window.dispatchEvent(new Event('sosecure:activate'))
       }
     }
@@ -329,7 +350,7 @@ export function AppShell() {
       voiceRecognitionRef.current = null
       try { recognition.stop() } catch { /* ignore */ }
     }
-  }, [voiceKeyword])
+  }, [voiceKeyword, language])
 
   // Auto-aceptar invitación de plan familiar pendiente tras iniciar sesión
   useEffect(() => {
