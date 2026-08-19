@@ -64,7 +64,7 @@
 |---|---|
 | 🆓 Plan Free | SOS ilimitado, audio ilimitado, 2 contactos, 1 ruta/día, mapa comunitario |
 | ⭐ Plan Premium ($59/mes) | Todo Free + chat IA, video ilimitado, 10 contactos, rutas ilimitadas, tracking compartido, historial SOS |
-| 👨‍👩‍👧 Plan Familiar ($295/mes) | Hasta 5 miembros con acceso Premium completo |
+| 👨‍👩‍👧 Plan Familiar ($229/mes) | Hasta 5 miembros con acceso Premium completo |
 | 📜 Historial de Alertas SOS (Premium) | Revisa alertas pasadas con filtros de 1 semana / 1 / 3 / 6 meses |
 
 ### General

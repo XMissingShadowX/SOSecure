@@ -10,7 +10,7 @@ Función para vender una **suscripción mensual** que protege a **5 usuarios** (
 |---|---|
 | Plan | Mensual |
 | Usuarios | 5 en total (incluye al titular) |
-| Precio sugerido | $295 MXN / mes *(configurable)* |
+| Precio sugerido | $229 MXN / mes *(configurable)* |
 | Cobro | 1 pago al mes |
 
 El precio, el número de cupos y los textos se cambian en **un solo lugar**: `lib/plan-config.ts`.

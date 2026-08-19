@@ -16,8 +16,8 @@ export const FAMILY_PLAN = {
   // Precio mensual. Cambia ambos valores juntos: el de centavos es el que
   // se cobra/registra, el formateado es solo para mostrar.
   currency: 'MXN',
-  amountCents: 29500, // $295.00 MXN / mes
-  priceLabel: '$295 MXN',
+  amountCents: 22900, // $229.00 MXN / mes
+  priceLabel: '$229 MXN',
   period: 'mes',
   // Slogan de marca
   tagline: 'La tecnología que te cuida desde tu bolsillo',
