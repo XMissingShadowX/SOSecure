@@ -47,9 +47,9 @@ const es = {
   free_plan: 'Plan gratuito',
   update_plan: 'Actualizar plan',
   plan_premiumBtn: 'Plan Premium — $59/mes',
-  plan_familiarBtn: 'Plan Familiar — $295/mes',
+  plan_familiarBtn: 'Plan Familiar — $229/mes',
   plan_premiumBtnShort: 'Premium — $59/mes',
-  plan_familiarBtnShort: 'Familiar — $295/mes',
+  plan_familiarBtnShort: 'Familiar — $229/mes',
 
   // Navegación inferior
   nav_home: 'Inicio',
@@ -692,9 +692,9 @@ const en: typeof es = {
   free_plan: 'Free plan',
   update_plan: 'Upgrade plan',
   plan_premiumBtn: 'Premium Plan — $59/mo',
-  plan_familiarBtn: 'Family Plan — $295/mo',
+  plan_familiarBtn: 'Family Plan — $229/mo',
   plan_premiumBtnShort: 'Premium — $59/mo',
-  plan_familiarBtnShort: 'Family — $295/mo',
+  plan_familiarBtnShort: 'Family — $229/mo',
 
   nav_home: 'Home',
   nav_before: 'Before',
