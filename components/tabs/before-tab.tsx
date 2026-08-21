@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/dialog'
 import type { RouteInfo } from '@/components/route-map'
 import type { TrackingMember } from '@/lib/types'
-import { useTranslation } from '@/lib/i18n'
+import { useTranslation, effectiveVoiceKeyword } from '@/lib/i18n'
 
 const RouteMap = dynamic(
   () => import('@/components/route-map').then(mod => mod.RouteMap),
@@ -197,7 +197,7 @@ export function BeforeTab() {
     contacts, securityTimerActive, securityTimerEnd, setSecurityTimer, setSosActive,
     showRoutes, selectedRoute, routeOrigin, routeDestination, nearbyIncidents,
     setRouteOptions, setRouteInfo,
-    sosActive, voiceKeyword, setVoiceKeyword,
+    sosActive, voiceKeyword, setVoiceKeyword, language,
     currentLocation: coordinates,
     simpleMode,
   } = useAppStore()
@@ -758,7 +758,7 @@ export function BeforeTab() {
           <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
             <div>
               <p className="text-xs text-muted-foreground mb-0.5">{t('before_voiceKeywordCurrent')}</p>
-              <p className="font-semibold text-sm">{voiceKeyword || t('before_voiceKeywordNotSet')}</p>
+              <p className="font-semibold text-sm">{voiceKeyword ? effectiveVoiceKeyword(voiceKeyword, language) : t('before_voiceKeywordNotSet')}</p>
             </div>
             {sosActive ? (
               <span className="text-xs text-muted-foreground">{t('before_voiceKeywordSosActive')}</span>
@@ -771,10 +771,13 @@ export function BeforeTab() {
           </div>
           <Dialog open={showKeywordDialog} onOpenChange={(open) => {
             setShowKeywordDialog(open)
-            if (open) setKeywordDraft(voiceKeyword)
+            // effectiveVoiceKeyword, no voiceKeyword crudo: si la persona nunca
+            // configuró nada, que vea (y pueda guardar tal cual) la palabra que
+            // de verdad se está escuchando en su idioma, no "socorro" a ciegas.
+            if (open) setKeywordDraft(effectiveVoiceKeyword(voiceKeyword, language))
           }}>
             <Button className="w-full" variant="outline" onClick={() => {
-              setKeywordDraft(voiceKeyword)
+              setKeywordDraft(effectiveVoiceKeyword(voiceKeyword, language))
               setShowKeywordDialog(true)
             }}>
               {t('before_voiceKeywordChange')}
