@@ -51,17 +51,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
 import type { User } from '@supabase/supabase-js'
 
 export function AppShell() {
@@ -76,8 +65,6 @@ export function AppShell() {
   const [isOnline, setIsOnline] = useState(true)
   const [isDark, setIsDark] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [deletingAccount, setDeletingAccount] = useState(false)
-  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   // PIN state
   // pinCheckLoading arranca en true (fail-closed): no se muestra ni el contenido
@@ -519,17 +506,13 @@ export function AppShell() {
     window.location.href = '/auth/login'
   }
 
-  const handleDeleteAccount = async () => {
-    setDeletingAccount(true)
-    setDeleteError(null)
-    const res = await fetch('/api/delete-account', { method: 'POST' })
-    if (res.ok) {
-      window.location.href = '/auth/login'
-    } else {
-      const body = await res.json().catch(() => ({}))
-      setDeleteError(body.error ?? 'Error al eliminar la cuenta')
-      setDeletingAccount(false)
-    }
+  // El botón de Ajustes → Cuenta → Eliminar cuenta redirige a
+  // /solicitar-eliminacion (misma página pública que exige el aviso de
+  // privacidad para usuarios sin sesión) en vez de agendar el borrado
+  // directo con la sesión actual — un solo flujo de confirmación por
+  // correo para ambos casos, con o sin sesión iniciada.
+  const handleGoToDeleteAccount = () => {
+    window.location.href = `/solicitar-eliminacion?email=${encodeURIComponent(user?.email ?? '')}`
   }
 
   // Fail-closed: mientras no sabemos con certeza quién es el usuario ni si
@@ -962,34 +945,15 @@ export function AppShell() {
                   <div>
                     <p className="text-sm font-medium mb-3">{t('settings_account')}</p>
                     <div className="p-3 rounded-lg border border-destructive/40 space-y-2">
-                      {deleteError && (
-                        <p className="text-xs text-destructive">{deleteError}</p>
-                      )}
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="destructive" size="sm" className="w-full" disabled={deletingAccount}>
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            {deletingAccount ? t('settings_deleteAccountDeleting') : t('settings_deleteAccount')}
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>{t('settings_deleteAccountTitle')}</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              {t('settings_deleteAccountDesc')}
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
-                            <AlertDialogAction
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              onClick={handleDeleteAccount}
-                            >
-                              {t('settings_deleteAccountConfirm')}
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="w-full"
+                        onClick={handleGoToDeleteAccount}
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        {t('settings_deleteAccount')}
+                      </Button>
                       <p className="text-xs text-muted-foreground">
                         {t('settings_deleteAccountNote')}
                       </p>
