@@ -25,6 +25,7 @@ function LoginContent() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [deletionCancelled, setDeletionCancelled] = useState(false)
   const justRegistered = searchParams.get('registered') === '1'
 
   useEffect(() => {
@@ -45,14 +46,48 @@ function LoginContent() {
     setLoading(true)
 
     const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
       setError(error.message)
       setLoading(false)
-    } else {
-      router.push('/')
+      return
     }
+
+    // Punto de integración elegido para cancelar un borrado de cuenta
+    // agendado: justo después de signInWithPassword, no en middleware.ts.
+    // middleware.ts corre en Edge sobre /api/:path* sin sesión de Supabase
+    // resuelta (solo hace rate limiting por IP) — cablear ahí una consulta a
+    // `profiles` en cada request de la app sería un costo constante para
+    // todos los usuarios, la mayoría de las veces para nada. La cancelación
+    // solo tiene sentido en el instante puntual de un login explícito con
+    // password (que es la señal real de "quiero seguir usando mi cuenta"),
+    // no en cada restauración silenciosa de sesión (refresh de token,
+    // navegación con cookie ya válida) — alguien con sesión ya abierta
+    // cuando pidió el borrado no debería revivirlo solo por seguir navegando.
+    const token = data.session?.access_token
+    if (token) {
+      try {
+        const res = await fetch('/api/delete-account/cancel', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (res.ok) {
+          const body = await res.json().catch(() => ({}))
+          if (body.cancelled) {
+            setDeletionCancelled(true)
+            setLoading(false)
+            return
+          }
+        }
+      } catch {
+        // Si esta llamada falla no bloqueamos el login — a lo sumo el
+        // usuario no ve el aviso de cancelación, pero la próxima vez que
+        // inicie sesión se vuelve a intentar.
+      }
+    }
+
+    router.push('/')
   }
 
   return (
@@ -94,6 +129,18 @@ function LoginContent() {
             <CardDescription>{t('auth_loginDesc')}</CardDescription>
           </CardHeader>
           <CardContent>
+            {deletionCancelled ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 p-3 bg-safe/10 text-safe rounded-lg text-sm">
+                  <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{t('settings_deleteAccountCancelled')}</span>
+                </div>
+                <Button className="w-full" onClick={() => router.push('/')}>
+                  {t('settings_deleteAccountCancelledContinue')}
+                </Button>
+              </div>
+            ) : (
+            <>
             {justRegistered && (
               <div className="flex items-center gap-2 p-3 bg-safe/10 text-safe rounded-lg text-sm mb-4">
                 <CheckCircle className="w-4 h-4 flex-shrink-0" />
@@ -147,6 +194,8 @@ function LoginContent() {
                 </Button>
               </FieldGroup>
             </form>
+            </>
+            )}
           </CardContent>
         </Card>
 

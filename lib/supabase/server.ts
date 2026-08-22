@@ -65,6 +65,29 @@ export async function getAuthedUser(req: Request): Promise<User | null> {
   return user
 }
 
+// Igual que getAuthedUser pero además devuelve el access token (JWT) crudo de
+// la sesión actual — lo necesitan las rutas que llaman
+// admin.auth.admin.signOut(jwt, scope), que revoca por token de sesión, no
+// por user id. Mismo soporte dual web (cookies) / Flutter (Bearer) que
+// getAuthedUser.
+export async function getAuthedUserWithToken(
+  req: Request
+): Promise<{ user: User; token: string } | null> {
+  const authHeader = req.headers.get('authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice('Bearer '.length)
+    const anon = createAnonClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+    const { data: { user } } = await anon.auth.getUser(token)
+    return user ? { user, token } : null
+  }
+  const supabase = await createClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  return session ? { user: session.user, token: session.access_token } : null
+}
+
 // Igual que getAuthedUser pero devuelve el cliente en vez del user — para rutas
 // que necesitan hacer un .rpc()/.from() que dependa de auth.uid() (RLS, RPCs
 // security definer como has_premium_access) en nombre de quien llama, sea web

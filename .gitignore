@@ -5,7 +5,20 @@ __v0_jsx-dev-runtime.ts
 
 # Dependencias
 node_modules/
-supabase/
+supabase/*
+# Excepción: borrado de cuenta con periodo de gracia (ver CLAUDE.md sección
+# "Borrado de cuenta"). Estos dos archivos sí viajan con git — el resto de
+# supabase/ (schema.sql, otras migraciones, otras Edge Functions) sigue sin
+# versionarse a propósito, aplicar manualmente en Supabase > SQL Editor.
+!supabase/migrations
+supabase/migrations/*
+!supabase/migrations/20240015_scheduled_account_deletion.sql
+!supabase/migrations/20240016_cron_process_scheduled_deletions.sql
+!supabase/functions
+supabase/functions/*
+!supabase/functions/process-scheduled-deletions
+supabase/functions/process-scheduled-deletions/*
+!supabase/functions/process-scheduled-deletions/index.ts
 
 # Next.js
 .next/
