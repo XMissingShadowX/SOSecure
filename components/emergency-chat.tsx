@@ -128,6 +128,10 @@ const BUFFER_KEEP_S     = 3     // segundos de buffer a conservar
 function LiveStreamViewer({ alertId }: { alertId: string }) {
   const { t } = useTranslation()
   const videoRef     = useRef<HTMLVideoElement>(null)
+  // Segundo <video> oculto para precargar el siguiente clip segmentado
+  // mientras el visible sigue reproduciendo — ver la misma nota en
+  // app/emergency/[alertId]/page.tsx.
+  const videoRefB    = useRef<HTMLVideoElement>(null)
   const msRef        = useRef<MediaSource | null>(null)
   const sbRef        = useRef<SourceBuffer | null>(null)
   const queueRef     = useRef<ArrayBuffer[]>([])
@@ -238,31 +242,61 @@ function LiveStreamViewer({ alertId }: { alertId: string }) {
     const segmentQueueRef: { current: string[] } = { current: [] }
     let segmentAdvanceTimer: ReturnType<typeof setTimeout> | null = null
     let segmentStarted = false
+    let activeIsA = true
+    const activeVideo = () => (activeIsA ? videoRef.current : videoRefB.current)
+    const standbyVideo = () => (activeIsA ? videoRefB.current : videoRef.current)
+    const showActive = () => {
+      if (videoRef.current) videoRef.current.style.display = activeIsA ? '' : 'none'
+      if (videoRefB.current) videoRefB.current.style.display = activeIsA ? 'none' : ''
+    }
+    const preloadNext = () => {
+      const standby = standbyVideo()
+      const nextUrl = segmentQueueRef.current[0]
+      if (!standby || !nextUrl || standby.dataset.preloadedUrl === nextUrl) return
+      standby.src = nextUrl
+      standby.dataset.preloadedUrl = nextUrl
+      standby.load()
+    }
     const playNextSegment = () => {
-      const video = videoRef.current
-      if (!video || video.dataset.playingSegment === '1') return
+      const active = activeVideo()
+      if (!active || active.dataset.playingSegment === '1') return
       const url = segmentQueueRef.current.shift()
       if (!url) return
-      video.dataset.playingSegment = '1'
-      video.src = url
+      const standby = standbyVideo()
+      const standbyReady =
+        standby && standby.dataset.preloadedUrl === url && standby.readyState >= 2
+      const next = standbyReady ? standby! : active
+      if (standbyReady) {
+        active.dataset.playingSegment = '0'
+        activeIsA = !activeIsA
+        showActive()
+      } else {
+        next.src = url
+        next.dataset.preloadedUrl = url
+      }
+      next.dataset.playingSegment = '1'
       // Respaldo: los clips de Flutter a veces traen metadata de duración que
       // el navegador no interpreta como "fin" — `ended` nunca dispara y el
       // visor se queda congelado en el primer frame. Ver la misma nota en
       // app/emergency/[alertId]/page.tsx.
       if (segmentAdvanceTimer) clearTimeout(segmentAdvanceTimer)
       segmentAdvanceTimer = setTimeout(() => {
-        video.dataset.playingSegment = '0'
+        next.dataset.playingSegment = '0'
         playNextSegment()
-      }, 2500)
-      video.play().catch(() => { video.dataset.playingSegment = '0' })
+      }, 6500) // margen sobre los 5000ms reales del segmento — ver la misma nota en app/emergency/[alertId]/page.tsx
+      next.play().catch(() => { next.dataset.playingSegment = '0' })
+      preloadNext()
     }
-    const onSegmentEnded = () => {
-      const video = videoRef.current
+    const onSegmentEnded = (e: Event) => {
+      const video = e.currentTarget as HTMLVideoElement
+      if (video.dataset.playingSegment !== '1') return
       if (segmentAdvanceTimer) { clearTimeout(segmentAdvanceTimer); segmentAdvanceTimer = null }
-      if (video) video.dataset.playingSegment = '0'
+      video.dataset.playingSegment = '0'
       playNextSegment()
     }
     videoRef.current?.addEventListener('ended', onSegmentEnded)
+    videoRefB.current?.addEventListener('ended', onSegmentEnded)
+    showActive()
 
     // ── suscripción al canal ─────────────────────────────────────────────────
     const channel = supabase
@@ -317,6 +351,10 @@ function LiveStreamViewer({ alertId }: { alertId: string }) {
           segmentStarted = true
           playNextSegment()
         }
+        // Ver la misma nota en app/emergency/[alertId]/page.tsx: con la
+        // reproducción ya en curso, playNextSegment() no hace nada, así que
+        // preloadNext() hay que llamarlo siempre, no solo antes de arrancar.
+        preloadNext()
       })
       .on('broadcast', { event: 'frame' }, ({ payload }) => {
         const p = payload as LiveFramePayload
@@ -338,6 +376,11 @@ function LiveStreamViewer({ alertId }: { alertId: string }) {
       if (video) {
         video.pause(); video.playbackRate = 1; video.src = ''
         video.removeEventListener('ended', onSegmentEnded)
+      }
+      const videoB = videoRefB.current
+      if (videoB) {
+        videoB.pause(); videoB.src = ''
+        videoB.removeEventListener('ended', onSegmentEnded)
       }
       msRef.current = null; sbRef.current = null; queueRef.current = []; mimeRef.current = null
       segmentQueueRef.current = []
@@ -368,15 +411,26 @@ function LiveStreamViewer({ alertId }: { alertId: string }) {
           {isLive ? t('chat_live') : t('chat_ended')}
         </div>
 
-        {/* Video real (MediaSource) */}
-        <video
-          ref={videoRef}
-          autoPlay
-          muted
-          playsInline
-          className={`w-full rounded-xl object-cover max-h-72 ${mode === 'video' || mode === 'segment' ? 'block' : 'hidden'}`}
-          style={{ background: '#000' }}
-        />
+        {/* Video real (MediaSource) / clips segmentados. El display de cada
+            <video> lo controla showActive() imperativamente — por eso no
+            llevan una clase reactiva propia, solo el contenedor. */}
+        <div className={mode === 'video' || mode === 'segment' ? 'block' : 'hidden'}>
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline
+            className="w-full rounded-xl object-cover max-h-72"
+            style={{ background: '#000' }}
+          />
+          <video
+            ref={videoRefB}
+            muted
+            playsInline
+            className="w-full rounded-xl object-cover max-h-72"
+            style={{ background: '#000' }}
+          />
+        </div>
 
         {/* Fallback JPEG */}
         {mode === 'jpeg' && jpgFrame && (
