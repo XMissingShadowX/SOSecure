@@ -33,6 +33,12 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
   const [liveMode, setLiveMode] = useState<'video' | 'jpeg' | null>(null)
   const [tick, setTick] = useState(0)
   const liveVideoRef  = useRef<HTMLVideoElement>(null)
+  // Segundo <video> oculto para precargar el siguiente segmento mientras el
+  // primero sigue reproduciéndose — sin esto, cada clip se pedía a la red
+  // recién cuando el anterior terminaba (video.src = url), y esa espera de
+  // red+decode era la pausa visible entre clips. Ver la nota gemela en
+  // live_stream_viewer.dart (lado Flutter) sobre el mismo problema.
+  const liveVideoRefB = useRef<HTMLVideoElement>(null)
   const liveMsRef     = useRef<MediaSource | null>(null)
   const liveSbRef     = useRef<SourceBuffer | null>(null)
   const liveQueueRef  = useRef<ArrayBuffer[]>([])
@@ -194,33 +200,75 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
     const liveSegmentQueueRef: { current: string[] } = { current: [] }
     let liveSegmentAdvanceTimer: ReturnType<typeof setTimeout> | null = null
     let liveSegmentStarted = false
+    // activeIsA decide cuál de los dos <video> está visible/reproduciendo en
+    // cada momento — los roles se intercambian en cada segmento, nunca se
+    // reasignan por identidad de elemento.
+    let activeIsA = true
+    const activeVideo = () => (activeIsA ? liveVideoRef.current : liveVideoRefB.current)
+    const standbyVideo = () => (activeIsA ? liveVideoRefB.current : liveVideoRef.current)
+    const showActive = () => {
+      if (liveVideoRef.current) liveVideoRef.current.style.display = activeIsA ? '' : 'none'
+      if (liveVideoRefB.current) liveVideoRefB.current.style.display = activeIsA ? 'none' : ''
+    }
+    // Descarga/decodifica por adelantado el siguiente segmento en el <video>
+    // oculto, sin tocar el que está en pantalla.
+    const preloadNext = () => {
+      const standby = standbyVideo()
+      const nextUrl = liveSegmentQueueRef.current[0]
+      if (!standby || !nextUrl || standby.dataset.preloadedUrl === nextUrl) return
+      standby.src = nextUrl
+      standby.dataset.preloadedUrl = nextUrl
+      standby.load()
+    }
     const playNextLiveSegment = () => {
-      const video = liveVideoRef.current
-      if (!video || video.dataset.playingSegment === '1') return
+      const active = activeVideo()
+      if (!active || active.dataset.playingSegment === '1') return
       const url = liveSegmentQueueRef.current.shift()
       if (!url) return
-      video.dataset.playingSegment = '1'
-      video.src = url
+      const standby = standbyVideo()
+      // Si el oculto ya trae este segmento precargado y con datos
+      // reproducibles, solo se intercambian roles (instantáneo) — si no,
+      // se cae al camino directo de siempre (carga en el activo).
+      const standbyReady =
+        standby && standby.dataset.preloadedUrl === url && standby.readyState >= 2
+      const next = standbyReady ? standby! : active
+      if (standbyReady) {
+        active.dataset.playingSegment = '0'
+        activeIsA = !activeIsA
+        showActive()
+      } else {
+        next.src = url
+        next.dataset.preloadedUrl = url
+      }
+      next.dataset.playingSegment = '1'
       // Respaldo: los clips que manda Flutter (cortados vía
       // stopVideoRecording()/startVideoRecording() de CameraX) a veces traen
       // metadata de duración que el navegador no interpreta como "fin de
       // reproducción" — el evento `ended` nunca dispara y el visor se queda
       // congelado en el primer frame para siempre. Este timer fuerza avanzar
-      // a la cola aunque `ended` no llegue.
+      // a la cola aunque `ended` no llegue. 6500ms da margen sobre los 5000ms
+      // reales del segmento (segmentDuration en live_broadcast_provider.dart)
+      // sin cortarlo a la mitad si sí está reproduciendo con normalidad.
       if (liveSegmentAdvanceTimer) clearTimeout(liveSegmentAdvanceTimer)
       liveSegmentAdvanceTimer = setTimeout(() => {
-        video.dataset.playingSegment = '0'
+        next.dataset.playingSegment = '0'
         playNextLiveSegment()
-      }, 2500)
-      video.play().catch(() => { video.dataset.playingSegment = '0' })
+      }, 6500)
+      next.play().catch(() => { next.dataset.playingSegment = '0' })
+      preloadNext()
     }
-    const onLiveSegmentEnded = () => {
-      const video = liveVideoRef.current
+    const onLiveSegmentEnded = (e: Event) => {
+      const video = e.currentTarget as HTMLVideoElement
+      if (video.dataset.playingSegment !== '1') return
       if (liveSegmentAdvanceTimer) { clearTimeout(liveSegmentAdvanceTimer); liveSegmentAdvanceTimer = null }
-      if (video) video.dataset.playingSegment = '0'
+      video.dataset.playingSegment = '0'
       playNextLiveSegment()
     }
     liveVideoRef.current?.addEventListener('ended', onLiveSegmentEnded)
+    liveVideoRefB.current?.addEventListener('ended', onLiveSegmentEnded)
+    // Estado inicial: A visible, B oculto (precargando) — antes de que
+    // showActive() se vuelva a llamar en el primer swap de segmentos.
+    showActive()
 
     const channel = supabase
       .channel(liveChannelName(alertId), { config: { broadcast: { self: false } } })
@@ -267,6 +315,14 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
           liveSegmentStarted = true
           playNextLiveSegment()
         }
+        // Bug real: con la reproducción ya en curso, playNextLiveSegment()
+        // no hace nada (active.dataset.playingSegment sigue en '1') y este
+        // era el ÚNICO otro lugar donde se llamaba a preloadNext() — así que
+        // el segmento que acaba de llegar nunca se precargaba, y el handoff
+        // volvía a esperar la red+decode al terminar el clip actual (la
+        // pausa seguía apareciendo). Se llama siempre, sin importar si ya
+        // se venía reproduciendo.
+        preloadNext()
       })
       .on('broadcast', { event: 'frame' }, ({ payload }) => {
         const p = payload as LiveFramePayload
@@ -292,6 +348,11 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
       if (video) {
         video.pause(); video.src = ''
         video.removeEventListener('ended', onLiveSegmentEnded)
+      }
+      const videoB = liveVideoRefB.current
+      if (videoB) {
+        videoB.pause(); videoB.src = ''
+        videoB.removeEventListener('ended', onLiveSegmentEnded)
       }
       liveMsRef.current = null; liveSbRef.current = null; liveQueueRef.current = []; liveMimeRef.current = null
       liveSegmentQueueRef.current = []
@@ -397,7 +458,8 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
             </h1>
           </div>
           <p className="text-destructive-foreground/80 text-sm">
-            Activada el {new Date(alert.created_at).toLocaleString('es-MX')}
+            Activada el{' '}
+            {new Date(alert.created_at).toLocaleString('es-MX', { timeZone: 'America/Mexico_City' })}
           </p>
         </div>
       </div>
@@ -429,7 +491,9 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
             <Clock className="w-5 h-5 text-muted-foreground flex-shrink-0" />
             <div>
               <p className="text-sm text-muted-foreground">Última ubicación recibida</p>
-              <p className="font-medium text-foreground">{lastUpdate.toLocaleTimeString('es-MX')}</p>
+              <p className="font-medium text-foreground">
+                {lastUpdate.toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City' })}
+              </p>
             </div>
           </div>
         )}
@@ -477,15 +541,31 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
               )}
             </div>
             <div className="bg-black">
-              {/* Video real via MediaSource */}
-              <video
-                ref={liveVideoRef}
-                autoPlay
-                muted
-                playsInline
-                className={`w-full object-contain ${liveMode === 'video' && liveIsFresh ? 'block' : 'hidden'}`}
-                style={{ maxHeight: '360px' }}
-              />
+              {/* Video real via MediaSource / clips segmentados. Cuál de los
+                  dos <video> se ve la controla showActive() imperativamente
+                  (ref.style.display) — por eso ninguno de los dos declara
+                  `display` en su propio style/className reactivo: si React lo
+                  reconciliara en cada render (p.ej. el tick de "hace Ns" cada
+                  2s), pisaría el swap justo después de hacerlo. Este div
+                  contenedor sí es reactivo para el show/hide global. */}
+              <div className={liveMode === 'video' && liveIsFresh ? 'block' : 'hidden'}>
+                <video
+                  ref={liveVideoRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  className="w-full object-contain"
+                  style={{ maxHeight: '360px' }}
+                />
+                {/* Precarga el siguiente segmento en silencio. */}
+                <video
+                  ref={liveVideoRefB}
+                  muted
+                  playsInline
+                  className="w-full object-contain"
+                  style={{ maxHeight: '360px' }}
+                />
+              </div>
               {/* Fallback JPEG */}
               {liveMode === 'jpeg' && liveIsFresh && liveFrame ? (
                 // eslint-disable-next-line @next/next/no-img-element
