@@ -60,15 +60,20 @@ export async function POST(req: NextRequest) {
   let event: ResendInboundEvent
   try {
     const wh = new Webhook(RESEND_WEBHOOK_SECRET)
-    event = wh.verify(payload, {
+    // wh.verify() está tipado (y se comporta) como `void` en esta versión de
+    // svix — solo lanza si la firma es inválida, nunca devuelve el payload
+    // parseado. Hay que parsear `payload` (el string crudo) por separado
+    // después de que verify() no haya lanzado.
+    wh.verify(payload, {
       'svix-id': svixId,
       'svix-timestamp': svixTimestamp,
       'svix-signature': svixSignature,
-    }) as unknown as ResendInboundEvent
+    })
+    event = JSON.parse(payload) as ResendInboundEvent
   } catch {
-    // Firma inválida: no confiar en el payload. Igual que con los endpoints sin
-    // autenticar señalados en la auditoría, un webhook público es superficie de
-    // ataque si no se verifica.
+    // Firma inválida (o payload no parseable): no confiar en el payload.
+    // Igual que con los endpoints sin autenticar señalados en la auditoría,
+    // un webhook público es superficie de ataque si no se verifica.
     return NextResponse.json({ error: 'invalid signature' }, { status: 401 })
   }
 
