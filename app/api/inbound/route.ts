@@ -21,7 +21,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Webhook } from 'svix'
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY
+// Key separada de RESEND_API_KEY (la que usan las rutas de envío, ej.
+// /api/family/invite) a propósito: esa key está restringida a "solo enviar"
+// en el dashboard de Resend (permiso mínimo necesario), y leer correos
+// recibidos requiere una key con más permisos (Full Access). Mejor una key
+// nueva dedicada a esto que subirle permisos a la de envío.
+const RESEND_RECEIVING_API_KEY = process.env.RESEND_RECEIVING_API_KEY
 const RESEND_WEBHOOK_SECRET = process.env.RESEND_WEBHOOK_SECRET
 
 function admin() {
@@ -96,10 +101,10 @@ export async function POST(req: NextRequest) {
   // aparte a la API REST de Resend.
   let textBody: string | null = null
   let htmlBody: string | null = null
-  if (RESEND_API_KEY) {
+  if (RESEND_RECEIVING_API_KEY) {
     try {
       const res = await fetch(`https://api.resend.com/emails/receiving/${email_id}`, {
-        headers: { Authorization: `Bearer ${RESEND_API_KEY}` },
+        headers: { Authorization: `Bearer ${RESEND_RECEIVING_API_KEY}` },
       })
       if (res.ok) {
         const full = await res.json()
@@ -111,6 +116,8 @@ export async function POST(req: NextRequest) {
     } catch (err) {
       console.error('Error llamando a la API de received emails:', err)
     }
+  } else {
+    console.error('RESEND_RECEIVING_API_KEY no configurado — se guarda el ticket sin cuerpo')
   }
 
   const supabase = admin()
