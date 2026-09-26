@@ -386,9 +386,13 @@ export default function EmergencyPage({ params }: { params: Promise<{ alertId: s
         mapInstanceRef.current = L.map(mapRef.current!).setView(
           [location.latitude, location.longitude], 16
         )
-        // Agregar una capa de mapa base utilizando los mapas de CartoDB para mostrar la ubicación de la alerta 
-        // con un estilo claro y legible
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(mapInstanceRef.current)
+        // Agregar una capa de mapa base para mostrar la ubicación de la alerta con un
+        // estilo claro y legible. CARTO (basemaps.cartocdn.com) empezó a exigir API
+        // key en su tier gratuito y dejaba el watermark "API KEY REQUIRED" en vez del
+        // mapa — OSM estándar no requiere key.
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap contributors',
+        }).addTo(mapInstanceRef.current)
 
         // Crear un marcador personalizado utilizando un div con estilos para mostrar un punto rojo pulsante que 
         // indique la ubicación de la alerta de emergencia, y agregarlo al mapa

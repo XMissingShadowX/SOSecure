@@ -115,7 +115,12 @@ function TrackingMap({ members, focusUserId }: { members: TrackingMember[], focu
 
       if (!mapInstanceRef.current) {
         mapInstanceRef.current = L.map(mapRef.current!)
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(mapInstanceRef.current)
+        // CARTO (basemaps.cartocdn.com) empezó a exigir API key en su tier gratuito
+        // y dejaba el watermark "API KEY REQUIRED" en vez del mapa — OSM estándar
+        // no requiere key.
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap contributors',
+        }).addTo(mapInstanceRef.current)
       }
 
       withLocation.forEach(m => {

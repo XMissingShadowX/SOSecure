@@ -20,6 +20,11 @@ supabase/functions/*
 supabase/functions/process-scheduled-deletions/*
 !supabase/functions/process-scheduled-deletions/index.ts
 
+# Copias sueltas fuera de supabase/ (no deberían existir ahí, pero por si
+# vuelven a aparecer no se versionan)
+components/supabase/
+public/supabase/
+
 # Next.js
 .next/
 out/

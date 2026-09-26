@@ -187,7 +187,12 @@ export default function TrackingPage({ params }: { params: Promise<{ sessionId: 
         mapInstanceRef.current = L.map(mapRef.current!).setView(
           [first.latitude!, first.longitude!], 15
         )
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(mapInstanceRef.current)
+        // CARTO (basemaps.cartocdn.com) empezó a exigir API key en su tier gratuito
+        // y dejaba el watermark "API KEY REQUIRED" en vez del mapa — OSM estándar
+        // no requiere key.
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap contributors',
+        }).addTo(mapInstanceRef.current)
       }
 
       membersWithLocation.forEach(m => {
