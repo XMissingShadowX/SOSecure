@@ -144,9 +144,9 @@ export function RouteMap({ origin, destination, selectedRoute, incidents, onRout
     setRoutes(prev => prev.map(r => ({ ...r, selected: r.id === selectedRoute })))
   }, [selectedRoute])
 
-  const tileUrl = isDark
-    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-    : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+  // Tiles de CARTO empezaron a exigir API key en su tier gratuito (ver
+  // components/incident-map.tsx para el mismo fix) — se usa OSM estándar y un
+  // filtro CSS para el modo oscuro en vez de un segundo proveedor con key.
 
   return (
     <MapContainer
@@ -156,7 +156,12 @@ export function RouteMap({ origin, destination, selectedRoute, incidents, onRout
       zoomControl={false}
       attributionControl={false}
     >
-      <TileLayer key={isDark ? 'dark' : 'light'} url={tileUrl} attribution='&copy; OpenStreetMap' />
+      <TileLayer
+        key={isDark ? 'dark' : 'light'}
+        className={isDark ? 'map-tiles-dark' : undefined}
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='&copy; OpenStreetMap contributors'
+      />
       <MapFitter origin={origin} destination={destination} />
 
       {routes.map(route => (

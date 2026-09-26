@@ -369,6 +369,13 @@ html.light .leaflet-tile {
   filter: none !important;
 }
 
+/* Tiles de OSM (siempre estilo claro) invertidos para modo oscuro — reemplaza a los
+   tiles dark_all de CARTO, que empezaron a exigir API key en su tier gratuito.
+   Ver components/incident-map.tsx y components/route-map.tsx. */
+.map-tiles-dark {
+  filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9);
+}
+
 /* Canvas del heatmap siempre transparente (fondo negro en modo claro) */
 .leaflet-heatmap-layer {
   background: transparent !important;

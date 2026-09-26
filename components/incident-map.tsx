@@ -202,19 +202,17 @@ export function IncidentMap({ incidents, userLocation, onMapClick, showHeatZones
         zoomControl={false}
         attributionControl={false}
       >
-        {isDark ? (
-          <TileLayer
-            key="dark-tiles"
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            attribution='&copy; OpenStreetMap'
-          />
-        ) : (
-          <TileLayer
-            key="light-tiles"
-            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-            attribution='&copy; OpenStreetMap'
-          />
-        )}
+        {/* Tiles de CARTO (basemaps.cartocdn.com) empezaron a exigir API key en su
+            tier gratuito y quedaban mostrando el watermark "API KEY REQUIRED" en vez
+            del mapa. OSM estándar no requiere key; para el modo oscuro se aplica un
+            filtro CSS (.map-tiles-dark en globals.css) en vez de depender de otro
+            proveedor con key. */}
+        <TileLayer
+          key={isDark ? 'dark-tiles' : 'light-tiles'}
+          className={isDark ? 'map-tiles-dark' : undefined}
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; OpenStreetMap contributors'
+        />
 
         <MapUpdater center={initialCenter} zoom={mapZoom} />
         <FlyToController trigger={flyToUserTrigger} userLocation={userLocation} />
